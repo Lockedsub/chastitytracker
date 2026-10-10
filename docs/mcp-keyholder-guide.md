@@ -66,7 +66,7 @@ direkt aus, ohne Rückfrage oder Bestätigung.
   oder er unterlässt ihn. Beide menschlichen Sichten warnen darauf; du siehst dasselbe Feld. Nicht
   zu verwechseln mit `hardwareEnforcedReason: "reported-open"`, das bei JEDEM offenen Riegel steht,
   auch bei einem völlig legitimen. Der Reisefall (Schlüssel beim Sub) ist ausgenommen.
-- **Der Riegel entscheidet** (nur wenn `get_context.box.requireBolt` an ist — bei einer LockMeBox (`get_context.box.boltAlways`) gilt er IMMER, der Wert ändert dort nichts; umlegbar mit
+- **Der Riegel entscheidet** (nur wenn `get_context.box.requireBolt` an ist — bei einer LockMeBox (`get_context.box.boltAlways`) ist es immer an und lässt sich nicht abschalten; umlegbar mit
   `set_box`): sein „Verschlossen" ist dann bloss der AUFRUF an die Box. Verschlossen ist er, wenn
   sie den Riegel meldet — bis dahin läuft NICHTS an: keine Sperrzeit aus einer Anforderung, keine
   erfüllte Anforderung, keine Tragezeit, und die Wiederverschluss-Frist nach einer Reinigungspause

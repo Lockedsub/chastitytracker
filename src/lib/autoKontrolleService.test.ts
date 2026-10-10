@@ -457,6 +457,21 @@ describe("fillFreeGaps — Nachplanen an zugestellten Kontrollen vorbei", () => 
       expect(minuteOf(s.deadline)).toBeLessThanOrEqual(21 * 60 - 1);
     });
 
+    it("zählt für die Tages-Anzahl nur Zeit, in der die Mindest-Frist noch vor den Schlaf passt", () => {
+      // 18:31–18:59 tragen eine Auslösung (29 von 60 Minuten) — nicht die 90 Minuten bis 20:00.
+      const many = { ...tester, perDayMin: 4, perDayMax: 4 };
+      const slots = generateAutoKontrollen(many, at1830, () => 0.5, tz);
+      expect(slots).toHaveLength(1);
+    });
+
+    it("erfindet ohne Ruhezeit (ruheVon == ruheBis) keinen Schlaf-Beginn, der die Frist kappt", () => {
+      const noSleep = { ...tester, ruheVon: "17:00", ruheBis: "17:00", fensterVon: "10:00", fensterBis: "16:00" };
+      const at1530 = dateAtLocalMinutes(now, 15 * 60 + 30, tz);
+      const create = fillFreeGaps(noSleep, [], 1, at1530, () => 0.5, tz);
+      expect(create).toHaveLength(1);
+      expect(minuteOf(create[0].deadline) - minuteOf(create[0].wirksamAb)).toBe(120);
+    });
+
     it("lässt nichts entstehen, wenn die Mindest-Frist vor dem Schlaf nicht mehr passt", () => {
       const at1930 = dateAtLocalMinutes(now, 19 * 60 + 30, tz);
       expect(fillFreeGaps(tester, [], 1, at1930, () => 0.5, tz)).toEqual([]);

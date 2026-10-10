@@ -10,7 +10,8 @@ describe("startIsNow", () => {
     expect(startIsNow({}, "VERSCHLUSS", false)).toBe(false);
     expect(startIsNow({ startIsNow: "true" }, "VERSCHLUSS", false)).toBe(false);
     expect(startIsNow({ startIsNow: true }, "PRUEFUNG", false)).toBe(false);
-    expect(startIsNow({ startIsNow: true }, "WEAR_BEGIN", false)).toBe(false);
+    expect(startIsNow({ startIsNow: true }, "WEAR_BEGIN", false)).toBe(true);
+    expect(startIsNow({ startIsNow: true }, "WEAR_END", false)).toBe(true);
   });
 
   it("ein offline erfasster Eintrag behält die Erfassungszeit des Clients", () => {

@@ -4,7 +4,7 @@ import { useState, type ChangeEvent } from "react";
 import { toDatetimeLocal } from "@/lib/utils";
 
 /**
- * Die Zeit-Eingabe eines Verschluss-/Öffnen-Formulars samt der Frage, ob der Träger sie angefasst hat
+ * Die Zeit-Eingabe eines Verschluss-/Öffnen-/Trage-Formulars samt der Frage, ob der Träger sie angefasst hat
  * (`entryStart.ts`). Unangetastet heisst „jetzt": das Formular schickt dann `startIsNow`, und der Server
  * datiert mit seiner eigenen Uhr, auf die Sekunde. Beim Bearbeiten eines bestehenden Eintrags gibt es
  * kein „jetzt" — dort ist die Zeit der gespeicherte Wert.

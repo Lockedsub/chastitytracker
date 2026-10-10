@@ -148,8 +148,10 @@ export function isInQuietMinutes(vonMin: number, bisMin: number, min: number): b
 }
 
 /** Nächster Schlaf-Beginn ≥ `trig` (+1440, wenn der heutige Schlaf-Beginn schon vor dem Trigger liegt
- *  — dann ist es der von morgen). Trigger sind vor Aufruf bereits als „nicht im Schlaf" gefiltert. */
-function nextSleepStart(quietVon: number, trig: number): number {
+ *  — dann ist es der von morgen). Trigger sind vor Aufruf bereits als „nicht im Schlaf" gefiltert.
+ *  `Infinity`, wenn es gar keinen Schlaf gibt (`ruheVon == ruheBis`, siehe {@link isInQuietMinutes}). */
+function nextSleepStart(quietVon: number, quietBis: number, trig: number): number {
+  if (quietVon === quietBis) return Infinity;
   return quietVon > trig ? quietVon : quietVon + 1440;
 }
 
@@ -159,8 +161,8 @@ function nextSleepStart(quietVon: number, trig: number): number {
  *  Damit hält JEDER erzeugte Fenster-Slot `dur ∈ [fristVon, fristBis]` — eine Kontrolle mit einer auf
  *  Minuten zusammengestauchten Frist wäre für den Sub nicht erfüllbar. Lieber kein Slot als einer,
  *  den er nicht schaffen kann. */
-function windowDeadlineMin(trig: number, dur: number, quietVon: number, fristVon: number): number | null {
-  const deadline = Math.min(trig + dur, nextSleepStart(quietVon, trig) - 1);
+function windowDeadlineMin(trig: number, dur: number, quietVon: number, quietBis: number, fristVon: number): number | null {
+  const deadline = Math.min(trig + dur, nextSleepStart(quietVon, quietBis, trig) - 1);
   return deadline - trig >= fristVon ? deadline : null;
 }
 
@@ -261,9 +263,9 @@ function planAxis(settings: AutoKontrolleSettings, now: Date, tz: string) {
 function remainderOfDay(
   x: number, settings: AutoKontrolleSettings, now: Date, tz: string,
 ): { from: number; count: number } {
-  const { at, minuteOf, lower, upper, occupied } = planAxis(settings, now, tz);
+  const { at, minuteOf, lower, placeableEnd, occupied } = planAxis(settings, now, tz);
   const from = at(lower).getTime() >= now.getTime() ? lower : Math.max(lower, minuteOf(now) + 1);
-  const freeFrom = (m: number) => freeGaps(m, upper, occupied).reduce((sum, g) => sum + gapLen(g), 0);
+  const freeFrom = (m: number) => freeGaps(m, placeableEnd, occupied).reduce((sum, g) => sum + gapLen(g), 0);
   const whole = freeFrom(lower);
   const rest = freeFrom(from);
   // Ein Anteil über 1 ist nicht bloss unerwünscht, er ist unerreichbar: `from` liegt nie unter
@@ -330,13 +332,13 @@ function spreadOverDay(
       const candidates: number[] = [];
       for (let m = triggerMin; m <= triggerMax; m++) {
         if (isInQuietMinutes(quietVon, quietBis, m)) continue; // nie im Schlaf wecken
-        if (windowDeadlineMin(m, fristVon, quietVon, fristVon) === null) continue; // Mindest-Frist passt nicht mehr
+        if (windowDeadlineMin(m, fristVon, quietVon, quietBis, fristVon) === null) continue; // Mindest-Frist passt nicht mehr
         candidates.push(m);
       }
       if (candidates.length === 0) continue;
       const trig = candidates[randomInt(0, candidates.length - 1, rand)];
       // Die Mindest-Frist passt hier nach Auswahl; eine längere gewürfelte wird am Schlaf-Beginn gekappt.
-      const deadlineMin = windowDeadlineMin(trig, randomInt(fristVon, fristBis, rand), quietVon, fristVon);
+      const deadlineMin = windowDeadlineMin(trig, randomInt(fristVon, fristBis, rand), quietVon, quietBis, fristVon);
       if (deadlineMin !== null) pushIfFuture(trig, deadlineMin);
     }
     return out;
@@ -390,27 +392,35 @@ function freeGaps(lower: number, upper: number, occupied: { start: number; end: 
  *  - `deadlineCap`: letzte Minute, in der eine FRIST liegen darf. Ohne Fenster dasselbe wie `upper`;
  *    mit Fenster darf die Frist übers Fensterende hinaus und wird erst vor dem nächsten Schlaf-Beginn
  *    gekappt — dieselbe Kappung wie `windowDeadlineMin` für einen Trigger in der letzten Minute.
+ *  - `placeableEnd`: bis hierhin zählt die Zeit für die Tages-Anzahl (`remainderOfDay`). Bei festem
+ *    Fenster nur, was eine Auslösung samt Mindest-Frist noch trägt; ohne Fenster `upper` wie bisher.
  *  - `occupied`: die von vornherein belegten Intervalle darin (Schlaf innerhalb eines festen
  *    Fensters), ab der Minute VOR dem Schlaf-Beginn: eine Frist genau auf der ersten Schlaf-Minute
  *    läge im Schlaf. */
 function triggerDomain(
   settings: AutoKontrolleSettings, awake: { start: number; end: number },
-): { lower: number; upper: number; lastTrigger: number; deadlineCap: number; occupied: { start: number; end: number }[] } {
+): { lower: number; upper: number; lastTrigger: number; deadlineCap: number; placeableEnd: number; occupied: { start: number; end: number }[] } {
   const fixed = fixedWindowMinutes(settings);
   // Ohne festes Fenster endet der Bereich eine Minute VOR dem Schlaf-Beginn: `awakeEnd` ist bereits
   // die erste Schlaf-Minute, eine Frist genau darauf läge im Schlaf. `spreadOverDay` rechnet mit
   // derselben Grenze (`awakeEnd - 1 - dur`).
   if (!fixed) {
     const upper = awake.end - 1;
-    return { lower: awake.start, upper, lastTrigger: upper, deadlineCap: upper, occupied: [] };
+    return { lower: awake.start, upper, lastTrigger: upper, deadlineCap: upper, placeableEnd: upper, occupied: [] };
   }
   const quietVon = hhmmToMinutes(settings.ruheVon);
+  const quietBis = hhmmToMinutes(settings.ruheBis);
+  const lastTrigger = fixed.end - 1;
+  const { von: fristVon, bis: fristBis } = fristRange(settings);
+  // Auch ohne Schlaf endlich: eine Frist reicht nie über `fristBis` hinter die letzte Auslösung.
+  const deadlineCap = Math.min(nextSleepStart(quietVon, quietBis, lastTrigger) - 1, lastTrigger + fristBis);
   return {
     lower: fixed.start,
     upper: fixed.end,
-    lastTrigger: fixed.end - 1,
-    deadlineCap: nextSleepStart(quietVon, fixed.end - 1) - 1,
-    occupied: sleepBlocksWithin(fixed, quietVon, hhmmToMinutes(settings.ruheBis)).map((o) => ({ start: o.start - 1, end: o.end })),
+    lastTrigger,
+    deadlineCap,
+    placeableEnd: Math.min(lastTrigger, deadlineCap - fristVon) + 1,
+    occupied: sleepBlocksWithin(fixed, quietVon, quietBis).map((o) => ({ start: o.start - 1, end: o.end })),
   };
 }
 

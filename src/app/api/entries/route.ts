@@ -136,8 +136,9 @@ export async function POST(req: NextRequest) {
       // eine gültige Offline-Tragezeit gegen eine andere Uhr geprüft und fälschlich mit 400
       // abgewiesen — und die Warteschlange verwirft ein 400 als „schlechte Daten" (Datenverlust).
       if (type === "WEAR_BEGIN" || type === "WEAR_END") {
-        const wearResult = await prepareWearEntry(tx, session.user.id, type, deviceId, effectiveStart, imageUrl);
+        const wearResult = await prepareWearEntry(tx, session.user.id, type, deviceId, effectiveStart, imageUrl, isNowStart);
         if (!wearResult.ok) throw entryGuardError(wearResult.code);
+        effectiveStart = wearResult.start;
       }
 
       // tx durchreichen: der Read-then-Write-Guard muss in DERSELBEN Transaktion lesen (TOCTOU).

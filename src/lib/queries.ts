@@ -8,6 +8,7 @@ import { CONFIRMED_LOCK_FILTER, PENDING_LOCK_FILTER, PENDING_OPEN_FILTER, effect
 import { hasLockmebox } from "@/lib/boxStatus";
 import { APP_TZ } from "@/lib/utils";
 import { isHealthHoldActive } from "@/lib/healthHold";
+import { startAfter } from "@/lib/entryStart";
 
 /**
  * Where-Fragment: bereits AKTIVE Kontroll-Anforderungen — sofortige (wirksamAb null) und
@@ -409,7 +410,7 @@ export interface ActiveWearSession {
 
 /** Result of `prepareWearEntry` — never thrown, returned for the route to inspect. */
 export type WearPrepareResult =
-  | { ok: true; categoryId: string }
+  | { ok: true; categoryId: string; start: Date }
   | { ok: false; code:
       | "WEAR_DEVICE_REQUIRED"
       | "WEAR_DEVICE_NO_CATEGORY"
@@ -431,6 +432,9 @@ export async function prepareWearEntry(
   deviceId: string | undefined,
   startTime: string | Date,
   imageUrl: string | null | undefined,
+  /** „Jetzt" (`entryStart.ts`): ein Zeitpunkt auf oder vor dem vorherigen Eintrag rückt dahinter,
+   *  statt abgewiesen zu werden. Eine von Hand gewählte Zeit wird nie verschoben. */
+  isNow = false,
 ): Promise<WearPrepareResult> {
   if (!deviceId) return { ok: false, code: "WEAR_DEVICE_REQUIRED" };
   const dev = await tx.device.findUnique({
@@ -458,10 +462,11 @@ export async function prepareWearEntry(
   if (type === "WEAR_END" && (!latestWear || latestWear.type !== "WEAR_BEGIN")) {
     return { ok: false, code: "NOT_WEARING" };
   }
-  if (latestWear && new Date(startTime) <= latestWear.startTime) {
+  const start = latestWear ? startAfter(new Date(startTime), latestWear.startTime, isNow) : new Date(startTime);
+  if (latestWear && start <= latestWear.startTime) {
     return { ok: false, code: "TIME_BEFORE" };
   }
-  return { ok: true, categoryId: dev.categoryId };
+  return { ok: true, categoryId: dev.categoryId, start };
 }
 
 /** Returns all currently active wear sessions across non-KG categories.

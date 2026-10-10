@@ -181,7 +181,8 @@ export interface ContextResult extends Envelope {
   /**
    * Die Schlüsselbox-Einstellungen — `null`, wenn die Instanz gar keine Box führt.
    *
-   * `requireBolt` ist die Regel aus docs/riegel-konzept.md: sein „Verschlossen" ist dann erst der
+   * `requireBolt` ist die WIRKSAME Regel aus docs/riegel-konzept.md (bei LockMeBox immer an,
+   * auch bei ausgeschaltetem Flag der Keyholderin): sein „Verschlossen" ist dann erst der
    * AUFRUF an die Box, und verschlossen ist er, wenn sie den Riegel meldet. Umgelegt wird sie mit
    * `set_box`; den Zustand der Box selbst liefert `get_box_state`.
    *
@@ -192,7 +193,7 @@ export interface ContextResult extends Envelope {
     requireBolt: boolean;
     /** Hat für diesen Träger überhaupt eine Box gemeldet? Ohne sie wartet nichts auf einen Riegel. */
     hasBox: boolean;
-    /** Führt er eine LockMeBox? Dann gilt der Riegel IMMER — `requireBolt` ändert dort nichts. */
+    /** Führt er eine LockMeBox? Dann gilt der Riegel IMMER — `requireBolt` ist dort schon `true`. */
     boltAlways: boolean;
     lockCallWaitingSince: string | null;
   } | null;
@@ -316,7 +317,7 @@ export async function getContext(username: string, opts: GetContextOptions = {})
       remainingKg: release.remainingKg,
       reason: release.reason,
     },
-    box: box && { requireBolt: user.lockRequiresBolt, ...box },
+    box: box && { requireBolt: user.lockRequiresBolt || box.boltAlways, ...box },
     recurringContext: recurring.map(recurringView),
     appointments: appts.map((a) => apptView(a, iso)),
   };

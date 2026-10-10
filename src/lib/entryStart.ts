@@ -1,5 +1,5 @@
 /**
- * **Der Zeitpunkt von Verschluss und Öffnung zählt Sekunden.**
+ * **Der Zeitpunkt von Verschluss, Öffnung und Tragen zählt Sekunden.**
  *
  * Das Formular kennt nur Minuten (`datetime-local`), und `fromDatetimeLocal` setzt die Sekunden auf 0.
  * Der Riegel meldet dagegen auf die Sekunde (`boltConfirmedAt`, `startTime` beim Vollzug). Wer kurz nach
@@ -13,11 +13,12 @@
  * **Importfrei** (wie `lockPending.ts`): das Formular und die Route teilen sich die Regel.
  */
 
-/** Die Eintrags-Arten, deren Zeit „jetzt" heissen kann — die beiden, die am Riegel hängen. */
-export const NOW_START_TYPES: ReadonlySet<string> = new Set(["VERSCHLUSS", "OEFFNEN"]);
+/** Die Eintrags-Arten, deren Zeit „jetzt" heissen kann: die beiden, die am Riegel hängen, und das
+ *  Anlegen/Beenden einer Trage-Session (gleiche Reihenfolge-Prüfung gegen den vorherigen Eintrag). */
+export const NOW_START_TYPES: ReadonlySet<string> = new Set(["VERSCHLUSS", "OEFFNEN", "WEAR_BEGIN", "WEAR_END"]);
 
 /**
- * Meint dieser Aufruf „jetzt"? Nur bei VERSCHLUSS/OEFFNEN und nur online: ein offline erfasster Eintrag
+ * Meint dieser Aufruf „jetzt"? Nur bei den Arten in {@link NOW_START_TYPES} und nur online: ein offline erfasster Eintrag
  * trägt die Erfassungszeit des Clients (`offlineCapture.ts`), die nie durch die Server-Uhr ersetzt wird.
  */
 export function startIsNow(body: { startIsNow?: unknown }, type: string, capturedOffline: boolean): boolean {

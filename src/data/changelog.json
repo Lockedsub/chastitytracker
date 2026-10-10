@@ -1,5 +1,32 @@
 [
   {
+    "version": "6.3.1",
+    "date": "2026-10-10",
+    "changes": [
+      {
+        "type": "fix",
+        "text": {
+          "de": "Automatische Kontrollen im festen Zeitfenster: Ändert die Keyholderin die Planung mitten im Fenster, geht die Kontrolle des Tages nicht mehr verloren. Die Frist darf übers Fensterende hinaus bis vor die Ruhezeit laufen.",
+          "en": "Automatic inspections in a fixed time window: if the keyholder changes the plan in the middle of the window, the day's inspection is no longer lost. The deadline may run past the end of the window, up to the quiet hours."
+        }
+      },
+      {
+        "type": "fix",
+        "text": {
+          "de": "Auch das Anlegen und Beenden einer Tragezeit zählt auf die Sekunde, wenn die Zeit nicht von Hand gewählt wird — wie bei Verschluss und Öffnung.",
+          "en": "Starting and ending a wear session now also counts to the second when the time is not chosen by hand — like locking and opening."
+        }
+      },
+      {
+        "type": "fix",
+        "text": {
+          "de": "Die KI-Keyholderin sieht bei einer LockMeBox, dass der Riegel immer gilt.",
+          "en": "The AI keyholder now sees that the bolt always applies with a LockMeBox."
+        }
+      }
+    ]
+  },
+  {
     "version": "6.3.0",
     "date": "2026-09-25",
     "changes": [

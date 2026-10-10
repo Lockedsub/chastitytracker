@@ -74,6 +74,8 @@ export interface OeffnenPayload {
 export interface WearBeginPayload {
   type: "WEAR_BEGIN";
   startTime: string;
+  /** Der Träger hat die Zeit nicht angefasst: der Server datiert mit seiner Uhr, auf die Sekunde. */
+  startIsNow?: boolean;
   deviceId: string;
   imageUrl: string | null;
   imageExifTime: string | null;
@@ -83,6 +85,8 @@ export interface WearBeginPayload {
 export interface WearEndPayload {
   type: "WEAR_END";
   startTime: string;
+  /** Der Träger hat die Zeit nicht angefasst: der Server datiert mit seiner Uhr, auf die Sekunde. */
+  startIsNow?: boolean;
   deviceId: string;
   imageUrl: string | null;
   imageExifTime: string | null;
