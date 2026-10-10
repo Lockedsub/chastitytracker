@@ -416,8 +416,10 @@ describe("fillFreeGaps — Nachplanen an zugestellten Kontrollen vorbei", () => 
     const create = fillFreeGaps(win, [{ wirksamAb: at(700), deadline: at(730) }], 2, now, () => 0.5, tz);
     expect(create).toHaveLength(2);
     for (const s of create) {
+      // Die AUSLÖSUNG liegt im Fenster; die Frist darf darüber hinauslaufen (wie im Tagesplan).
       expect(minuteOf(s.wirksamAb)).toBeGreaterThanOrEqual(600);
-      expect(minuteOf(s.deadline)).toBeLessThanOrEqual(960);
+      expect(minuteOf(s.wirksamAb)).toBeLessThan(960);
+      expect(minuteOf(s.deadline)).toBeLessThanOrEqual(22 * 60 - 1);
     }
   });
 
@@ -428,8 +430,52 @@ describe("fillFreeGaps — Nachplanen an zugestellten Kontrollen vorbei", () => 
     expect(create.length).toBeGreaterThan(0);
     for (const s of create) {
       expect(minuteOf(s.wirksamAb)).toBeGreaterThanOrEqual(6 * 60);
-      expect(minuteOf(s.deadline)).toBeLessThanOrEqual(8 * 60);
+      expect(minuteOf(s.wirksamAb)).toBeLessThan(8 * 60);
+      // Die Frist darf hinters Fensterende laufen, nie unter die Mindest-Frist und nie in den Schlaf.
+      expect(minuteOf(s.deadline) - minuteOf(s.wirksamAb)).toBeGreaterThanOrEqual(settings.fristVon);
+      expect(minuteOf(s.deadline)).toBeLessThanOrEqual(22 * 60 - 1);
     }
+  });
+
+  // Regression (Tester-Meldung): Fenster 18–20, Ruhe ab 21:00, Mindest-Frist 120. Ein Neuwurf um 18:30
+  // fand nur 90 Minuten im Fenster und verwarf die einzige Kontrolle des Tages. Die Frist darf aber
+  // bis 20:59 laufen — eine Auslösung zwischen 18:31 und 18:59 ist erfüllbar.
+  describe("Neuwurf mitten im festen Fenster", () => {
+    const tester = settingsOf({
+      ruheVon: "21:00", ruheBis: "08:00", fensterVon: "18:00", fensterBis: "20:00",
+      fristVon: 120, fristBis: 120, perDayMin: 1, perDayMax: 1,
+    });
+    const at1830 = dateAtLocalMinutes(now, 18 * 60 + 30, tz);
+
+    const RANDS = [0, 0.5, 0.999];
+    it.each(RANDS)("setzt die Kontrolle (Zufall %s) mit voller Mindest-Frist vor den Schlaf", (r) => {
+      const create = fillFreeGaps(tester, [], 1, at1830, () => r, tz);
+      expect(create).toHaveLength(1);
+      const [s] = create;
+      expect(s.wirksamAb.getTime()).toBeGreaterThan(at1830.getTime());
+      expect(minuteOf(s.deadline) - minuteOf(s.wirksamAb)).toBe(120);
+      expect(minuteOf(s.deadline)).toBeLessThanOrEqual(21 * 60 - 1);
+    });
+
+    it("lässt nichts entstehen, wenn die Mindest-Frist vor dem Schlaf nicht mehr passt", () => {
+      const at1930 = dateAtLocalMinutes(now, 19 * 60 + 30, tz);
+      expect(fillFreeGaps(tester, [], 1, at1930, () => 0.5, tz)).toEqual([]);
+    });
+
+    it("endet die Frist vor der ersten Schlaf-Minute, wenn das Fenster genau dort endet", () => {
+      const bis21 = { ...tester, fensterBis: "21:00", fristVon: 30, fristBis: 30 };
+      for (const r of RANDS) {
+        const create = fillFreeGaps(bis21, [], 3, dateAtLocalMinutes(now, 18 * 60, tz), () => r, tz);
+        expect(create.length).toBeGreaterThan(0);
+        for (const s of create) expect(minuteOf(s.deadline)).toBeLessThanOrEqual(21 * 60 - 1);
+      }
+    });
+
+    it("plant nicht in eine zugestellte Kontrolle hinein, die die Restzeit unter die Mindest-Frist drückt", () => {
+      // 18:31–20:15 sind nur 104 Minuten: kürzer als die Mindest-Frist, also kein Slot.
+      const taken = [{ wirksamAb: at(20 * 60 + 15), deadline: at(20 * 60 + 45) }];
+      expect(fillFreeGaps(tester, taken, 1, at1830, () => 0.999, tz)).toEqual([]);
+    });
   });
 
   it("legt nichts in die Vergangenheit", () => {
