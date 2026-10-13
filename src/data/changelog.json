@@ -1,5 +1,18 @@
 [
   {
+    "version": "6.4.0",
+    "date": "2026-10-13",
+    "changes": [
+      {
+        "type": "feat",
+        "text": {
+          "de": "Offene Kontrollen mit Code und Frist lassen sich über eine eigene Schnittstelle abfragen (GET /api/kontrollen/open) — für Geräte und Skripte, die den Code anzeigen, ohne das Dashboard zu lesen.",
+          "en": "Open inspections with their code and deadline can be queried through a dedicated endpoint (GET /api/kontrollen/open) — for devices and scripts that display the code without reading the dashboard."
+        }
+      }
+    ]
+  },
+  {
     "version": "6.3.2",
     "date": "2026-10-13",
     "changes": [

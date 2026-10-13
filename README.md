@@ -736,6 +736,7 @@ The keyholder inbox mirrors these under `/api/admin/messages` (`GET`, `[id]`, `[
 |--------|----------|-------------|
 | `GET` | `/api/version` | Returns `{ version, buildDate }` |
 | `GET` | `/api/heartbeat` | Consolidated client heartbeat |
+| `GET` | `/api/kontrollen/open` | Own open inspections with code and deadline (`{ inspections: [{ id, code, deadline, categoryId, deviceId }] }`; session cookie, for devices/scripts; overdue ones stay listed until fulfilled or withdrawn) |
 | `GET` | `/api/upstream-changelog` | Proxied upstream changelog (1 h cache) |
 | `POST` | `/api/feedback` | Submit in-app feedback (forwarded unless `DISABLE_FEEDBACK`) |
 | `GET` | `/api/push/vapid-public-key` | VAPID public key for web-push subscription |

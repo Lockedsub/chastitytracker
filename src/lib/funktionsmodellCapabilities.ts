@@ -258,6 +258,12 @@ export const FM_CAPABILITIES: FmCapability[] = [
     actors: ["sub"], surfaces: ["sub-ui"], routes: ["/api/kontrollen/code-push", "/api/kontrollen/[id]/code-push"],
   }),
   c({
+    id: "inspection-open-list", mechanic: "Kontrollen", title: "Offene Kontrollen abfragen",
+    what: "Liefert Code und Frist der offenen Kontrollen des Subs als schmales JSON — für Geräte und Skripte, die den Code anzeigen, ohne das Dashboard zu lesen.",
+    actors: ["sub"], surfaces: ["extern"], routes: ["/api/kontrollen/open"],
+    note: "Dieselbe Auswahl wie das Dashboard: geplante, noch nicht ausgelöste Kontrollen bleiben unsichtbar. Der Code ist null, wenn das Gerät keinen verlangt.",
+  }),
+  c({
     id: "auto-inspections", mechanic: "Auto-Kontrollen", title: "Automatische Kontrollen einstellen",
     what: "Hauptschalter, Anzahl pro Tag, Schlaf-Fenster, Fristspanne, festes Auslöse-Fenster und die Beschränkung auf Sperrzeiten.",
     actors: ["admin", "mcp"], surfaces: ["admin-ui", "mcp"],
