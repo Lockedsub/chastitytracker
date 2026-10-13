@@ -88,8 +88,14 @@ Die beiden Keyholder-Wege liegen als Dienste daneben, weil die KI-Keyholderin si
 mitbenutzt: `entryCreateService.ts` (nachtragen, `add_entry`) und `entryCorrection.ts`
 (korrigieren, `edit_entry`). Die Routen sind dort nur noch Rechte-Prüfung plus Aufruf.
 
+Ein drittes Paar gehört dazu: `entryGapService.ts` trägt eine vergessene Pause (`add_missed_break`,
+Öffnen + Wiederverschluss in einer Tragephase) oder eine vergessene Tragezeit (`add_missed_session`,
+Verschluss + Öffnung in einer offenen Phase) nach. Das Paar geht in EINER Transaktion hinein, weil
+jeder der beiden Schritte allein die Kette bräche; frei ist es nur mit `ALLOW_ENTRY_GAP=true`.
+
 ## Tests
 
 `sessionModel.test.ts`, `wearSessions.test.ts`, `utils.test.ts`, `utils.time.test.ts`,
 `entryFulfilment.test.ts`, `entryFormRoute.test.ts`, `entryErrors.test.ts`, `entryNotify.test.ts`,
-`deviceUsage.test.ts`, `statsBuilders.test.ts`, `entryCorrection.test.ts`, `mcpAddEntry.test.ts`.
+`deviceUsage.test.ts`, `statsBuilders.test.ts`, `entryCorrection.test.ts`, `mcpAddEntry.test.ts`,
+`entryGapService.test.ts`.

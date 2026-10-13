@@ -58,7 +58,7 @@ import {
 import { type RecurrenceFreq } from "@/lib/taskRecurrence";
 import { chainBreakPartner, correctEntry, correctionProblem, deleteEntryForUser, type EntryCorrection } from "@/lib/entryCorrection";
 import { createEntryForUser, validateEntryCreate } from "@/lib/entryCreateService";
-import { createEntryGapForUser, validateEntryGap, entryGapEnabled } from "@/lib/entryGapService";
+import { createEntryGapForUser, validateEntryGap, entryGapEnabled, type EntryGapKind } from "@/lib/entryGapService";
 import { deleteReference, importEntryAsReference, importRecentVerschluss, selectImportCandidates } from "@/lib/deviceReferenceService";
 import { effectiveProofOrderMatters, earliestActionableAt } from "@/lib/tasks";
 import { releaseNow, previewReleaseNow } from "@/lib/releaseNowService";
@@ -2532,10 +2532,12 @@ export async function mcpAddEntry(username: string, args: AddEntryArgs) {
   };
 }
 
-export interface AddMissedBreakArgs {
+/** Argumente beider Nachträge. Die Reihenfolge der Zeitpunkte hängt von der Art ab: bei der Pause
+ *  liegt `openedAt` vor `lockedAt`, bei der Tragezeit `lockedAt` vor `openedAt`. */
+export interface AddMissedPairArgs {
   /** Wann der Gürtel geöffnet wurde (ISO 8601, Vergangenheit). */
   openedAt: string;
-  /** Wann er wieder verschlossen wurde (ISO 8601, nach `openedAt`). */
+  /** Wann er verschlossen wurde (ISO 8601, Vergangenheit). */
   lockedAt: string;
   /** Der Öffnungsgrund (Code wie in `get_context`). */
   openingReason: string;
@@ -2544,26 +2546,40 @@ export interface AddMissedBreakArgs {
   dryRun?: boolean;
 }
 
-/** Die Sätze der Ketten-Absagen des Pausen-Nachtrags, an eine Keyholderin gerichtet. */
-const GAP_ERROR_TEXT: Record<string, string> = {
-  GAP_NOT_LOCKED: "The user was not locked at `openedAt`. A missed break must lie within an existing locked period.",
-  INVALID_ORDER: "The break does not fit: `openedAt` must be before `lockedAt`, and `lockedAt` before the next recorded opening.",
+/** Wortlaut je Art, an eine Keyholderin gerichtet. `INVALID_ORDER` verlangt je Richtung etwas
+ *  anderes, deshalb stehen die Absagen je Art. */
+const GAP_KIND_TEXT: Record<EntryGapKind, {
+  tool: string; noun: string; label: string; caveat: string; hint: string; errors: Record<string, string>;
+}> = {
+  break: {
+    tool: "add_missed_break", noun: "breaks", label: "Break",
+    caveat: "Chain checks (inside a locked period, before the next opening) run at commit time.",
+    hint: "",
+    errors: {
+      GAP_NOT_LOCKED: "The user was not locked at `openedAt`. A missed break must lie within an existing locked period.",
+      INVALID_ORDER: "The break does not fit: `openedAt` must be before `lockedAt`, and `lockedAt` before the next recorded opening.",
+    },
+  },
+  session: {
+    tool: "add_missed_session", noun: "sessions", label: "Locked session",
+    caveat: "Chain checks (inside an open phase, before the next lock-in) run at commit time.",
+    hint: " The lock-in carries no device — set one with edit_entry if needed.",
+    errors: {
+      GAP_NOT_OPEN: "The user was already locked at `lockedAt`. A missed locked session must lie within an open phase (or before the first entry).",
+      INVALID_ORDER: "The session does not fit: `lockedAt` must be before `openedAt`, and `openedAt` before the next recorded lock-in.",
+    },
+  },
 };
 
 /**
- * Trägt eine VERGESSENE PAUSE nach: ein Öffnen samt Wiederverschluss, mitten in einer Tragephase.
- *
- * Der Grund für ein eigenes Werkzeug: `add_entry` kann das nicht — ein einzelnes Öffnen mitten in
- * einer Tragephase hätte einen zweiten Öffnen-Eintrag als Nachbarn, und ein einzelner Verschluss
- * einen Verschluss davor; beide Schritte sind ohne den anderen eine gebrochene Kette. Die Regeln
- * stehen im geteilten Dienst ({@link createEntryGapForUser}), derselbe Weg wie das Formular.
- *
- * Der heutige Stand bleibt unverändert; es werden weder Sperrzeiten freigegeben noch Anforderungen
- * erfüllt noch Kontrolleure benachrichtigt.
+ * Trägt eine VERGESSENE PAUSE (`break`) oder TRAGEZEIT (`session`) nach. Warum eigene Werkzeuge und
+ * was bewusst unverändert bleibt, steht im Dienst (`entryGapService.ts`) — derselbe Weg wie das
+ * Formular.
  */
-export async function mcpAddMissedBreak(username: string, args: AddMissedBreakArgs) {
+async function addMissedPair(username: string, kind: EntryGapKind, args: AddMissedPairArgs) {
+  const text = GAP_KIND_TEXT[kind];
   if (!entryGapEnabled()) {
-    throw new Error("Adding missed breaks is not enabled on this instance (the operator must set ALLOW_ENTRY_GAP=true).");
+    throw new Error(`Adding missed ${text.noun} is not enabled on this instance (the operator must set ALLOW_ENTRY_GAP=true).`);
   }
   const userId = await resolveTargetUserId(username);
   const iso = await isoForUser(userId);
@@ -2573,25 +2589,28 @@ export async function mcpAddMissedBreak(username: string, args: AddMissedBreakAr
 
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) throw new Error(`User not found: ${username}`);
-  const input = { openAt, lockAt, oeffnenGrund: args.openingReason, note: args.note };
+  const input = { kind, openAt, lockAt, oeffnenGrund: args.openingReason, note: args.note };
+  const wording = (code: string) => text.errors[code] ?? enErrorText(code);
 
   if (args.dryRun) {
     const problem = validateEntryGap(user, input);
-    return dryRunPreview("add_missed_break", problem ? (GAP_ERROR_TEXT[problem] ?? enErrorText(problem)) : undefined, {
-      openedAt: iso(openAt), lockedAt: iso(lockAt), openingReason: args.openingReason,
-      caveat: "Chain checks (inside a locked period, before the next opening) run at commit time.",
+    return dryRunPreview(text.tool, problem ? wording(problem) : undefined, {
+      openedAt: iso(openAt), lockedAt: iso(lockAt), openingReason: args.openingReason, caveat: text.caveat,
     });
   }
 
   const result = await createEntryGapForUser(user, input);
-  if (!result.ok) throw new Error(GAP_ERROR_TEXT[result.error] ?? enErrorText(result.error));
+  if (!result.ok) throw new Error(wording(result.error));
   return {
     ok: true,
     openedId: result.opened.id,
     lockedId: result.locked.id,
-    message: "Break recorded. The current state is unchanged; session and statistics follow on their own.",
+    message: `${text.label} recorded. The current state is unchanged; session and statistics follow on their own.${text.hint}`,
   };
 }
+
+export const mcpAddMissedBreak = (username: string, args: AddMissedPairArgs) => addMissedPair(username, "break", args);
+export const mcpAddMissedSession = (username: string, args: AddMissedPairArgs) => addMissedPair(username, "session", args);
 
 /**
  * Zwei Absagen des Entry-Pfads sind an den TRÄGER adressiert („Öffnen nur möglich, wenn aktuell

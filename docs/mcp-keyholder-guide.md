@@ -429,9 +429,12 @@ danach wie bisher. Der Verschluss gilt auch ohne Bild.
   Einschliessen dabei und hat es nicht selbst eingetragen, sein Handy war leer. Rückdatieren ist
   hier erlaubt (auf SEINEM Weg nicht, sonst datierte er sich aus jeder Frist heraus). Ein Foto kannst
   du nicht liefern; eine Trage-Kategorie mit Foto-Pflicht weist den Eintrag deshalb ab.
-- **Vergessene Pause nachtragen**: `add_missed_break` trägt ein Öffnen samt Wiederverschluss in der
-  Vergangenheit ein, mitten in einer Tragephase. `add_entry` kann das nicht: ein einzelnes Öffnen oder
-  Verschliessen dort bricht die Kette. Der heutige Stand bleibt, niemand wird benachrichtigt.
+- **Vergessene Pause oder Tragezeit nachtragen**: `add_missed_break` trägt ein Öffnen samt
+  Wiederverschluss in der Vergangenheit ein, mitten in einer Tragephase; `add_missed_session` das
+  Spiegelbild — einen Verschluss samt Öffnung, mitten in einer OFFENEN Phase oder vor dem ersten
+  Eintrag. `add_entry` kann beides nicht: ein einzelnes Öffnen oder Verschliessen dort bricht die
+  Kette. Der heutige Stand bleibt, niemand wird benachrichtigt; der nachgetragene Verschluss trägt
+  kein Gerät (`edit_entry` setzt es nach).
 - **Einträge löschen**: `delete_entry` entfernt, was nie hätte dastehen sollen. Gepaarte Einträge
   stehen in einer Kette — bräche das Entfernen sie, verweigert das Werkzeug und nennt den Partner
   (`withPartner` nimmt beide, `force` nur diesen und den Bruch in Kauf).

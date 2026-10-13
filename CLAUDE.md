@@ -73,6 +73,8 @@ Drei Workflows, alle `workflow_dispatch` (kein Auto-Deploy bei Push):
 | `:latest` | alle, inkl. Self-Hoster — der **offizielle Release** | nur durch `promote.yml` |
 | `:v<version>`, `:sha-<sha>` | unveränderliche Referenz zum Pinnen, Promoten, Rollback | pro `main`-Build (`v…`) bzw. pro Build (`sha-…`) |
 
+**Plattformen:** jeder Build liefert `linux/amd64` UND `linux/arm64` als ein Index — je Plattform nativ gebaut (`ubuntu-latest` bzw. `ubuntu-24.04-arm`, keine Emulation), danach vom Job `build-and-push` zu einem Index mit allen Tags zusammengesetzt. arm64 ist für Self-Hoster auf ARM (Raspberry Pi); die Flotte läuft auf amd64. Der arm64-Zweig darf scheitern, ohne den amd64-Deploy zu blockieren — dann trägt der Lauf die Warnung „dem Index fehlt arm64“ und der Index hat nur amd64. `.Image` ist bei einem Index eine Map nach Plattform: das Revision-Label liegt unter `."linux/amd64".config.Labels`, nicht direkt unter `.config`.
+
 **Daneben: Seitenkanäle (`publishAs`).** Ein Build von einem Nicht-`main`-Zweig taggt normalerweise `:feature` — und trifft damit ALLE, die dort mittesten. Für Arbeit, die über längere Zeit getestet werden soll, ohne den Ring zu belegen, veröffentlicht `-f publishAs=<name>` **statt** `:feature` einen eigenen rollenden Kanal:
 
 ```bash
@@ -166,7 +168,7 @@ Dispatch-Inputs von `docker.yml`: `deploy` (Default `true`), `instances`, `chann
 
 ```bash
 docker buildx imagetools inspect ghcr.io/trublue-2/chastitytracker:latest \
-  --format '{{json .Image}}' | jq -r '.config.Labels["org.opencontainers.image.revision"]'
+  --format '{{json .Image}}' | jq -r '."linux/amd64".config.Labels["org.opencontainers.image.revision"]'
 gh api -X POST repos/trublue-2/chastitytracker/git/refs -f ref=refs/tags/release -f sha=<sha>
 ```
 
@@ -278,7 +280,7 @@ WEBAUTHN_RP_ORIGIN=<origin-url>    # default: http://localhost:3000
 PORTAL_SHARED_SECRET=<secret>      # optional: Portal-Login JWT-Secret
 USE_ADMIN_RELATIONSHIPS=true       # optional: Admin↔User n:m Zuordnung aktivieren
 BUILD_DATE=<iso-date>              # optional: wird beim Build gesetzt
-ALLOW_ENTRY_GAP=true               # optional: schaltet den Pausen-Nachtrag frei (Admin-Formular + MCP `add_missed_break`). Standard aus.
+ALLOW_ENTRY_GAP=true               # optional: schaltet den Nachtrag von Pausen UND Tragezeiten frei (Admin-Formulare + MCP `add_missed_break` / `add_missed_session`). Standard aus.
 # Update-Check / anonyme Deployment-Zählung (siehe docs/update-check.md):
 DISABLE_UPDATE_CENSUS=true         # optional: Census aus, Update-Check liest den Release-Tag direkt auf GitHub
 UPSTREAM_CHANGELOG_URL=<url>       # optional: eigene Changelog-Quelle (dann keine Census-Header)

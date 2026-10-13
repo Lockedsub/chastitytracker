@@ -14,7 +14,7 @@ import {
   checkMcpKeyholder, mcpRequestLock, mcpSetLockPeriod,
   mcpReleaseNow, mcpRequestInspection, mcpSetTrainingGoal, mcpWithdraw,
   mcpListTrainingGoals, mcpEditTrainingGoal, mcpDeleteTrainingGoal, mcpSetCleaning, mcpSetBox, mcpSetWeightTracking, mcpSetWeightRelease, mcpSetOffenseRules, mcpSetInspectionEscalation, mcpSetAutoInspections, mcpResolveInspection, mcpEditLockPeriod, mcpEditLockRequest, mcpCreateTask,
-  mcpReviewTaskProof, mcpEditTask, mcpEditEntry, mcpAddEntry, mcpAddMissedBreak,
+  mcpReviewTaskProof, mcpEditTask, mcpEditEntry, mcpAddEntry, mcpAddMissedBreak, mcpAddMissedSession,
   mcpCreateTaskSeries, mcpEditTaskSeries, mcpWithdrawTaskSeries,
   mcpImportDeviceReferences, mcpDeleteDeviceReference, mcpDeleteEntry,
   mcpRequestOrgasm, mcpJudgeOffense, mcpRecordOffense,
@@ -1687,6 +1687,32 @@ function registerTools(server: McpServer) {
         },
       },
       (args, extra) => runWriteTool("add_missed_break", extra, args, (u) => mcpAddMissedBreak(u, args)),
+    );
+
+    server.registerTool(
+      "add_missed_session",
+      {
+        title: "Record a forgotten locked session (lock + open) in the past",
+        description:
+          "Records a locked session the user forgot to log: a lock-in and the opening that ended it, BOTH in " +
+          "the past, inside one existing OPEN phase (or before the first recorded entry). The mirror of " +
+          "add_missed_break: a single lock-in in the middle of an open phase would sit in front of another " +
+          "lock-in and breaks the chain, so add_entry refuses it. Both entries are written in one step. " +
+          "The lock-in carries no device (there is no surrounding lock to inherit it from) — set one with " +
+          "edit_entry. Today's state does not change: no lock period is released, no request is fulfilled, " +
+          "nobody is notified. Only works if the instance operator enabled it (ALLOW_ENTRY_GAP); otherwise " +
+          "the call is refused. The note is required, as for any opening. dryRun runs everything except the " +
+          "chain checks." + KEYHOLDER_BASE,
+        inputSchema: {
+          lockedAt: z.string().describe("When the belt was locked (ISO 8601, in the past, after the previous recorded opening)."),
+          openedAt: z.string().describe("When it was opened again (ISO 8601, after lockedAt, before the next recorded lock-in)."),
+          openingReason: z.string().describe("The reason code for the opening (see get_context)."),
+          note: z.string().describe("Required note for the opening."),
+          reason: reasonField,
+          dryRun: dryRunFieldV1,
+        },
+      },
+      (args, extra) => runWriteTool("add_missed_session", extra, args, (u) => mcpAddMissedSession(u, args)),
     );
 
     server.registerTool(

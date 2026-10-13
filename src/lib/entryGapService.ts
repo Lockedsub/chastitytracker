@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import type { Entry, User } from "@prisma/client";
 import { validateEntryCreate } from "@/lib/entryCreateService";
-import { getKgNeighbors } from "@/lib/queries";
+import { getKgNeighbors, type PrismaTx } from "@/lib/queries";
 import { entryGuardError, entryGuardCode } from "@/lib/entryErrors";
 import type { EntryCreateError } from "@/lib/entryCreateService";
 import { boltFieldsFor } from "@/lib/lockPending";
@@ -16,6 +16,13 @@ import { boltFieldsFor } from "@/lib/lockPending";
  * Paarung nicht abbilden kann. Die Ketten-Prüfung ist richtig und bleibt; also geht das Paar in
  * einer Transaktion hinein, und geprüft wird das ENDERGEBNIS der Kette.
  *
+ * Zwei Arten, dieselbe Idee in Spiegelform (`kind`):
+ *   · `break`   — eine vergessene PAUSE: Öffnen + Wiederverschluss INNERHALB einer Tragephase;
+ *   · `session` — eine vergessene TRAGEZEIT: Verschluss + Öffnen INNERHALB einer offenen Phase
+ *                 (oder vor dem ersten Eintrag). Ein einzelner Verschluss dort hätte einen
+ *                 Verschluss als Nachfolger (`INVALID_ORDER`), eine einzelne Öffnung danach einen
+ *                 Öffnen-Eintrag davor — wieder ist jeder Schritt ohne den anderen eine gebrochene Kette.
+ *
  * Bewusst NICHT hier (der Zustand von JETZT bleibt, wie er war — verschlossen vor wie nach dem
  * Nachtrag):
  *   · keine Sperrzeit-Freigabe (`releaseLockPeriodsOnOpen`): eine rückdatierte Pause ist kein
@@ -25,16 +32,22 @@ import { boltFieldsFor } from "@/lib/lockPending";
  *   · keine Meldung an die übrigen Kontrolleure: es ist eine Korrektur der Aufzeichnung, kein
  *     Ereignis, auf das jemand reagieren müsste.
  */
-/** Ist der Pausen-Nachtrag auf DIESER Instanz freigeschaltet? Standard aus: er schreibt Einträge
- *  in die Vergangenheit und gehört in die Hand des Betreibers, nicht jeder Instanz. */
+/** Ist der Nachtrag (Pause und Tragezeit) auf DIESER Instanz freigeschaltet? Standard aus: er
+ *  schreibt Einträge in die Vergangenheit und gehört in die Hand des Betreibers, nicht jeder Instanz. */
 export function entryGapEnabled(): boolean {
   return process.env.ALLOW_ENTRY_GAP === "true";
 }
 
+/** `break`: Öffnen, dann Wiederverschluss (in einer Tragephase). `session`: Verschluss, dann
+ *  Öffnen (in einer offenen Phase). */
+export const ENTRY_GAP_KINDS = ["break", "session"] as const;
+export type EntryGapKind = (typeof ENTRY_GAP_KINDS)[number];
+
 export interface EntryGapInput {
-  /** Wann der Gürtel geöffnet wurde. */
+  kind: EntryGapKind;
+  /** Wann der Gürtel geöffnet wurde. Bei `break` VOR `lockAt`, bei `session` danach. */
   openAt: Date;
-  /** Wann er wieder verschlossen wurde. Muss nach `openAt` liegen. */
+  /** Wann er verschlossen wurde. */
   lockAt: Date;
   oeffnenGrund: string;
   /** Pflicht wie beim Einzel-Öffnen (`NOTE_REQUIRED`). Gilt für das Öffnen. */
@@ -52,13 +65,74 @@ export function validateEntryGap(
   input: EntryGapInput,
   opts: { allowFuture?: boolean } = {},
 ): EntryCreateError | null {
-  if (!(input.openAt < input.lockAt)) return "INVALID_ORDER";
+  const [first, second] = input.kind === "session" ? [input.lockAt, input.openAt] : [input.openAt, input.lockAt];
+  if (!(first < second)) return "INVALID_ORDER";
   // Die Prüfungen am Öffnen (Grund, Notiz, Zukunft) sind die des Einzel-Eintrags — dieselbe Quelle.
   const open = validateEntryCreate(user, {
     type: "OEFFNEN", startTime: input.openAt, oeffnenGrund: input.oeffnenGrund, note: input.note,
   }, opts);
   if (open) return open;
   return validateEntryCreate(user, { type: "VERSCHLUSS", startTime: input.lockAt }, opts);
+}
+
+/** Die beiden Einträge des Paars, in zeitlicher Reihenfolge angelegt. `deviceId` gehört dem
+ *  Verschluss; die Prüfung der Nachbarn steht bei den Aufrufern. */
+async function writePair(tx: PrismaTx, userId: string, input: EntryGapInput, deviceId: string | null) {
+  const open = () => tx.entry.create({
+    data: {
+      userId,
+      type: "OEFFNEN",
+      startTime: input.openAt,
+      oeffnenGrund: input.oeffnenGrund,
+      note: input.note.trim(),
+    },
+  });
+  const lock = () => tx.entry.create({
+    data: {
+      userId,
+      type: "VERSCHLUSS",
+      startTime: input.lockAt,
+      deviceId,
+      ...boltFieldsFor("VERSCHLUSS", input.lockAt),
+    },
+  });
+  // Nacheinander und in der Reihenfolge der Zeit: gleiche Transaktion, gleiche `createdAt`-Folge
+  // wie ein von Hand erfasstes Paar.
+  if (input.kind === "session") {
+    const locked = await lock();
+    return { ok: true as const, opened: await open(), locked };
+  }
+  const opened = await open();
+  return { ok: true as const, opened, locked: await lock() };
+}
+
+/** `break`: der Nachbar VOR dem Öffnen muss ein Verschluss sein — die Pause liegt IN einer
+ *  Tragephase. `prev` zählt einen exakten Gleichstand mit (`lte`); der Nachtrag verlangt dagegen
+ *  Abstand, sonst wären Verschluss und Öffnen zeitlich nicht zu unterscheiden. Das Gerät erbt der
+ *  Wiederverschluss vom umgebenden Verschluss: wer die Phase unterbrach, hat denselben Gürtel
+ *  wieder angelegt; ein anderes korrigiert `edit_entry`. */
+async function insertBreak(tx: PrismaTx, userId: string, input: EntryGapInput) {
+  const { prev, next } = await getKgNeighbors(userId, input.openAt, tx);
+  if (!prev || prev.type !== "VERSCHLUSS") throw entryGuardError("GAP_NOT_LOCKED");
+  if (prev.startTime >= input.openAt) throw entryGuardError("INVALID_ORDER");
+  // Der Nachbar DANACH (falls es einen gibt) ist das Öffnen, das die Tragephase beendet. Der
+  // Wiederverschluss muss davor liegen, sonst überspränge das Paar einen bestehenden Eintrag.
+  if (next && next.startTime <= input.lockAt) throw entryGuardError("INVALID_ORDER");
+
+  const lockDevice = (await tx.entry.findUnique({ where: { id: prev.id }, select: { deviceId: true } }))?.deviceId ?? null;
+  return writePair(tx, userId, input, lockDevice);
+}
+
+/** `session`: der Nachbar VOR dem Verschluss darf KEIN Verschluss sein — die Tragezeit liegt in
+ *  einer offenen Phase oder vor dem ersten Eintrag. Der Nachbar DANACH ist, falls vorhanden, der
+ *  nächste Verschluss; die Öffnung des Paars muss davor liegen. Das Gerät bleibt leer: es gibt keine
+ *  umgebende Tragephase, von der es sich ableiten liesse. */
+async function insertSession(tx: PrismaTx, userId: string, input: EntryGapInput) {
+  const { prev, next } = await getKgNeighbors(userId, input.lockAt, tx);
+  if (prev?.type === "VERSCHLUSS") throw entryGuardError("GAP_NOT_OPEN");
+  if (prev && prev.startTime >= input.lockAt) throw entryGuardError("INVALID_ORDER");
+  if (next && (next.type !== "VERSCHLUSS" || next.startTime <= input.openAt)) throw entryGuardError("INVALID_ORDER");
+  return writePair(tx, userId, input, null);
 }
 
 export async function createEntryGapForUser(
@@ -71,39 +145,8 @@ export async function createEntryGapForUser(
 
   try {
     return await prisma.$transaction(async (tx) => {
-      // Der Nachbar VOR dem Öffnen muss ein Verschluss sein — die Pause liegt IN einer Tragephase.
-      // `prev` zählt einen exakten Gleichstand mit (`lte`); der Nachtrag verlangt dagegen Abstand,
-      // sonst wären Verschluss und Öffnen zeitlich nicht zu unterscheiden.
-      const { prev, next } = await getKgNeighbors(user.id, input.openAt, tx);
-      if (!prev || prev.type !== "VERSCHLUSS") throw entryGuardError("GAP_NOT_LOCKED");
-      if (prev.startTime >= input.openAt) throw entryGuardError("INVALID_ORDER");
-      // Der Nachbar DANACH (falls es einen gibt) ist das Öffnen, das die Tragephase beendet. Der
-      // Wiederverschluss muss davor liegen, sonst überspränge das Paar einen bestehenden Eintrag.
-      if (next && next.startTime <= input.lockAt) throw entryGuardError("INVALID_ORDER");
-
-      const lockDevice = (await tx.entry.findUnique({ where: { id: prev.id }, select: { deviceId: true } }))?.deviceId ?? null;
-
-      const opened = await tx.entry.create({
-        data: {
-          userId: user.id,
-          type: "OEFFNEN",
-          startTime: input.openAt,
-          oeffnenGrund: input.oeffnenGrund,
-          note: input.note.trim(),
-        },
-      });
-      const locked = await tx.entry.create({
-        data: {
-          userId: user.id,
-          type: "VERSCHLUSS",
-          startTime: input.lockAt,
-          // Dasselbe Gerät wie in der Tragephase, in die das Paar fällt: wer sie unterbrach, hat
-          // denselben Gürtel wieder angelegt. Ein anderes Gerät korrigiert `edit_entry`.
-          deviceId: lockDevice,
-          ...boltFieldsFor("VERSCHLUSS", input.lockAt),
-        },
-      });
-      return { ok: true as const, opened, locked };
+      if (input.kind === "session") return await insertSession(tx, user.id, input);
+      return await insertBreak(tx, user.id, input);
     });
   } catch (e: unknown) {
     return { ok: false, error: entryGuardCode(e) };

@@ -114,6 +114,13 @@ export const FM_CAPABILITIES: FmCapability[] = [
     note: "Eigener Vorgang, weil ein einzelnes Öffnen oder Verschliessen mitten in einer Tragephase die Kette bricht (INVALID_ORDER / ALREADY_LOCKED); das Paar geht in EINER Transaktion hinein und die Kette wird am Ergebnis geprüft. Der heutige Stand bleibt: keine Sperrzeit-Freigabe, keine Erfüllung, keine Meldung. Beide Wege gehen durch `createEntryGapForUser`. Nur mit `ALLOW_ENTRY_GAP=true` in der .env des Betreibers, sonst aus.",
   }),
   c({
+    id: "entry-admin-session", mechanic: "Einträge", title: "Vergessene Tragezeit nachtragen",
+    what: "Trägt einen Verschluss samt Öffnung in der Vergangenheit ein, mitten in einer offenen Phase oder vor dem ersten Eintrag.",
+    actors: ["admin", "mcp"], surfaces: ["admin-ui", "mcp"], routes: ["/api/admin/entries/gap"],
+    tools: ["add_missed_session"],
+    note: "Das Spiegelbild der vergessenen Pause: ein einzelner Verschluss mitten in einer offenen Phase stünde vor einem Verschluss (INVALID_ORDER), eine einzelne Öffnung dahinter hätte keinen Verschluss davor. Das Paar geht in EINER Transaktion hinein; der Verschluss trägt kein Gerät (`edit_entry` setzt es nach). Derselbe Dienst `createEntryGapForUser`, dieselbe Freischaltung `ALLOW_ENTRY_GAP=true`.",
+  }),
+  c({
     id: "entry-admin-edit", mechanic: "Einträge", title: "Fremden Eintrag ändern oder löschen",
     what: "Korrigiert oder entfernt den Eintrag eines Trägers.",
     actors: ["admin", "mcp"], surfaces: ["admin-ui", "mcp"], routes: ["/api/entries/[id]"],

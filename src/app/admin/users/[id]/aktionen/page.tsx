@@ -156,14 +156,22 @@ export default async function AktionenPage({ params }: { params: Promise<{ id: s
             lockedReason={isLocked ? undefined : t("entryOnlyIfLocked")}
           />
 
-          {/* Nur mit `ALLOW_ENTRY_GAP`. Kein Gate auf „verschlossen": die Pause liegt in der Vergangenheit. */}
+          {/* Nur mit `ALLOW_ENTRY_GAP`. Kein Gate auf den Zustand: Pause wie Tragezeit liegen in der Vergangenheit. */}
           {entryGapEnabled() && (
-            <ActionRow
-              href={`${base}/pause`}
-              icon={<LockOpenIcon className="size-4" />}
-              title={t("entryPause")}
-              description={t("entryPauseDesc")}
-            />
+            <>
+              <ActionRow
+                href={`${base}/pause`}
+                icon={<LockOpenIcon className="size-4" />}
+                title={t("entryPause")}
+                description={t("entryPauseDesc")}
+              />
+              <ActionRow
+                href={`${base}/session`}
+                icon={<LockClosedIcon className="size-4" />}
+                title={t("entrySession")}
+                description={t("entrySessionDesc")}
+              />
+            </>
           )}
 
           <ActionRow

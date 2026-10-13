@@ -65,17 +65,15 @@ jobs:
       - run: npx tsc --noEmit
       - run: npm test
 
-  # ── Docker Image bauen & pushen ────────────────────────────────────────────
-  build-and-push:
+  # ── Image-Metadaten: Tags, Labels, bewegte Kanäle ──────────────────────────
+  # Einmal berechnet und an Build und Merge gereicht — die Tag-Logik darf nicht an zwei Stellen
+  # stehen (siehe die Begründung am Schritt „Bewegte Kanäle").
+  prepare:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
     outputs:
-      # Welche ROLLENDEN Kanäle dieser Build bewegt hat — der Deploy leitet daraus ab, welche
-      # Instanzen neu starten müssen.
+      tags: ${{ steps.meta.outputs.tags }}
+      labels: ${{ steps.meta.outputs.labels }}
       pins: ${{ steps.pins.outputs.value }}
-
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -86,13 +84,6 @@ jobs:
         run: |
           NEW_VERSION=$(jq -r .version package.json)
           echo "NEW_VERSION=${NEW_VERSION}" >> $GITHUB_ENV
-
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v4
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Extract metadata (tags & labels)
         id: meta
@@ -170,6 +161,44 @@ jobs:
           echo "value=$VALUE" >> "$GITHUB_OUTPUT"
           echo "Bewegte Kanäle: ${VALUE:-<keine>}"
 
+  # ── Docker Image bauen: je Plattform nativ, ohne Emulation ─────────────────
+  # Jede Plattform baut auf einem eigenen Runner und veröffentlicht nur einen Digest (kein Tag).
+  # Die Tags setzt erst der Merge-Job unten. Native Runner statt QEMU, weil ein emulierter Next-Build
+  # ein Vielfaches dauert — und jeder `main`-Build wartet für den Deploy darauf.
+  #
+  # arm64 ist für Self-Hoster auf ARM (Raspberry Pi, ARM-VPS); die Flotte läuft auf amd64. Deshalb
+  # darf dieser Zweig scheitern, ohne den amd64-Deploy zu blockieren (`continue-on-error`) — der
+  # Merge-Job meldet es dann laut, statt still ein Image ohne arm64 zu veröffentlichen.
+  build:
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { platform: linux/amd64, runner: ubuntu-latest, suffix: amd64, optional: false }
+          - { platform: linux/arm64, runner: ubuntu-24.04-arm, suffix: arm64, optional: true }
+    runs-on: ${{ matrix.runner }}
+    continue-on-error: ${{ matrix.optional }}
+    # Begrenzt auch den Fall „kein Runner mit diesem Label verfügbar": der optionale arm64-Zweig
+    # bliebe sonst in der Warteschlange und hielte `build-and-push` (und damit den Deploy) fest.
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
@@ -179,17 +208,96 @@ jobs:
         id: builddate
         run: echo "value=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
 
-      - name: Build and push
+      # `provenance: false`: ohne Attestierung ist jeder Plattform-Digest ein einfaches Image, und
+      # der Merge baut daraus einen sauberen Index. Mit Attestierung wäre jeder Digest selbst ein
+      # Index, und `imagetools create` würde Indexe in einen Index stecken.
+      - name: Build and push by digest
+        id: build
         uses: docker/build-push-action@v7
         with:
           context: .
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          platforms: ${{ matrix.platform }}
+          labels: ${{ needs.prepare.outputs.labels }}
+          provenance: false
+          outputs: type=image,name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }},push-by-digest=true,name-canonical=true,push=true
+          # Eigener Cache je Plattform: ein gemeinsamer Bereich ließe die beiden einander verdrängen.
+          cache-from: type=gha,scope=${{ matrix.suffix }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.suffix }}
           build-args: |
             BUILD_DATE=${{ steps.builddate.outputs.value }}
+
+      - name: Export digest
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          mkdir -p /tmp/digests
+          touch "/tmp/digests/${DIGEST#sha256:}"
+
+      - name: Upload digest
+        uses: actions/upload-artifact@v7
+        with:
+          name: digests-${{ matrix.suffix }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  # ── Index bauen und taggen ─────────────────────────────────────────────────
+  # Job-ID bleibt `build-and-push`: `deploy` hängt per `needs` daran (und an seinem `pins`-Output).
+  build-and-push:
+    needs: [prepare, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      # Welche ROLLENDEN Kanäle dieser Build bewegt hat — der Deploy leitet daraus ab, welche
+      # Instanzen neu starten müssen.
+      pins: ${{ needs.prepare.outputs.pins }}
+
+    steps:
+      - name: Download digests
+        uses: actions/download-artifact@v8
+        with:
+          path: /tmp/digests
+          pattern: digests-*
+          merge-multiple: true
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Create manifest list and push tags
+        working-directory: /tmp/digests
+        env:
+          TAGS: ${{ needs.prepare.outputs.tags }}
+        run: |
+          set -euo pipefail
+          COUNT=$(ls | wc -l)
+          [ "$COUNT" -ge 1 ] || { echo "::error::Kein Plattform-Digest vorhanden."; exit 1; }
+          # amd64 ist Pflicht (Job schlägt sonst fehl); ein fehlender arm64-Zweig ist erlaubt, soll
+          # aber nicht untergehen.
+          [ "$COUNT" -ge 2 ] || echo "::warning::Nur $COUNT Plattform gebaut — dem Index fehlt arm64."
+
+          ARGS=()
+          while IFS= read -r TAG; do
+            [ -n "$TAG" ] && ARGS+=(-t "$TAG")
+          done <<< "$TAGS"
+
+          REFS=()
+          for D in *; do REFS+=("${REGISTRY}/${IMAGE_NAME}@sha256:${D}"); done
+
+          docker buildx imagetools create "${ARGS[@]}" "${REFS[@]}"
+
+      - name: Inspect result
+        env:
+          TAGS: ${{ needs.prepare.outputs.tags }}
+        run: docker buildx imagetools inspect "$(printf '%s\n' "$TAGS" | head -n1)"
 
   # ── Deploy auf Server ──────────────────────────────────────────────────────
   # Das Deploy-Skript liegt in deploy.yml (workflow_call) und wird auch von promote.yml

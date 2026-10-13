@@ -16,9 +16,19 @@ import { useApiError } from "@/app/hooks/useApiError";
 import { fromDatetimeLocal } from "@/lib/utils";
 import type { ResolvedReason } from "@/lib/reasonsService";
 import { actionSign } from "@/app/entries/actionSign";
-import { LockOpenIcon } from "@/app/components/lockIcons";
+import { LockClosedIcon, LockOpenIcon } from "@/app/components/lockIcons";
+import type { EntryGapKind } from "@/lib/entryGapService";
 
-export default function PauseForm({ userId, grundOptions, tz, nowDefault }: {
+/** Beschriftung und Zeichen je Art. Die beiden Zeitpunkte heissen hier „erster" und „zweiter": bei
+ *  der Pause ist der erste das Öffnen, bei der Tragezeit der Verschluss — die Reihenfolge am Bildschirm
+ *  folgt der Zeit, die API-Felder (`openAt`/`lockAt`) werden erst beim Absenden zugeordnet. */
+const COPY = {
+  break: { sign: "OEFFNEN", title: "pauseTitle", intro: "pauseIntro", submit: "pauseSubmit", first: "pauseOpenAt", second: "pauseLockAt", Icon: LockOpenIcon },
+  session: { sign: "VERSCHLUSS", title: "sessionTitle", intro: "sessionIntro", submit: "sessionSubmit", first: "sessionLockAt", second: "sessionOpenAt", Icon: LockClosedIcon },
+} as const;
+
+export default function EntryGapForm({ kind, userId, grundOptions, tz, nowDefault }: {
+  kind: EntryGapKind;
   userId: string;
   grundOptions: ResolvedReason[];
   tz: string;
@@ -30,9 +40,10 @@ export default function PauseForm({ userId, grundOptions, tz, nowDefault }: {
   const apiError = useApiError();
   const router = useRouter();
   const target = `/admin/users/${userId}/aktionen`;
+  const copy = COPY[kind];
 
-  const [openAt, setOpenAt] = useState("");
-  const [lockAt, setLockAt] = useState("");
+  const [first, setFirst] = useState("");
+  const [second, setSecond] = useState("");
   const [grund, setGrund] = useState("");
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
@@ -47,9 +58,10 @@ export default function PauseForm({ userId, grundOptions, tz, nowDefault }: {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          kind,
           userId,
-          openAt: fromDatetimeLocal(openAt, tz).toISOString(),
-          lockAt: fromDatetimeLocal(lockAt, tz).toISOString(),
+          openAt: fromDatetimeLocal(kind === "session" ? second : first, tz).toISOString(),
+          lockAt: fromDatetimeLocal(kind === "session" ? first : second, tz).toISOString(),
           oeffnenGrund: grund,
           note: note.trim(),
         }),
@@ -70,33 +82,33 @@ export default function PauseForm({ userId, grundOptions, tz, nowDefault }: {
     <AdminActionFormShell
       userId={userId}
       backLabel={t("aktionen")}
-      {...actionSign("OEFFNEN")}
-      title={t("pauseTitle")}
+      {...actionSign(copy.sign)}
+      title={t(copy.title)}
     >
       <EntryFormShell
         onSubmit={handleSubmit}
         onCancel={() => router.push(target)}
         cancelLabel={tCommon("cancel")}
         actions={
-          <Button type="submit" variant="primary" fullWidth loading={saving} icon={<LockOpenIcon size={16} />}>
-            {t("pauseSubmit")}
+          <Button type="submit" variant="primary" fullWidth loading={saving} icon={<copy.Icon size={16} />}>
+            {t(copy.submit)}
           </Button>
         }
       >
         <RequiredHint />
-        <p className="text-fliess text-foreground-muted">{t("pauseIntro")}</p>
+        <p className="text-fliess text-foreground-muted">{t(copy.intro)}</p>
         <DateTimePicker
-          label={t("pauseOpenAt")}
-          value={openAt}
-          onChange={(e) => setOpenAt(e.target.value)}
+          label={t(copy.first)}
+          value={first}
+          onChange={(e) => setFirst(e.target.value)}
           max={nowDefault}
           required
         />
         <DateTimePicker
-          label={t("pauseLockAt")}
-          value={lockAt}
-          onChange={(e) => setLockAt(e.target.value)}
-          min={openAt || undefined}
+          label={t(copy.second)}
+          value={second}
+          onChange={(e) => setSecond(e.target.value)}
+          min={first || undefined}
           max={nowDefault}
           required
         />

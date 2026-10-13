@@ -75,8 +75,8 @@ Erkennen lässt sich der Build so:
 - **Am Aussehen.** Der Unterschied ist nicht zu übersehen.
 - Über `GET /api/version` — `buildDate` unterscheidet sich.
 - Über das Image-Label: `docker buildx imagetools inspect ghcr.io/trublue-2/chastitytracker:feature
-  --format '{{json .Image}}' | jq -r '.config.Labels["org.opencontainers.image.revision"]'`
-  liefert den Commit.
+  --format '{{json .Image}}' | jq -r '."linux/amd64".config.Labels["org.opencontainers.image.revision"]'`
+  liefert den Commit (das Image ist ein Index über amd64 und arm64).
 
 ## Was in diesem Stand drin ist
 
