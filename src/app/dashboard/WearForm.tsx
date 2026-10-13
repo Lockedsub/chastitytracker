@@ -15,8 +15,9 @@ import RotatableImagePreview from "@/app/components/RotatableImagePreview";
 import FormField from "@/app/components/FormField";
 import useToast from "@/app/hooks/useToast";
 import useOfflineQueue from "@/app/hooks/useOfflineQueue";
+import { useEntryStartTime } from "@/app/hooks/useEntryStartTime";
 import { usePhotoUpload } from "@/app/hooks/usePhotoUpload";
-import { toDatetimeLocal, fromDatetimeLocal, toDateLocale, formatDurationBetween } from "@/lib/utils";
+import { fromDatetimeLocal, toDateLocale, formatDurationBetween } from "@/lib/utils";
 import { categoryStyle } from "@/lib/categoryConstants";
 import useTaskHoldGate from "@/app/hooks/useTaskHoldGate";
 import type { TaskWarning } from "@/lib/taskIntervals";
@@ -96,9 +97,7 @@ export default function WearForm({ kind, category, devices, activeSession, admin
   const isEdit = !!initial;
   const target = redirectTo ?? "/dashboard";
 
-  const [startTime, setStartTime] = useState(
-    toDatetimeLocal(initial?.startTime, tz) || nowDefault,
-  );
+  const { startTime, onStartChange, startIsNow } = useEntryStartTime(initial?.startTime, nowDefault, tz);
   const [deviceId, setDeviceId] = useState<string>(
     initial?.deviceId
       ?? (kind === "end" ? activeSession?.deviceId ?? "" : devices?.[0]?.id ?? ""),
@@ -170,6 +169,8 @@ export default function WearForm({ kind, category, devices, activeSession, admin
     const payload: WearBeginPayload | WearEndPayload = {
       type: kind === "begin" ? "WEAR_BEGIN" : "WEAR_END",
       startTime: fromDatetimeLocal(startTime, tz).toISOString(),
+      // Nur der Sub datiert „jetzt" mit der Server-Uhr; die Keyholderin trägt eine Zeit nach.
+      ...(startIsNow && !adminUserId ? { startIsNow } : {}),
       deviceId,
       imageUrl: imageUrl || null,
       imageExifTime: imageExifTime || null,
@@ -251,7 +252,7 @@ export default function WearForm({ kind, category, devices, activeSession, admin
         <DateTimePicker
           label={t("time")}
           value={startTime}
-          onChange={(e) => setStartTime(e.target.value)}
+          onChange={onStartChange}
           min={minTime}
           max={maxTime ?? nowDefault}
           required

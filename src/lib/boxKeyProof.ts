@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { heimdallEnabled, BOLT_OPEN_EVENT_TYPES } from "@/lib/constants";
+import type { BoxKind } from "@/lib/boxStatus";
 
 /**
  * Schlüssel-Nachweis aus der Box-Telemetrie (Spur 2) statt aus dem Box-Foto (Spur 1).
@@ -12,8 +13,9 @@ import { heimdallEnabled, BOLT_OPEN_EVENT_TYPES } from "@/lib/constants";
  */
 
 /** Woher der Schlüssel-Nachweis einer Zeile stammt — für den Keyholder sichtbar, weil ein Foto mehr
- *  zeigt (den Schlüssel selbst) als die Telemetrie (nur: der Riegel lag still). */
-export type KeyProofSource = "photo" | "telemetry";
+ *  zeigt (den Schlüssel selbst) als die Telemetrie (nur: der Riegel lag still). `photo-before-bolt`:
+ *  das Foto trägt eine Aufnahmezeit VOR „Riegel zu" (`boxPhotoTakenBeforeBolt`). */
+export type KeyProofSource = "photo" | "photo-before-bolt" | "telemetry";
 
 /** Ein Zeitpunkt, an dem sich am Riegel oder am Nachweis etwas entscheidet. Bewusst eine
  *  unterschiedene Union: welche Zusatz-Angabe zählt, hängt an der Art des Ankers. */
@@ -168,7 +170,10 @@ export async function loadTelemetryKeyProof(userId: string, sessions: LockSessio
   if (declaredAt.length === 0) return NO_TELEMETRY_KEY_PROOF;
   const firstAt = new Date(Math.min(...declaredAt));
   const [boxes, events] = await Promise.all([
-    prisma.boxStatus.findMany({ where: { userId }, select: { lastSyncAt: true, reportedLocked: true, locked: true } }),
+    // Nur Heimdall-Boxen: der Beweis stützt sich auf den lückenlosen Strom ihrer Riegel-Ereignisse.
+    // Eine LockMeBox meldet keine Ereignisse und ist zwischen zwei Handy-Kontakten stumm — ihr
+    // Schweigen hiesse hier „Riegel lag still", obwohl niemand zugesehen hat.
+    prisma.boxStatus.findMany({ where: { userId, kind: "heimdall" satisfies BoxKind }, select: { lastSyncAt: true, reportedLocked: true, locked: true } }),
     prisma.boxEvent.findMany({
       where: { userId, type: { in: BOLT_OPEN_EVENT_TYPES }, at: { gte: firstAt } },
       select: { at: true },
@@ -205,8 +210,12 @@ export function keyProofFor(
   photoDetected: boolean | null | undefined,
   boxImageUrl: string | null | undefined,
   telemetryProven: ReadonlySet<string>,
+  photoBeforeBolt = false,
 ): { keyDetected: boolean | null; keyProofSource: KeyProofSource | null } {
-  if (photoDetected != null) return { keyDetected: photoDetected, keyProofSource: "photo" };
+  if (photoDetected != null) return { keyDetected: photoDetected, keyProofSource: photoBeforeBolt ? "photo-before-bolt" : "photo" };
+  // Ein Foto von VOR „Riegel zu" meldet sich auch OHNE Urteil: ohne Vision-Anbieter bleibt `keyDetected`
+  // für immer leer, und die Warnung wäre dort nie zu sehen.
+  if (boxImageUrl && photoBeforeBolt) return { keyDetected: null, keyProofSource: "photo-before-bolt" };
   if (!boxImageUrl && entryId && telemetryProven.has(entryId)) return { keyDetected: true, keyProofSource: "telemetry" };
   return { keyDetected: null, keyProofSource: null };
 }

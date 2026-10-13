@@ -105,7 +105,6 @@
   --nav-icon-bg:            #241a1e;
   --nav-icon-active-bg:     #ff3d68;
   --focus-ring:             #ff3d68;
-  --role-keyholder:         #8f88ff;
   --btn-primary-bg:         #ff3d68;
   --btn-primary-hover:      #ff6083;
   --btn-primary-text:       #2b0410;
@@ -212,7 +211,6 @@
   --nav-icon-bg:            #181b26;
   --nav-icon-active-bg:     #8f88ff;
   --focus-ring:             #8f88ff;
-  --role-keyholder:         #8f88ff;
   --btn-primary-bg:         #8f88ff;
   --btn-primary-hover:      #a39dff;
   --btn-primary-text:       #2b0410;
@@ -320,7 +318,6 @@
   --nav-icon-bg:            #1a211c;
   --nav-icon-active-bg:     #34d399;
   --focus-ring:             #34d399;
-  --role-keyholder:         #8f88ff;
   --btn-primary-bg:         #34d399;
   --btn-primary-hover:      #59dbab;
   --btn-primary-text:       #2b0410;
@@ -541,7 +538,6 @@
   --color-focus-ring:         var(--focus-ring);
   /* Der Ton der KEYHOLDER-Rolle in JEDER Welt — für Stellen, die ÜBER den Bereich sprechen,
      statt in ihm zu stehen. Begründung am Erzeuger (`docs/design/tokens.mjs`). */
-  --color-role-keyholder:     var(--role-keyholder);
 
   /* Semantic button fills */
   --color-btn-lock:            var(--btn-lock);

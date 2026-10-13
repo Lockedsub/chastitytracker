@@ -6,7 +6,7 @@ import { CLEANING_USER_SELECT } from "@/lib/cleaningService";
 import { CLEANING_RULE_CHANGE_SELECT, cleaningRulesFrom, cleaningRulesAt } from "@/lib/cleaningRules";
 import { deviceCategoriesEnabled } from "@/lib/constants";
 import { loadTelemetryKeyProof } from "@/lib/boxKeyProof";
-import { latestEffectiveKgEntry, isPendingLock } from "@/lib/lockPending";
+import { latestEffectiveKgEntry, isPendingLock, isPendingOpen } from "@/lib/lockPending";
 import {
   buildKontrolleItems, buildKgWearPairs, buildPairs, wearHoursOfPairs,
   completedPairsFrom, getOpenPair, KG_PAIR, pairDurationMs, tzDayKey,
@@ -80,12 +80,12 @@ const BLOCK_USER_SELECT = {
   inspectionAutoMarkEnabled: true,
   inspectionAutoMarkDelayMinutes: true,
   inspectionReminderDelayMinutes: true,
-  // Für den Umstellungs-Hinweis (`ChangeoverNoticeGate`). Steht MIT drin aus demselben Grund wie
+  // Für den Hinweis zur Foto-Prüfung (`PhotoAnalysisScope`). Steht MIT drin aus demselben Grund wie
   // `dashboardLayout`: die Zeile wird ohnehin geladen, eine zweite Abfrage dafür kostete
   // gemessene ~215 µs auf dem kritischen Pfad, die Spalte kostet nichts.
-  noticeSeenVersion: true,
-  // Für den Hinweis zur Foto-Prüfung (`PhotoAnalysisScope`) — dieselbe Begründung.
   photoAnalysisNoticeSeen: true,
+  // Für die Foto-Aufnahme der Dashboard-Karten (`BoxPhotoDueCard`) — dieselbe Begründung.
+  mobileDesktopUpload: true,
 } as const;
 
 /** Die Benutzerzeile eines Trägers, wie die Blöcke sie sehen. */
@@ -149,6 +149,12 @@ export const latestKgEntryCached = cache(async (userId: string) =>
  *  {@link latestKgEntryCached}, aus derselben geladenen Liste (jüngster zuerst). */
 export const pendingLockCached = cache(async (userId: string) =>
   (await entriesCached(userId)).find(isPendingLock) ?? null,
+);
+
+/** Die schwebende Öffnung (LockMeBox), wenn eine offen ist — das Gegenstück zu
+ *  {@link pendingLockCached}: der Träger bleibt verschlossen, bis die Box „Riegel offen" meldet. */
+export const pendingOpenCached = cache(async (userId: string) =>
+  (await entriesCached(userId)).find(isPendingOpen) ?? null,
 );
 
 /**

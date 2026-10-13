@@ -138,17 +138,13 @@ model User {
   // täglich gebraucht werden, hängt an seinen Regeln, nicht an ihrem Geschmack. Zwei Keyholder
   // desselben Trägers teilen sie sich damit — wie jede andere seiner Einstellungen auch.
   quickSettings                  String?
-  // Welche Umstellung dieser Nutzer zuletzt quittiert hat, als Versionsnummer ("6.0.0").
-  //
-  // Eine VERSION und kein Boolean: derselbe Merker trägt damit auch den nächsten
-  // Umstellungs-Hinweis, statt dass jeder eine eigene Spalte bekommt. Und am `User` und nicht in
-  // `localStorage`, weil der Hinweis einmal pro PERSON gelesen werden soll — nicht einmal pro
-  // Gerät. Genau das war der Fehler, den #88 beschrieb: eine Anzeige-Entscheidung im
-  // Gerätespeicher läuft zwischen Handy und Rechner auseinander.
+  // VERALTET: Quittung des einmaligen Umstellungs-Hinweises auf v6, der entfernt wurde. Wird nirgends
+  // mehr gelesen oder geschrieben. Die Spalte bleibt, bis eine eigene Migration sie entfernt
+  // (Trigger-Register in `mcp/stateAreas.ts` mitziehen).
   noticeSeenVersion              String?
   // Welchen Stand der Foto-Prüfung dieser Nutzer zuletzt quittiert hat: `none` oder
-  // `external:<anbieter>` (siehe `disclosureOf` in vision/config.ts). Kein Versions-Zähler wie
-  // `noticeSeenVersion`: der Hinweis muss je INSTANZ-Zustand erscheinen und erneut, sobald der Admin
+  // `external:<anbieter>` (siehe `disclosureOf` in vision/config.ts). Kein Versions-Zähler:
+  // der Hinweis muss je INSTANZ-Zustand erscheinen und erneut, sobald der Admin
   // den Anbieter wechselt oder die Übergangsfrist abläuft — beides weiss keine einkompilierte Version.
   photoAnalysisNoticeSeen        String?
   // Free-text keyholder rules the human admin sets for the MCP AI keyholder (soft guidance, read-only to the agent).
@@ -1198,8 +1194,16 @@ model BoxStatus {
   id                     String    @id @default(cuid())
   userId                 String
   user                   User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  boxId                  String // Heimdall-Geräte-id (stabil)
+  boxId                  String // Heimdall-Geräte-id (stabil) bzw. BLE-Name `LOCKMEBOX-<id>`
   name                   String
+  // Welche Box: "heimdall" (eigene Firmware, meldet sich über den Heimdall-Server) oder "lockmebox"
+  // (Werks-Firmware, nur Bluetooth — das Handy des Trägers reicht Befehle und Status durch,
+  // `lockmeboxService.ts`). Bestimmt, wer die Zeile schreibt; die Anzeige ist für beide dieselbe.
+  kind                   String    @default("heimdall")
+  // Nur "lockmebox": das Passwort, mit dem der Tracker die Box verschliesst (`C/0/1/*/<pw>`) und
+  // wieder öffnet (`O/<pw>`). EINES je Box, beim Koppeln erzeugt und nie gewechselt — ein Wechsel
+  // könnte eine Box aussperren, deren Verschluss-Rückmeldung verloren ging. Verlässt nie den Server.
+  lockPassword           String?
   locked                 Boolean   @default(false)
   // Physisches IST der frischen Sync-Meldung — `locked` ist das SOLL. Seit dem Präsenz-Guard
   // (FW 0.2.33) kann die Box offen stehen, obwohl sie zu sein soll. null = Alt-Zeile (Fallback SOLL).
@@ -1258,6 +1262,20 @@ model Entry {
   // Vision-Provider, oder Prüfung läuft noch). Advisory wie deviceCheck: die Keyholderin sieht es,
   // blockiert aber nichts. Erkennt "ein Schlüssel", NICHT "der richtige Schlüssel".
   keyDetected                   Boolean?
+  /// Ab wann das Box-Foto fällig ist — nur VERSCHLUSS mit `keyInBox: true`. Gesetzt in dem Moment, in
+  /// dem die Box „Riegel zu" meldet: ein Foto VOR dem Riegel belegt nichts, bei offener Box lässt
+  /// sich der Schlüssel danach wieder herausnehmen. Das Foto wird nachgereicht und landet in
+  /// `boxImageUrl`. Einmal gesetzt, wird es nicht erneut gesetzt (siehe `boxPhotoDueService.ts`).
+  boxPhotoDueAt                 DateTime?
+  /// Die Keyholderin hat das Foto erlassen (Notausgang bei Kamerafehler, Schlüssel nicht sichtbar).
+  /// Eigenes Feld statt `boxPhotoDueAt = null`, weil der nächste „Riegel zu"-Sync es sonst neu fällig
+  /// stellte.
+  boxPhotoWaivedAt              DateTime?
+  /// Das nachgereichte Box-Foto trägt eine Aufnahmezeit (EXIF, sonst Dateizeit des Geräts) VOR „Riegel
+  /// zu" (`boxPhotoTakenBeforeBolt`): es zeigt dann womöglich die noch offene Box. Angenommen, aber
+  /// markiert; die Keyholderin sieht den Hinweis. Das Urteil steht fest, die Zeit selbst wird nicht
+  /// gespeichert — sie kommt vom Gerät und ist ein Hinweis, kein Beweis.
+  boxImageBeforeBolt            Boolean   @default(false)
   /// Wann der Riegel diesen Verschluss VOLLZOGEN hat — nur bei VERSCHLUSS gesetzt.
   ///
   /// `null` heisst „der Aufruf steht noch aus": der Träger hat den Verschluss erfasst, die Box hat
@@ -1270,6 +1288,11 @@ model Entry {
   /// (`User.lockRequiresBolt`), ohne Box oder auf dem Keyholder-Pfad wird die Zeile sofort vollzogen
   /// und trägt ihre `startTime`. Siehe `lockCommit.ts` und docs/riegel-konzept.md.
   boltConfirmedAt               DateTime?
+  /// Nur OEFFNEN, nur LockMeBox: die Öffnung ist erst der AUFRUF, die Box zu öffnen — sie gilt, wenn
+  /// die Box „Riegel offen" meldet (`commitPendingOpen`, lockCommit.ts). Bis dahin für jede Ableitung
+  /// unsichtbar wie ein schwebender Verschluss. Vorgabe `false`: ein Erzeuger, der das Feld nicht
+  /// kennt, legt eine sofort gültige Öffnung an — das Bestandsverhalten, nie ein unsichtbarer Eintrag.
+  openAwaitsBolt                Boolean   @default(false)
   note                          String?
   oeffnenGrund                  String?
   orgasmusArt                   String?
@@ -1313,6 +1336,8 @@ model Entry {
   // gibt (meistens keine); `boltConfirmedAt` allein hinter `userId` wäre wertlos, weil JEDER
   // Nicht-Verschluss dort NULL trägt.
   @@index([userId, type, boltConfirmedAt])
+  // Die wartende Öffnung (LockMeBox) — sonst läse jede Suche nach ihr alle Öffnungen des Trägers.
+  @@index([userId, type, openAwaitsBolt])
   // Ein Stempel gilt je Nutzer. Mehrere NULL nebeneinander erlaubt SQLite in einem UNIQUE-Index,
   // Einträge ohne Stempel bleiben also unberührt — es braucht keine Rückfüllung.
   @@unique([userId, clientRequestId])

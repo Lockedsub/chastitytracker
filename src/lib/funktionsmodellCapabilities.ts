@@ -487,12 +487,36 @@ export const FM_CAPABILITIES: FmCapability[] = [
     what: "Ob der Verschluss des Trägers erst gilt, wenn die Box „Riegel zu\" meldet — bis dahin ist sein Eintrag nur der Aufruf.",
     actors: ["admin", "mcp"], surfaces: ["admin-ui", "mcp"],
     routes: ["/api/admin/users/[id]"], tools: ["set_box"],
-    note: "Vorgabe aus; sichtbar nur, wo eine Box gemeldet hat. Das ABSCHALTEN vollzieht einen gerade wartenden Aufruf sofort — das ist zugleich der Ausweg, wenn die Box nicht mehr meldet. Details: docs/riegel-konzept.md.",
+    note: "Vorgabe aus; sichtbar nur, wo eine Box gemeldet hat. Bei einer LockMeBox gilt der Riegel immer — der Schalter steht dort gesperrt auf „an\", und Umlegen (auch über den MCP) tut nichts, auch kein Vollziehen eines wartenden Aufrufs. Das ABSCHALTEN vollzieht einen gerade wartenden Aufruf sofort — das ist zugleich der Ausweg, wenn die Box nicht mehr meldet. Details: docs/riegel-konzept.md.",
+  }),
+  c({
+    id: "box-photo-due", mechanic: "Box", title: "Box-Foto nach „Riegel zu\" nachreichen",
+    what: "Sobald die Box den Riegel als zu meldet, fordert das Dashboard ein Bild der Box mit sichtbarem Schlüssel an; es hängt am Verschluss.",
+    actors: ["sub", "system"], surfaces: ["sub-ui", "automatik"], routes: ["/api/entries/[id]/box-photo"],
+    note: "Der Verschluss-Dialog fragt das Foto nicht mehr ab: bei offener Box belegt es nichts, der Schlüssel liesse sich danach wieder entnehmen. Die Aufforderung bleibt, bis das Bild da ist oder erlassen wird; der Verschluss gilt auch ohne. Fällig wird es einmal je Verschluss, für LockMeBox und Heimdall. Ein Foto mit Aufnahmezeit vor „Riegel zu\" wird angenommen, aber markiert. Kontrollen verlangen ihr Foto weiterhin.",
+  }),
+  c({
+    id: "box-photo-waive", mechanic: "Box", title: "Fälliges Box-Foto erlassen",
+    what: "Die Keyholderin streicht die Aufforderung, wenn das Bild nicht zu beschaffen ist (Kamera defekt, Schlüssel im Fenster nicht erkennbar).",
+    actors: ["admin", "mcp"], surfaces: ["admin-ui", "mcp"], routes: ["/api/admin/box-photo"], tools: ["waive_box_photo"],
+    note: "Notausgang, kein Bypass der Kontrolle. Der Verschluss bleibt unberührt.",
   }),
   c({
     id: "box-relock", mechanic: "Box", title: "Box wieder verriegeln",
     what: "Löst das Verriegeln nach einer Reinigungspause aus.",
     actors: ["sub"], surfaces: ["sub-ui"], routes: ["/api/box/relock"],
+  }),
+  c({
+    id: "box-ble", mechanic: "Box", title: "LockMeBox per Bluetooth koppeln und bedienen",
+    what: "Das Handy des Trägers verbindet sich mit einer LockMeBox (Werks-Firmware) und reicht Status und Befehle zwischen Box und Tracker durch; der erste Kontakt koppelt sie.",
+    actors: ["sub"], surfaces: ["sub-ui"], routes: ["/api/box/ble"],
+    note: "Die Box folgt den Einträgen wie Heimdall, ausgeführt wird aber erst beim nächsten Verbinden an der Box. Nur mit BLE_BRIDGE_KEY. Details: docs/lockmebox.md.",
+  }),
+  c({
+    id: "box-remove", mechanic: "Box", title: "Box entfernen",
+    what: "Der Träger entfernt seine Box, um eine andere zu koppeln — er führt genau eine.",
+    actors: ["sub"], surfaces: ["sub-ui"], routes: ["/api/box/[boxId]"],
+    note: "Nur wenn er offen ist, die Box nicht als zu gemeldet hat und weder Aufruf noch Kommando wartet. Eine zweite Kopplung lehnen beide Wege ab (Bluetooth und Heimdall-Sync). Details: docs/lockmebox.md.",
   }),
   c({
     id: "box-integration", mechanic: "Box", title: "Gegenstelle für die Box",
@@ -649,9 +673,9 @@ export const FM_CAPABILITIES: FmCapability[] = [
   }),
   c({
     id: "account-display", mechanic: "Zugang", title: "Darstellung einstellen",
-    what: "Sprache, Startseite, das Ausblenden des eigenen Trackers, die Zusammenstellung des eigenen Dashboards und das Wegklicken des Umstellungs-Hinweises.",
+    what: "Sprache, Startseite, das Ausblenden des eigenen Trackers, die Zusammenstellung des eigenen Dashboards und das Wegklicken des Hinweises zur Foto-Prüfung.",
     actors: ["sub"], surfaces: ["sub-ui"],
-    routes: ["/api/settings/locale", "/api/settings/start-page", "/api/settings/hide-own-tracker", "/api/settings/dashboard-layout", "/api/settings/notice-seen", "/api/settings/photo-analysis-notice-seen"],
+    routes: ["/api/settings/locale", "/api/settings/start-page", "/api/settings/hide-own-tracker", "/api/settings/dashboard-layout", "/api/settings/photo-analysis-notice-seen"],
   }),
   c({
     id: "account-timezone", mechanic: "Zugang", title: "Zeitzone setzen",

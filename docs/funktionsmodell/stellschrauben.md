@@ -22,6 +22,7 @@ Steckbrief: [15-eintraege.md](15-eintraege.md)
 | `Entry.startTime` | DateTime | (keiner) | je Eintrag | Der Zeitpunkt, den der Eintrag behauptet. Auf dem Sub-Pfad gegen Rückdatierung begrenzt, auf dem Keyholder-Pfad frei — dort erfüllt ein Nachtrag nur, was es zu seinem Zeitpunkt schon gab. | Sub, Keyholder (UI) | Sessions/Statistik, Strafbuch | `entryFulfilment.ts` |
 | `Entry.keyInBox` | Boolean? | — | je Eintrag | Erklärung beim Verschluss, ob der Schlüssel in die Box wandert. `false` = er behält ihn, die Box bekommt bewusst KEIN Sperr-Kommando. `null` = nicht gefragt. | Sub | Box, Sperrzeit | `boxCommand.ts` |
 | `Entry.boltConfirmedAt` | DateTime? | — | je Eintrag | Wann der Riegel diesen Verschluss vollzogen hat. `null` = der Aufruf steht noch aus, und dann ist die Zeile für JEDE Ableitung unsichtbar (Verschluss-Zustand, Sessions, Statistik, Strafbuch). Ohne aktiven Riegel-Schalter sofort gesetzt. | System | Box, Sperrzeit, Sessions/Statistik, Strafbuch | `lockPending.ts` |
+| `Entry.openAwaitsBolt` | Boolean | `false` | je Eintrag | Nur LockMeBox: die Öffnung ist erst der Aufruf, die Box zu öffnen. `true` = für JEDE Ableitung unsichtbar, der Träger bleibt verschlossen, bis die Box „Riegel offen" meldet; dann wird sie vollzogen und das Feld gelöscht. | System | Box, Sperrzeit, Sessions/Statistik, Strafbuch | `lockPending.ts` |
 | `Entry.oeffnenGrund` | String? | — | je Eintrag | Grund einer Öffnung. `REINIGUNG` ist der eine Wert, an dem die gesamte Reinigungsmechanik hängt — er entscheidet, ob die Sperrzeit fällt. | Sub, Keyholder (UI) | Reinigung, Sperrzeit, Strafbuch, Sessions/Statistik | `queries.ts:isAllowedCleaningOpen` |
 | `Entry.deviceId` | String? | — | je Eintrag | Welches Gerät der Eintrag betrifft. Bei einem Konflikt mit dem Bild gewinnt das Bild, nicht diese Deklaration. | Sub, Keyholder (UI) | Geräte, Sessions/Statistik, Kontrollen | — |
 
@@ -244,7 +245,6 @@ Steckbrief: [85-zugang.md](85-zugang.md)
 | `User.locale` | String | `"de"` | dauerhaft | Sprache der Oberfläche UND aller Anschreiben — auch der Portal-Mails, die sie von hier lesen. | Sub, Keyholder (UI) | Oberfläche, Benachrichtigungen | `emailI18n.ts` |
 | `User.dashboardLayout` | String? | — | dauerhaft | Abweichungen vom Standard-Dashboard (ausgeblendete Blöcke, eigene Reihenfolge) als JSON je Oberfläche. Leer = Standard. | Sub | Oberfläche | `dashboardLayout.ts:resolveLayout` |
 | `User.quickSettings` | String? | — | dauerhaft | Welche Einstellungen dieses Trägers in der Keyholder-Übersicht als Schnellschalter erscheinen (Liste von Schlüsseln, höchstens vier). Reine Anzeige-Auswahl: sie ändert keine Regel, sondern nur, welche davon ohne Umweg über die Einstellungen erreichbar ist. | Keyholder (UI) | Oberfläche | `quickSettings.ts` |
-| `User.noticeSeenVersion` | String? | — | dauerhaft | Welche Umstellung dieser Nutzer quittiert hat, als Versionsnummer. Leer = der Hinweis zur laufenden Umstellung erscheint beim nächsten Aufruf. Reine Anzeige-Quittung: er ändert nichts an Regeln, Fristen oder Beurteilung. | Sub | Oberfläche | `notice.ts:NOTICE_VERSION` |
 | `User.photoAnalysisNoticeSeen` | String? | — | dauerhaft | Welchen Stand der Foto-Prüfung dieser Nutzer zuletzt quittiert hat (`none` oder `external:<anbieter>`). Weicht der Stand der Instanz davon ab, erscheint der Hinweis erneut — bei Anbieterwechsel und am Ende der Übergangsfrist. Den Hinweis gibt es nur im Keyholder-Bereich; Subs erfahren den Datenweg allein über das ⓘ am Foto-Feld. Reine Anzeige-Quittung. | Sub | Oberfläche | `vision/config.ts:disclosureOf` |
 | `AdminUserRelationship.adminId` | String | (keiner) | dauerhaft | Wer diesen Sub steuern darf. Ohne Zeile sieht ein Admin ihn nicht — die Zuordnung ist die eigentliche Berechtigung. | Keyholder (UI) | Zugang, MCP, Nachrichten | — |
 | `AdminUserRelationship.userId` | String | (keiner) | dauerhaft | Der zugeordnete Sub. | Keyholder (UI) | Zugang | — |
@@ -295,6 +295,7 @@ eigentliche Vollständigkeitsbeweis: ein Feld, das weder oben noch hier steht, g
 | `User.createdAt` | Identität | Anlage-Zeitpunkt. |
 | `User.autoInspectionPlannedFor` | Laufzeitzustand | Merker des Planers: bis wann der Tagesplan gewürfelt ist. Wird vom Poller gesetzt, nicht von Hand. |
 | `User.telegramChatId` | Datensatz | Verknüpfter Telegram-Chat als Ziel des dritten Benachrichtigungs-Kanals. Kein Schalter, sondern eine Bindung: gesetzt vom Verknüpfungs-Webhook (der Nutzer drückt im Chat Start), gelöscht beim Entkoppeln. `null` = nicht verknüpft, dann wird für ihn nie über Telegram zugestellt. |
+| `User.noticeSeenVersion` | Laufzeitzustand | Veraltet: Quittung des einmaligen Umstellungs-Hinweises auf v6, der entfernt wurde. Wird nirgends mehr gelesen oder geschrieben; die Spalte bleibt, bis eine Migration sie entfernt. |
 | `User.weightReminderMark` | Laufzeitzustand | Für welches Wiege-Fenster zuletzt erinnert wurde (`<Tag>#<Startzeit>`). Kein Schalter, sondern die Merkfähigkeit des Minuten-Pollers: sie verhindert die Wiederholung und erlaubt zugleich das Nachholen nach einem Neustart. |
 | `Entry.id` | Identität | Primärschlüssel. |
 | `Entry.clientRequestId` | Laufzeitzustand | Merkfähigkeit gegen die doppelte Zustellung: erkennt einen wiederholten Anlege-Versuch als denselben, statt einen zweiten Eintrag zu schreiben. Kein Teil dessen, was der Eintrag festhält — leer, wo der Versuch nicht wiederholbar ist. |
@@ -306,6 +307,9 @@ eigentliche Vollständigkeitsbeweis: ein Feld, das weder oben noch hier steht, g
 | `Entry.codeReadable` | Laufzeitzustand | Ob im Bildersafe-Foto überhaupt Ziffern erkennbar waren. Die Zahl selbst wird bewusst nicht gespeichert. |
 | `Entry.boxImageUrl` | Datensatz | Aufnahme durch das Sichtfenster der Box als Schlüssel-Nachweis. |
 | `Entry.keyDetected` | Laufzeitzustand | Hat die Bilderkennung im Sichtfenster einen Schlüssel gesehen? Beratend, blockiert nichts — und erkennt 'ein Schlüssel', nicht 'der richtige'. |
+| `Entry.boxPhotoDueAt` | Laufzeitzustand | Ab wann das Box-Foto fällig ist: gesetzt, wenn die Box „Riegel zu" meldet — ein Foto vorher belegte nichts. Einmal je Verschluss. |
+| `Entry.boxPhotoWaivedAt` | Laufzeitzustand | Die Keyholderin hat das fällige Box-Foto erlassen (Notausgang). Eigenes Feld, damit der nächste Riegel-Sync es nicht neu fällig stellt. |
+| `Entry.boxImageBeforeBolt` | Laufzeitzustand | Das Box-Foto wurde mehr als fünf Minuten VOR „Riegel zu" aufgenommen: angenommen, aber markiert — es zeigt womöglich die noch offene Box. |
 | `Entry.note` | Datensatz | Freitext des Erfassenden. |
 | `Entry.orgasmusArt` | Datensatz | Art des Orgasmus; die Auswahlliste steuert `User.orgasmusArtenConfig`. |
 | `Entry.kontrollCode` | Laufzeitzustand | Der bei dieser Kontrolle geforderte Code. |
@@ -455,7 +459,9 @@ eigentliche Vollständigkeitsbeweis: ein Feld, das weder oben noch hier steht, g
 | `BoxStatus.id` | Identität | Primärschlüssel. |
 | `BoxStatus.userId` | Identität | Eigentümer der Zeile. |
 | `BoxStatus.boxId` | Identität | Stabile Geräte-Kennung der Box. |
-| `BoxStatus.name` | Datensatz | Anzeigename der Box; kommt aus Heimdall. |
+| `BoxStatus.name` | Datensatz | Anzeigename der Box; kommt aus Heimdall bzw. ist bei der LockMeBox ihr Bluetooth-Name. |
+| `BoxStatus.kind` | Identität | Welche Box: `heimdall` meldet sich selbst, `lockmebox` (Werks-Firmware) nur, wenn sich das Handy des Trägers per Bluetooth verbindet. |
+| `BoxStatus.lockPassword` | Datensatz | Nur LockMeBox: das Passwort, mit dem der Tracker sie verschliesst und öffnet. Einmal je Box beim Koppeln erzeugt, nie gewechselt, verlässt nie den Server. |
 | `BoxStatus.locked` | Laufzeitzustand | Das SOLL: so soll die Box stehen. |
 | `BoxStatus.reportedLocked` | Laufzeitzustand | Das IST der letzten Meldung. Seit dem Präsenz-Guard kann die Box offen stehen, obwohl sie zu sein soll. |
 | `BoxStatus.lockUntil` | Laufzeitzustand | Die effektive Sperre aus eigener Frist und Tracker-Sperrzeit, gekappt. |

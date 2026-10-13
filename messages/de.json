@@ -96,6 +96,7 @@
     "noFieldsToUpdate": "Keine Felder zum Aktualisieren",
     "ALREADY_LOCKED": "Verschluss nur möglich, wenn aktuell offen. Lade die Seite neu — vielleicht ist der Verschluss schon erfasst.",
     "LOCK_ALREADY_PENDING": "Es läuft bereits ein Verschluss-Aufruf: drücke den Knopf an der Box, damit der Riegel schliesst.",
+    "OPEN_ALREADY_PENDING": "Es läuft bereits ein Öffnungs-Aufruf: drücke den Knopf an der Box, damit sie sich öffnet.",
     "ALREADY_WEARING": "In dieser Kategorie läuft bereits eine Tragezeit. Beende sie zuerst, dann kannst du neu beginnen.",
     "DEVICE_CATEGORIES_DISABLED": "Geräte-Kategorien sind nicht aktiviert",
     "FORBIDDEN": "Kein Zugriff",
@@ -206,6 +207,11 @@
     "DEVICE_INVALID_CODE_REQUIREMENT": "Ungültiger Wert für die Kontroll-Code-Pflicht",
     "BOX_RELOCK_NOT_LOCKED": "Du bist gerade nicht verschlossen — die Box folgt sonst dem Verschluss-Eintrag",
     "BOX_RELOCK_KEY_NOT_IN_BOX": "Laut Deklaration liegt der Schlüssel nicht in der Box",
+    "BOX_BLE_BAD_STATUS": "Die Box hat eine unlesbare Antwort geschickt — bitte nochmals verbinden",
+    "BOX_BLE_OTHER_BOX": "Diese Box ist bereits als andere Box-Art gekoppelt",
+    "BOX_ONE_PER_USER": "Du hast bereits eine Schlüsselbox. Entferne sie zuerst in den Einstellungen, dann kannst du eine andere koppeln",
+    "BOX_REMOVE_BLOCKED": "Die Box lässt sich nur entfernen, wenn du offen bist, die Box offen ist und kein Aufruf wartet. Könnte sie noch zu sein, verbinde dich einmal mit ihr — dann weiss der Tracker Bescheid.",
+    "USER_BOX_LOCKED": "Dieser Benutzer hat eine Schlüsselbox, die zu sein könnte. Mit dem Konto ginge ihr Passwort verloren — erst die Box öffnen oder entfernen.",
     "lastAdmin": "Der letzte Admin kann sich die Rechte nicht selbst entziehen — sonst kommt niemand mehr in den Adminbereich",
     "BOX_PHOTO_REQUIRED": "Diese Kontrolle verlangt das Foto der Box — ohne Foto lässt sie sich nicht abschliessen.",
     "BOX_PHOTO_REUSED": "Dieses Box-Foto gehört bereits zu einem anderen Eintrag. Bitte eine frische Aufnahme machen.",
@@ -277,7 +283,8 @@
     "Forbidden": "Kein Zugriff — für diese Aktion fehlen deinem Konto die Rechte.",
     "Unauthorized": "Du bist nicht (mehr) angemeldet. Bitte melde dich neu an.",
     "rateLimited": "Zu viele Versuche. Bitte in ein paar Minuten erneut.",
-    "photoAnalysisBaseUrlPrivate": "Diese Adresse zeigt auf ein internes Netz. Das geht nur, wenn der Server-Betreiber es ausdrücklich freigegeben hat."
+    "photoAnalysisBaseUrlPrivate": "Diese Adresse zeigt auf ein internes Netz. Das geht nur, wenn der Server-Betreiber es ausdrücklich freigegeben hat.",
+    "BOX_PHOTO_NOT_DUE": "Für diesen Verschluss ist kein Box-Bild fällig (mehr)."
   },
   "appLock": {
     "subtitle": "Identität bestätigen um fortzufahren",
@@ -600,6 +607,7 @@
     "lockCallPressButton": "Drück den Knopf an der Box — verschlossen bist du, sobald der Riegel zufällt.",
     "lockCallWithdraw": "Aufruf zurücknehmen",
     "lockCallWithdrawFailed": "Der Aufruf konnte nicht zurückgenommen werden.",
+    "openCallPressButton": "Öffnung angefordert — drück den Knopf an der Box. Offen bist du, sobald der Riegel aufgeht.",
     "cleaningRelockWarn": "Wieder einschliessen bis {time} — danach gilt es als versäumt.",
     "cleaningRelockWarnPassed": "Die Frist um {time} ist verstrichen — der Wiederverschluss gilt als versäumt.",
     "lockNow": "Jetzt einschliessen",
@@ -613,7 +621,11 @@
     "editLayoutLocked": "Trägt eine Frist — bleibt sichtbar",
     "editLayoutMoved": "{name} ist jetzt an Position {position} von {total}.",
     "editLayoutStartsOpen": "„{name}\": startet Offen — antippen, damit der Block zugeklappt startet",
-    "editLayoutStartsClosed": "„{name}\": startet Zu — antippen, damit der Block offen startet"
+    "editLayoutStartsClosed": "„{name}\": startet Zu — antippen, damit der Block offen startet",
+    "boxPhotoDueTitle": "Box-Bild mit sichtbarem Schlüssel hinterlegen",
+    "boxPhotoDueText": "Der Riegel ist zu. Fotografiere die Box durchs Sichtfenster, sodass der Schlüssel gut erkennbar ist.",
+    "boxPhotoDueSave": "Bild hinterlegen",
+    "keyPhotoBeforeBolt": "Foto vor Riegel zu aufgenommen"
   },
   "newEntry": {
     "title": "Neu erfassen",
@@ -670,14 +682,25 @@
     "failsafeBatteryWarn": "Akku {percent} % — ab {opensAt} % öffnet sich die Box von selbst. Laden.",
     "failsafeBatteryDue": "Akku {percent} % — die Box öffnet sich jederzeit von selbst (Schwelle {opensAt} %). Sofort laden.",
     "subTimePrefix": "Sub",
-    "deviceInfo": "Angaben zum Gerät"
+    "deviceInfo": "Angaben zum Gerät",
+    "pendingCloseBle": "Schliessen angefordert — die Box schliesst, sobald sich jemand an ihr per Bluetooth verbindet.",
+    "pendingOpenBle": "Öffnung freigegeben — die Box öffnet, sobald sich jemand an ihr per Bluetooth verbindet.",
+    "neverContacted": "noch nie verbunden",
+    "lastContactMinutes": "letzter Kontakt vor {count} Min",
+    "lastContactHours": "letzter Kontakt vor {count} Std",
+    "lastContactDays": "letzter Kontakt vor {count} Tg",
+    "settingsRow": "Schlüsselbox",
+    "pairedHintHeimdall": "Die Box meldet sich über Heimdall. Für einen Wechsel hier entfernen und die Box auch bei Heimdall abmelden — sonst meldet sie sich beim nächsten Abgleich wieder an.",
+    "remove": "Box entfernen",
+    "removeConfirm": "Box wirklich entfernen? Danach kannst du eine andere koppeln.",
+    "paired": "Gekoppelt: {name}"
   },
   "lockForm": {
     "title": "Verschluss erfassen",
     "saveBtn": "Verschluss speichern",
     "keyInBoxName": "Box: {name}",
     "keyInBoxLabel": "Schlüssel ist in der Box",
-    "keyInBoxDesc": "Aus = du behältst den Schlüssel (z.B. auf Reise). Die Box verriegelt dann nicht.",
+    "keyInBoxDesc": "Aus = du behältst den Schlüssel (z.B. auf Reise). Die Box verriegelt dann nicht. An = sobald der Riegel zu ist, wirst du um ein Bild der Box gebeten.",
     "boltGateTimeHint": "Setzt der Riegel: Speichern ruft die Box zum Schliessen: verschlossen bist du, sobald sie „Riegel zu“ meldet.",
     "sealNumber": "Siegel-Nummer (optional)",
     "sealNumberHint": "5–8 Ziffern",
@@ -705,9 +728,9 @@
     "boxPhotoHint": "Durch das Sichtfenster fotografieren, sodass der Schlüssel gut erkennbar ist.",
     "confirmKeyOutsideTitle": "Schlüssel nicht in der Box?",
     "confirmKeyOutsideText": "Sicher, dass der Schlüssel nicht in die Box muss? Die Box verriegelt dann nicht.",
+    "confirmSaveAnyway": "Trotzdem speichern",
     "confirmNoBoxPhotoTitle": "Kein Foto der Box",
-    "confirmNoBoxPhotoText": "Sicher ohne Foto der Box speichern? Ohne Foto ist nicht belegt, dass der Schlüssel wirklich drin liegt.",
-    "confirmSaveAnyway": "Trotzdem speichern"
+    "confirmNoBoxPhotoText": "Sicher ohne Foto der Box speichern? Ohne Foto ist nicht belegt, dass der Schlüssel wirklich drin liegt."
   },
   "feedback": {
     "title": "Feedback",
@@ -1551,7 +1574,16 @@
     "strafbuchUrteilPlaceholder": "Urteil wählen …",
     "strafbuchUrteilAufgabe": "Aufgabe als Strafe stellen",
     "strafbuchStrafeBeschreiben": "Strafe beschreiben",
-    "strafbuchGemeldet": "Vom Träger als erledigt gemeldet am {date}"
+    "strafbuchGemeldet": "Vom Träger als erledigt gemeldet am {date}",
+    "boxPhotoDueInfo": "Box-Bild ausstehend seit {date}",
+    "boxPhotoWaive": "Box-Bild erlassen",
+    "boxPhotoWaiveHint": "Der Verschluss bleibt gültig. Nur für den Fall, dass das Bild nicht zu beschaffen ist.",
+    "boltGateAlways": "Bei einer LockMeBox gilt der Verschluss immer erst mit dem Riegel — dieser Schalter wirkt dort nicht und lässt sich nicht ändern.",
+    "boxInfoNone": "Keine Box hinterlegt.",
+    "boxInfoKind": "Box-Art",
+    "boxInfoNumber": "Box-Nr.",
+    "boxKindHeimdall": "Heimdall",
+    "boxKindLockmebox": "LockMeBox"
   },
   "forgotPassword": {
     "pageTitle": "Passwort zurücksetzen",
@@ -1878,6 +1910,9 @@
     "lockPushRequestTitle": "Bitte einschliessen",
     "lockPushPeriodTitle": "Sperrzeit gesetzt",
     "lockPushRequestBody": "Der Keyholder fordert dich auf, dich einzuschliessen.",
+    "boxWaitingPushTitle": "Box wartet",
+    "boxWaitingPushLock": "Die Box soll schliessen. Öffne die App und drück den Knopf an der Box.",
+    "boxWaitingPushOpen": "Die Box soll öffnen. Öffne die App und drück den Knopf an der Box.",
     "lockPushDeadline": "Frist: {date}",
     "lockPushUntil": "Bis: {date}",
     "orgasmAnweisungSubject": "Orgasmus angewiesen",
@@ -1982,7 +2017,9 @@
     "penaltyReportedDoneSubject": "{username} meldet eine Strafe als erledigt",
     "penaltyReportedDoneMessage": "{username} meldet die Strafe „{penalty}“ als erledigt. Bestätigen kannst du sie auf der Übersicht oder im Strafbuch.",
     "taskProofReminderSubject": "Nachweis fehlt noch",
-    "taskProofReminderMessage": "Zur Aufgabe „{title}“ fehlt noch der Nachweis „{description}“ — fällig um {until}."
+    "taskProofReminderMessage": "Zur Aufgabe „{title}“ fehlt noch der Nachweis „{description}“ — fällig um {until}.",
+    "boxPhotoDuePushTitle": "Box-Bild hinterlegen",
+    "boxPhotoDuePushBody": "Der Riegel ist zu. Öffne die App und hinterlege ein Bild der Box mit sichtbarem Schlüssel."
   },
   "tasks": {
     "titleLabel": "Titel",
@@ -2283,17 +2320,6 @@
     "autoInspectionsEnabledLabel": "Automatische Kontrollen aktiv",
     "offensesDesc": "Welche Vergehensarten bei dir zählen. Was hier nicht zählt, wird dir auch nicht angelastet."
   },
-  "notice": {
-    "title": "Die App sieht neu aus — und die Farbe sagt jetzt etwas",
-    "intro": "Bisher war sie Geschmackssache: hell oder dunkel, dazu eine Farbwelt zur Auswahl. Ab dieser Version zeigt sie den Zustand — und deshalb sind beide Schalter aus den Einstellungen verschwunden. Es gibt nichts mehr zu wählen.",
-    "legendLocked": "Grün heisst: verschlossen.",
-    "legendOpen": "Rosa heisst: nicht verschlossen.",
-    "legendKeyholder": "Indigo ist kein Zustand, sondern ein Ort: so sieht der Keyholder-Bereich aus.",
-    "caveats": "Zwei Dinge gehören dazu: Rosa erscheint auch während einer Reinigungspause — eine erlaubte Öffnung ist immer noch eine Öffnung. Und das Schloss unterscheidet offen von geschlossen an der Form, nicht nur am Ton; wer Grün und Rosa schlecht auseinanderhält, liest es trotzdem.",
-    "unchanged": "Es fehlt keine Funktion und nichts ist abgeschaltet. Die App kann genau dasselbe wie vorher.",
-    "understood": "Verstanden",
-    "whatElse": "Was sonst neu ist"
-  },
   "photoAnalysis": {
     "infoLabel": "Wohin geht dieses Foto?",
     "infoPhoto": "Dieses Foto wird zur automatischen Prüfung an {provider} übertragen.",
@@ -2349,5 +2375,23 @@
     "saveButton": "Speichern",
     "noticeTitleLocal": "Fotos werden jetzt auf einem eigenen Server geprüft",
     "noticeBodyLocal": "Eingereichte Fotos gehen an keinen externen KI-Dienst mehr. Die automatische Prüfung läuft auf einem Server, den der Betreiber dieser Instanz als eigenen angegeben hat."
+  },
+  "lockmebox": {
+    "connect": "Mit Box verbinden",
+    "connecting": "Verbinde mit der Box …",
+    "pressButton": "Zuerst den Knopf an der Box drücken — sie schläft sonst und ist nicht zu finden.",
+    "done": "Box abgeglichen.",
+    "doneLocked": "Box abgeglichen — sie ist verschlossen.",
+    "doneOpen": "Box abgeglichen — sie ist offen.",
+    "notSupported": "Dieses Gerät kann nicht per Bluetooth verbinden. Auf dem iPhone geht es nur in der App, auf Android und am Computer in Chrome oder Edge.",
+    "noDevice": "Keine Box gefunden. Knopf an der Box drücken und nochmals versuchen.",
+    "noReply": "Die Box hat nicht geantwortet. Knopf an der Box drücken und nochmals versuchen.",
+    "passwordWrong": "Die Box ist mit einem anderen Passwort verschlossen, vermutlich über die Hersteller-App. Der Tracker kann sie so nicht öffnen.",
+    "notApplied": "Die Box hat den Befehl nicht ausgeführt. Bitte nochmals verbinden.",
+    "settingsHint": "Koppelt eine LockMeBox mit Werks-Firmware per Bluetooth. Danach folgt sie deinen Verschluss- und Öffnen-Einträgen — ausgeführt wird jeweils, wenn du dich an der Box verbindest.",
+    "permission": "Bluetooth ist ausgeschaltet oder für die App nicht erlaubt. Bitte in den iPhone-Einstellungen freigeben.",
+    "serverUnreachable": "Keine Verbindung zum Tracker. Die Box hat womöglich schon reagiert — nach dem Verbinden nochmals abgleichen.",
+    "autoSearching": "Drück den Knopf an der Box — die App verbindet sich von selbst.",
+    "pairedHint": "Die Box folgt deinen Verschluss- und Öffnen-Einträgen. Die App verbindet sich jeweils selbst, sobald du den Knopf an der Box drückst."
   }
 }

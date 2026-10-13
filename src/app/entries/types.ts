@@ -43,6 +43,8 @@ export interface PruefungPayload {
 export interface VerschlussPayload {
   type: "VERSCHLUSS";
   startTime: string;
+  /** Der Träger hat die Zeit nicht angefasst: der Server datiert mit seiner Uhr, auf die Sekunde. */
+  startIsNow?: boolean;
   imageUrl: string | null;
   imageExifTime: string | null;
   note: string | null;
@@ -56,16 +58,13 @@ export interface VerschlussPayload {
   codeImageUrl?: string | null;
   /** Bildersafe: Ziffern im Code-Foto erkannt (Lesbarkeits-✓). */
   codeReadable?: boolean | null;
-  /** Foto durchs Sichtfenster der Box, das den Schlüssel darin zeigt. Nur bei aktiver Box. */
-  boxImageUrl?: string | null;
-  /** Anzeige-Drehung des Box-Fotos — die server-seitige Erkennung liest es damit so, wie der Sub
-   *  es gesehen hat. Kein Urteil vom Client: `keyDetected` entsteht ausschliesslich auf dem Server. */
-  boxImageRotation?: number;
 }
 
 export interface OeffnenPayload {
   type: "OEFFNEN";
   startTime: string;
+  /** Der Träger hat die Zeit nicht angefasst: der Server datiert mit seiner Uhr, auf die Sekunde. */
+  startIsNow?: boolean;
   oeffnenGrund: string;
   note: string | null;
   /** Only set when user confirmed the Reinigung-limit-bypass sheet. */
@@ -75,6 +74,8 @@ export interface OeffnenPayload {
 export interface WearBeginPayload {
   type: "WEAR_BEGIN";
   startTime: string;
+  /** Der Träger hat die Zeit nicht angefasst: der Server datiert mit seiner Uhr, auf die Sekunde. */
+  startIsNow?: boolean;
   deviceId: string;
   imageUrl: string | null;
   imageExifTime: string | null;
@@ -84,6 +85,8 @@ export interface WearBeginPayload {
 export interface WearEndPayload {
   type: "WEAR_END";
   startTime: string;
+  /** Der Träger hat die Zeit nicht angefasst: der Server datiert mit seiner Uhr, auf die Sekunde. */
+  startIsNow?: boolean;
   deviceId: string;
   imageUrl: string | null;
   imageExifTime: string | null;

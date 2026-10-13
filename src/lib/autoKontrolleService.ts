@@ -7,10 +7,10 @@ import {
   AUTO_INSPECTION_DEADLINE_FROM_RANGE, AUTO_INSPECTION_DEADLINE_TO_RANGE,
   CLEANING_RELOCK_INSPECTION_DELAY, CLEANING_RELOCK_INSPECTION_DELAY_SLEEP, TIME_RANGE_INVALID,
   POST_LOCK_INSPECTION_DELAY_MIN_RANGE, POST_LOCK_INSPECTION_DELAY_MAX_RANGE,
-  POST_LOCK_INSPECTION_DEADLINE_RANGE, heimdallEnabled,
+  POST_LOCK_INSPECTION_DEADLINE_RANGE,
 } from "@/lib/constants";
 import { generateKontrollCode } from "@/lib/utils";
-import { GENUINELY_WITHDRAWN_WHERE, AUTO_PLAN_WHERE, todaysAutoPlanWhere, getIsLocked } from "@/lib/queries";
+import { GENUINELY_WITHDRAWN_WHERE, AUTO_PLAN_WHERE, todaysAutoPlanWhere, getIsLocked, userHasBox } from "@/lib/queries";
 import {
   autoInspectionDayRulesProblem, fixedWindowMinutes, formatAutoInspectionDayRule,
   parseAutoInspectionDayRules, timesForDay, triggerWindowAllQuiet, type AutoInspectionDayRule,
@@ -148,8 +148,10 @@ export function isInQuietMinutes(vonMin: number, bisMin: number, min: number): b
 }
 
 /** Nächster Schlaf-Beginn ≥ `trig` (+1440, wenn der heutige Schlaf-Beginn schon vor dem Trigger liegt
- *  — dann ist es der von morgen). Trigger sind vor Aufruf bereits als „nicht im Schlaf" gefiltert. */
-function nextSleepStart(quietVon: number, trig: number): number {
+ *  — dann ist es der von morgen). Trigger sind vor Aufruf bereits als „nicht im Schlaf" gefiltert.
+ *  `Infinity`, wenn es gar keinen Schlaf gibt (`ruheVon == ruheBis`, siehe {@link isInQuietMinutes}). */
+function nextSleepStart(quietVon: number, quietBis: number, trig: number): number {
+  if (quietVon === quietBis) return Infinity;
   return quietVon > trig ? quietVon : quietVon + 1440;
 }
 
@@ -159,8 +161,8 @@ function nextSleepStart(quietVon: number, trig: number): number {
  *  Damit hält JEDER erzeugte Fenster-Slot `dur ∈ [fristVon, fristBis]` — eine Kontrolle mit einer auf
  *  Minuten zusammengestauchten Frist wäre für den Sub nicht erfüllbar. Lieber kein Slot als einer,
  *  den er nicht schaffen kann. */
-function windowDeadlineMin(trig: number, dur: number, quietVon: number, fristVon: number): number | null {
-  const deadline = Math.min(trig + dur, nextSleepStart(quietVon, trig) - 1);
+function windowDeadlineMin(trig: number, dur: number, quietVon: number, quietBis: number, fristVon: number): number | null {
+  const deadline = Math.min(trig + dur, nextSleepStart(quietVon, quietBis, trig) - 1);
   return deadline - trig >= fristVon ? deadline : null;
 }
 
@@ -203,14 +205,10 @@ function sleepBlocksWithin(win: { start: number; end: number }, quietVon: number
  * Einschalten um 21:00 in ein Trommelfeuer. Aufgerundet wird, damit ein spät begonnener Tag nicht
  * doch wieder an der Rundung verstummt; ganz ohne Platz bleibt er leer, denn erfunden wird keiner.
  *
- * **Warum nicht `fillFreeGaps`**, das ja genau „ab jetzt" füllt und dem Neuwurf dient: es hält
- * Auslösung UND Frist in derselben Lücke, weil es an zugestellten Kontrollen vorbei planen muss.
- * Bei festem Auslöse-Fenster ist das zu streng — dort darf die Frist übers Fensterende hinaus und
- * wird erst am Schlaf-Beginn gekappt. Ein Fenster bis 16:00 mit Mindest-Frist 60 gäbe ab 15:01
- * sonst gar nichts mehr, obwohl eine Auslösung um 15:30 mit Frist bis 17:00 völlig in Ordnung ist.
- * Ein Differenz-Test über rund 92 000 Kombinationen hat genau das gefunden: 593 Fälle, in denen
- * dieselben Einstellungen mit `fillFreeGaps` verstummten. Der Tagesplan braucht keine Rücksicht auf
- * Zugestelltes — an dieser Stelle ist noch nichts zugestellt.
+ * **Warum nicht `fillFreeGaps`**, das ja genau „ab jetzt" füllt und dem Neuwurf dient: es muss an
+ * zugestellten Kontrollen vorbei planen und arbeitet deshalb mit Lücken. Der Tagesplan braucht
+ * keine Rücksicht auf Zugestelltes — an dieser Stelle ist noch nichts zugestellt. Beide teilen die
+ * Fenster-Grenzen aus {@link triggerDomain} (Auslösung im Fenster, Frist bis vor den Schlaf-Beginn).
  */
 export function generateAutoKontrollen(
   settings: AutoKontrolleSettings,
@@ -265,9 +263,9 @@ function planAxis(settings: AutoKontrolleSettings, now: Date, tz: string) {
 function remainderOfDay(
   x: number, settings: AutoKontrolleSettings, now: Date, tz: string,
 ): { from: number; count: number } {
-  const { at, minuteOf, lower, upper, occupied } = planAxis(settings, now, tz);
+  const { at, minuteOf, lower, placeableEnd, occupied } = planAxis(settings, now, tz);
   const from = at(lower).getTime() >= now.getTime() ? lower : Math.max(lower, minuteOf(now) + 1);
-  const freeFrom = (m: number) => freeGaps(m, upper, occupied).reduce((sum, g) => sum + gapLen(g), 0);
+  const freeFrom = (m: number) => freeGaps(m, placeableEnd, occupied).reduce((sum, g) => sum + gapLen(g), 0);
   const whole = freeFrom(lower);
   const rest = freeFrom(from);
   // Ein Anteil über 1 ist nicht bloss unerwünscht, er ist unerreichbar: `from` liegt nie unter
@@ -325,9 +323,22 @@ function spreadOverDay(
       const triggerMin = Math.ceil(winStart + i * segSize);
       const triggerMax = Math.floor(winStart + (i + 1) * segSize) - 1; // Trigger vor Segmentende → verteilt
       if (triggerMax < triggerMin) continue; // Segment < 1 Min → überspringen
-      const trig = randomInt(triggerMin, triggerMax, rand);
-      if (isInQuietMinutes(quietVon, quietBis, trig)) continue; // nie im Schlaf wecken
-      const deadlineMin = windowDeadlineMin(trig, randomInt(fristVon, fristBis, rand), quietVon, fristVon);
+      // Gewürfelt wird nur unter den Minuten, die GEHEN: nicht im Schlaf, und die Mindest-Frist endet
+      // noch vor dem nächsten Schlaf-Beginn. Vorher wurde über das ganze Segment gewürfelt und ein
+      // unpassender Wurf VERWORFEN — bei Fenster 18–20, Ruhe ab 21:00 und Frist 120 fiel jeder Wurf
+      // nach 18:59 weg, bei „1 pro Tag" also an gut jedem zweiten Tag die einzige Kontrolle. Und der
+      // Tages-Merker stempelte den Tag trotzdem als geplant. Verworfen wird jetzt nur noch, wenn im
+      // Segment gar keine passende Minute liegt — dann ist es wirklich nicht erfüllbar.
+      const candidates: number[] = [];
+      for (let m = triggerMin; m <= triggerMax; m++) {
+        if (isInQuietMinutes(quietVon, quietBis, m)) continue; // nie im Schlaf wecken
+        if (windowDeadlineMin(m, fristVon, quietVon, quietBis, fristVon) === null) continue; // Mindest-Frist passt nicht mehr
+        candidates.push(m);
+      }
+      if (candidates.length === 0) continue;
+      const trig = candidates[randomInt(0, candidates.length - 1, rand)];
+      // Die Mindest-Frist passt hier nach Auswahl; eine längere gewürfelte wird am Schlaf-Beginn gekappt.
+      const deadlineMin = windowDeadlineMin(trig, randomInt(fristVon, fristBis, rand), quietVon, quietBis, fristVon);
       if (deadlineMin !== null) pushIfFuture(trig, deadlineMin);
     }
     return out;
@@ -376,20 +387,40 @@ function freeGaps(lower: number, upper: number, occupied: { start: number; end: 
   return gaps.filter(([a, b]) => b > a);
 }
 
-/** Wohin ein Trigger überhaupt darf: das feste Auslöse-Fenster, sonst das Wach-Fenster. `occupied`
- *  sind die von vornherein belegten Intervalle darin (Schlaf innerhalb eines festen Fensters). */
+/** Wohin ein Trigger überhaupt darf: das feste Auslöse-Fenster, sonst das Wach-Fenster.
+ *  - `upper`/`lastTrigger`: Ende des Bereichs bzw. letzte Minute, in der eine AUSLÖSUNG liegen darf.
+ *  - `deadlineCap`: letzte Minute, in der eine FRIST liegen darf. Ohne Fenster dasselbe wie `upper`;
+ *    mit Fenster darf die Frist übers Fensterende hinaus und wird erst vor dem nächsten Schlaf-Beginn
+ *    gekappt — dieselbe Kappung wie `windowDeadlineMin` für einen Trigger in der letzten Minute.
+ *  - `placeableEnd`: bis hierhin zählt die Zeit für die Tages-Anzahl (`remainderOfDay`). Bei festem
+ *    Fenster nur, was eine Auslösung samt Mindest-Frist noch trägt; ohne Fenster `upper` wie bisher.
+ *  - `occupied`: die von vornherein belegten Intervalle darin (Schlaf innerhalb eines festen
+ *    Fensters), ab der Minute VOR dem Schlaf-Beginn: eine Frist genau auf der ersten Schlaf-Minute
+ *    läge im Schlaf. */
 function triggerDomain(
   settings: AutoKontrolleSettings, awake: { start: number; end: number },
-): { lower: number; upper: number; occupied: { start: number; end: number }[] } {
+): { lower: number; upper: number; lastTrigger: number; deadlineCap: number; placeableEnd: number; occupied: { start: number; end: number }[] } {
   const fixed = fixedWindowMinutes(settings);
   // Ohne festes Fenster endet der Bereich eine Minute VOR dem Schlaf-Beginn: `awakeEnd` ist bereits
   // die erste Schlaf-Minute, eine Frist genau darauf läge im Schlaf. `spreadOverDay` rechnet mit
   // derselben Grenze (`awakeEnd - 1 - dur`).
-  if (!fixed) return { lower: awake.start, upper: awake.end - 1, occupied: [] };
+  if (!fixed) {
+    const upper = awake.end - 1;
+    return { lower: awake.start, upper, lastTrigger: upper, deadlineCap: upper, placeableEnd: upper, occupied: [] };
+  }
+  const quietVon = hhmmToMinutes(settings.ruheVon);
+  const quietBis = hhmmToMinutes(settings.ruheBis);
+  const lastTrigger = fixed.end - 1;
+  const { von: fristVon, bis: fristBis } = fristRange(settings);
+  // Auch ohne Schlaf endlich: eine Frist reicht nie über `fristBis` hinter die letzte Auslösung.
+  const deadlineCap = Math.min(nextSleepStart(quietVon, quietBis, lastTrigger) - 1, lastTrigger + fristBis);
   return {
     lower: fixed.start,
     upper: fixed.end,
-    occupied: sleepBlocksWithin(fixed, hhmmToMinutes(settings.ruheVon), hhmmToMinutes(settings.ruheBis)),
+    lastTrigger,
+    deadlineCap,
+    placeableEnd: Math.min(lastTrigger, deadlineCap - fristVon) + 1,
+    occupied: sleepBlocksWithin(fixed, quietVon, quietBis).map((o) => ({ start: o.start - 1, end: o.end })),
   };
 }
 
@@ -401,11 +432,10 @@ function triggerDomain(
  * Anders als {@link spreadOverDay} füllt es ab JETZT (`minuteOf(now) + 1`) statt über den ganzen Tag —
  * das macht es zum Platzierer für alles, was mitten am Tag geplant wird.
  *
- * Trigger UND Frist bleiben in derselben Lücke — bewusst konservativer als {@link spreadOverDay}, das
- * im Fenster-Fall die Frist bis zum Schlaf-Beginn ziehen darf. Der Unterschied betrifft die letzte
- * Fenster-Minute, verhindert aber jede Überlappung mit dem nächsten Slot. Schlaf-Blöcke im Fenster
- * zählen als belegt → dort landet nie ein Trigger, und weil die Lücke am Schlaf-Block endet, liegt
- * auch die Frist nie im Schlaf.
+ * Bei festem Auslöse-Fenster gilt dieselbe Regel wie im Tagesplan: die AUSLÖSUNG liegt im Fenster, die
+ * Frist darf übers Fensterende hinauslaufen und wird erst vor dem nächsten Schlaf-Beginn gekappt
+ * (`triggerDomain`), ohne je eine zugestellte Kontrolle zu überlappen. Eine Frist unter der
+ * Mindest-Frist wird NIE erzeugt: lieber kein Slot als einer, den der Sub nicht schaffen kann.
  *
  * Reine Funktion (Zufall injizierbar). Die Achse ist dieselbe wie in {@link spreadOverDay} (Anker
  * Wach-Beginn), sonst lägen gefüllte und geplante Slots an einem Umstellungstag eine Stunde auseinander.
@@ -420,24 +450,26 @@ export function fillFreeGaps(
 ): AutoKontrolleSlot[] {
   if (count <= 0) return [];
   const { von: fristVon, bis: fristBis } = fristRange(settings);
-  const { at, minuteOf, lower, upper, occupied: domainOccupied } = planAxis(settings, now, tz);
+  const { at, minuteOf, lower, lastTrigger, deadlineCap, occupied: domainOccupied } = planAxis(settings, now, tz);
   const occupied = [
     ...taken.map((t) => ({ start: minuteOf(t.wirksamAb), end: minuteOf(t.deadline) })),
     ...domainOccupied,
   ];
 
   const out: AutoKontrolleSlot[] = [];
-  let gaps = freeGaps(Math.max(lower, minuteOf(now) + 1), upper, occupied);
+  // Eine Lücke, die erst nach der letzten Auslösung beginnt, taugt für keinen Trigger.
+  const usable = (list: [number, number][]) => list.filter(([a]) => a <= lastTrigger);
+  let gaps = usable(freeGaps(Math.max(lower, minuteOf(now) + 1), deadlineCap, occupied));
   for (let i = 0; i < count; i++) {
     if (gaps.length === 0) break;
     const best = gaps.reduce((bi, g, gi) => (gapLen(g) > gapLen(gaps[bi]) ? gi : bi), 0);
     if (gapLen(gaps[best]) < fristVon) break; // kein Platz mehr
     const [gapStart, gapEnd] = gaps[best];
     const dur = Math.min(randomInt(fristVon, fristBis, rand), gapEnd - gapStart);
-    const trig = randomInt(gapStart, gapEnd - dur, rand);
+    const trig = randomInt(gapStart, Math.min(gapEnd - dur, lastTrigger), rand);
     out.push({ wirksamAb: at(trig), deadline: at(trig + dur) });
     gaps.splice(best, 1, [gapStart, trig], [trig + dur, gapEnd]);
-    gaps = gaps.filter(([a, b]) => b > a);
+    gaps = usable(gaps.filter(([a, b]) => b > a));
   }
   return out;
 }
@@ -834,9 +866,7 @@ export async function schedulePostLockInspection(
   // beim Einreichen aus der Einstellung rekonstruiert: sonst änderte ein Umlegen des Schalters die
   // Regeln einer bereits laufenden Kontrolle, deren Frist tickt. Die Box-Abfrage kostet nur, wo der
   // Schalter überhaupt gesetzt ist — ohne gemeldete Box bliebe die Kontrolle sonst unerfüllbar.
-  const requireBoxPhoto = settings.postLockRequireBoxPhoto
-    && heimdallEnabled()
-    && (await prisma.boxStatus.count({ where: { userId } })) > 0;
+  const requireBoxPhoto = settings.postLockRequireBoxPhoto && (await userHasBox(userId));
 
   await createAutoKontrollen(userId, [{ wirksamAb, deadline }], { postLock: true, requireBoxPhoto });
   return { wirksamAb, deadline, imSchlaf };

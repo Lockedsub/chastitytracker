@@ -22,7 +22,7 @@ import { Users, CalendarClock, ChevronRight } from "lucide-react";
 import { getTranslations, getLocale } from "next-intl/server";
 import { toDateLocale, formatDurationBetween, formatDateTimeDual, groupByUser, nowDatetimeLocal, APP_TZ } from "@/lib/utils";
 import { getKeyholderLockPeriods, getKeyholderOrgasmusAnforderungen, keyholderVisibleKontrolleWhere, foldActiveLockPeriods, isScheduledDirective, LOCK_REQUEST_ORDER, openLockRequestWhere } from "@/lib/queries";
-import { orgasmusAnforderungArtLabel, heimdallEnabled } from "@/lib/constants";
+import { orgasmusAnforderungArtLabel, boxCouplingEnabled } from "@/lib/constants";
 import { QUICK_SETTING_SELECT, quickSettingOnCard, parseQuickSettings, quickSettingValue } from "@/lib/quickSettings";
 import Section from "@/app/components/Section";
 import Badge from "@/app/components/Badge";
@@ -110,14 +110,14 @@ export default async function AdminPage() {
     // Nur die drei Spalten, die über den Riegel entscheiden. Der Rest des Box-Zustands gehört auf
     // die Detailseite — hier geht es allein um die Frage, ob eine Box offen steht, die zu sein soll.
     //
-    // Hinter dem Heimdall-Tor wie JEDE andere Box-Abfrage im Projekt. Nicht bloss gespart: ohne
-    // Sync-Secret gibt es die Box-Oberfläche nicht, auch wenn noch alte `BoxStatus`-Zeilen liegen
-    // (`heimdallEnabled`). Ungetort baute die Übersicht aus so einer Alt-Zeile einen Riegel-Alarm
+    // Hinter dem Box-Tor wie JEDE andere Box-Abfrage im Projekt. Nicht bloss gespart: ohne
+    // Box-Kopplung gibt es die Box-Oberfläche nicht, auch wenn noch alte `BoxStatus`-Zeilen liegen
+    // (`boxCouplingEnabled`). Ungetort baute die Übersicht aus so einer Alt-Zeile einen Riegel-Alarm
     // und sortierte den Träger nach oben, während die Box-Karte daneben gar nicht erst rendert.
-    heimdallEnabled()
+    boxCouplingEnabled()
       ? prisma.boxStatus.findMany({
           where: { userId: { in: userIds } },
-          select: { userId: true, locked: true, reportedLocked: true, pendingCommand: true },
+          select: { userId: true, kind: true, locked: true, reportedLocked: true, pendingCommand: true },
         })
       : [],
     // Wartende Aufgaben-Nachweise (#8): eingereicht (`submittedAt`), Aufgabe nicht zurückgezogen —
@@ -149,7 +149,7 @@ export default async function AdminPage() {
   // 60 000 Zeilen, linear wachsend), um am Ende je Träger eine Zeile zu behalten — auf einer
   // `force-dynamic`-Seite, bei jedem Aufruf. Der `groupBy` oben kennt die Zeitpunkte bereits,
   // damit wird daraus eine index-gestützte Punktabfrage über (userId, type, startTime).
-  const laufendeVerschluesse = heimdallEnabled()
+  const laufendeVerschluesse = boxCouplingEnabled()
     ? [...verschlussMap].flatMap(([userId, startTime]) => {
         const lastO = oeffnenMap.get(userId);
         return startTime && (!lastO || startTime > lastO)
@@ -168,6 +168,8 @@ export default async function AdminPage() {
   // Wer hat überhaupt eine Box gemeldet? Dieselbe Zeilen-Menge, aus der oben der Riegel-Hinweis
   // entsteht — für die Schnellschalter, die es nur mit Box gibt (Riegel-Pflicht, Boxfoto-Zwang).
   const boxUserIds = new Set(allBoxes.map((b) => b.userId));
+  // Träger mit LockMeBox: der Riegel-Schalter wirkt dort nicht und steht deshalb nicht als Chip da.
+  const lockmeboxUserIds = new Set(allBoxes.filter((b) => b.kind === "lockmebox").map((b) => b.userId));
   // Das Aufgaben-Zeichen aus der EINEN Registratur (`actionSign`) — nicht `ClipboardCheck` von Hand,
   // das trägt die Prüfung.
   const TaskIcon = actionIcon("TASK");
@@ -626,7 +628,7 @@ export default async function AdminPage() {
                               sagt, wie es steht, und wer danach handelt, hat den Zustand gelesen.
                               Ohne Auswahl ist die Liste leer und die Zeile sieht aus wie bisher. */}
                           {parseQuickSettings(u.quickSettings)
-                            .filter((qs) => quickSettingOnCard(qs, u, { hasBox: boxUserIds.has(u.id) }))
+                            .filter((qs) => quickSettingOnCard(qs, u, { hasBox: boxUserIds.has(u.id), hasLockmebox: lockmeboxUserIds.has(u.id) }))
                             .map((qs) => (
                               <QuickSettingChip
                                 key={qs.key}

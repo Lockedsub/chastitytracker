@@ -172,6 +172,26 @@ export function visionMaxTotalRefs(): number {
 export function heimdallEnabled(): boolean {
   return !!process.env.HEIMDALL_SYNC_SECRET;
 }
+
+/** LockMeBox (Bluetooth) aktiv? = der Schlüssel der Bluetooth-Brücke ist gesetzt (32 Hex-Zeichen).
+ *  Er kommt vom Betreiber der Instanz und steht nicht im Repo. */
+export function lockmeboxEnabled(): boolean {
+  return bleBridgeKey() !== null;
+}
+
+/** Der Schlüssel der Bluetooth-Brücke, oder `null`, wenn er fehlt oder kein 128-Bit-Hex-Wert ist —
+ *  die EINE Stelle, die die Variable liest. */
+export function bleBridgeKey(): string | null {
+  const raw = process.env.BLE_BRIDGE_KEY ?? "";
+  return /^[0-9a-f]{32}$/i.test(raw) ? raw : null;
+}
+
+/** Gibt es auf dieser Instanz überhaupt eine Box-Kopplung — Heimdall ODER LockMeBox? Das Tor für
+ *  alles, was nur vom Box-ZUSTAND abhängt (Karte, Kommandos, Riegel-Schalter, Formular-Rückfrage).
+ *  Was an Heimdall selbst hängt (Instant-Push, Riegel-Ereignisse), prüft weiter `heimdallEnabled`. */
+export function boxCouplingEnabled(): boolean {
+  return heimdallEnabled() || lockmeboxEnabled();
+}
 export const ORGASMUS_ARTEN = ["Orgasmus", "ruinierter Orgasmus", "feuchter Traum"] as const;
 /** Maps each ORGASMUS_ARTEN value to its orgasmForm i18n key (shared by entry + Anforderung forms). */
 export const ORGASMUS_ART_I18N_KEYS: Record<string, string> = {
@@ -295,9 +315,6 @@ export const SELF_EDITABLE_USER_FIELDS = [
   // (`weightTrackingEnabled`, `weighingWindows`, `targetWeightKeyholderKg`) stehen bewusst nicht
   // hier — sie laufen über `requireKeyholderOrAdminApi()`.
   "heightCm", "unitSystem", "targetWeightKg",
-  // Quittung für den Umstellungs-Hinweis (`notice.ts`). Ein Self-Feld im Wortsinn: es hält fest,
-  // was DIESE Person gesehen hat, und niemand sonst hat ein Interesse daran.
-  "noticeSeenVersion",
   // Quittung für den Hinweis zur Foto-Prüfung (`vision/config.ts`: `disclosureOf`) — dieselbe Sorte.
   "photoAnalysisNoticeSeen",
   // Die drei Kanal-Stufen (`NOTIFY_LEVELS`): wie laut Mail, Push und Telegram sein dürfen. Ein
@@ -819,8 +836,15 @@ export function validateDeviceInput(input: {
 
 // ── Rotation ────────────────────────────────────────────────────────────────
 
+/** Wie weit die Uhr eines Handys gegenüber der des Servers vorgehen darf, bevor eine von ihm gelieferte
+ *  Zeit „in der Zukunft" liegt — ein paar Minuten Luft, eine Stunde wäre keine Luft mehr, sondern eine
+ *  Lücke. Geteilt von Mess- und Aufnahmezeiten. */
+export const CLIENT_CLOCK_SKEW_MS = 5 * 60 * 1000;
+
 export const VALID_ROTATIONS = [0, 90, 180, 270] as const;
 export type Rotation = typeof VALID_ROTATIONS[number];
+/** Eine vom Client gelieferte Drehung, auf eine gültige geklemmt — alles Unbekannte ist 0. */
+export const parseRotation = (v: unknown): Rotation => ((VALID_ROTATIONS as readonly unknown[]).includes(v) ? (v as Rotation) : 0);
 
 /** Validates that imageUrl is an internal upload path (prevents SSRF + ownership bypass). */
 const ALLOWED_IMAGE_URL = /^\/api\/uploads\/[a-zA-Z0-9][a-zA-Z0-9._-]*$/;

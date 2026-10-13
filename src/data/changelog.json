@@ -1,5 +1,101 @@
 [
   {
+    "version": "6.3.1",
+    "date": "2026-10-10",
+    "changes": [
+      {
+        "type": "fix",
+        "text": {
+          "de": "Automatische Kontrollen im festen Zeitfenster: Ändert die Keyholderin die Planung mitten im Fenster, geht die Kontrolle des Tages nicht mehr verloren. Die Frist darf übers Fensterende hinaus bis vor die Ruhezeit laufen.",
+          "en": "Automatic inspections in a fixed time window: if the keyholder changes the plan in the middle of the window, the day's inspection is no longer lost. The deadline may run past the end of the window, up to the quiet hours."
+        }
+      },
+      {
+        "type": "fix",
+        "text": {
+          "de": "Auch das Anlegen und Beenden einer Tragezeit zählt auf die Sekunde, wenn die Zeit nicht von Hand gewählt wird — wie bei Verschluss und Öffnung.",
+          "en": "Starting and ending a wear session now also counts to the second when the time is not chosen by hand — like locking and opening."
+        }
+      },
+      {
+        "type": "fix",
+        "text": {
+          "de": "Die KI-Keyholderin sieht bei einer LockMeBox, dass der Riegel immer gilt.",
+          "en": "The AI keyholder now sees that the bolt always applies with a LockMeBox."
+        }
+      }
+    ]
+  },
+  {
+    "version": "6.3.0",
+    "date": "2026-09-25",
+    "changes": [
+      {
+        "type": "feat",
+        "text": {
+          "de": "Eine LockMeBox mit Werks-Firmware lässt sich per Bluetooth koppeln — in der iOS-App und in Chrome/Edge. Verschluss und Öffnung gelten erst, wenn die Box sie ausgeführt hat; in der App genügt dafür der Knopf an der Box.",
+          "en": "A LockMeBox with factory firmware can be paired via Bluetooth — in the iOS app and in Chrome/Edge. Locking and opening only take effect once the box has carried them out; in the app, pressing the button on the box is enough."
+        }
+      },
+      {
+        "type": "feat",
+        "text": {
+          "de": "Wartet die LockMeBox auf einen Befehl, erinnert eine Push-Mitteilung daran, die App zu öffnen und den Knopf an der Box zu drücken.",
+          "en": "When the LockMeBox is waiting for a command, a push notification reminds you to open the app and press the button on the box."
+        }
+      },
+      {
+        "type": "feat",
+        "text": {
+          "de": "Pro Träger ist genau eine Schlüsselbox gekoppelt. Für einen Wechsel lässt sie sich in den Einstellungen entfernen, solange du offen bist und nichts wartet.",
+          "en": "Each wearer has exactly one key box paired. To switch, remove it in the settings while you are unlocked and nothing is waiting."
+        }
+      },
+      {
+        "type": "feat",
+        "text": {
+          "de": "Das Foto der Box mit sichtbarem Schlüssel wird nicht mehr beim Verschliessen verlangt, sondern erst, wenn die Box den Riegel als zu meldet — vorher belegt es nichts. Die Keyholderin kann es erlassen, falls es sich nicht beschaffen lässt. Wurde es vor dem Schliessen aufgenommen, markiert die Session es.",
+          "en": "The box photo with the key visible is no longer asked for when locking, but once the box reports the bolt closed — before that it proves nothing. The keyholder can waive it if it cannot be obtained. If it was taken before the bolt closed, the session flags it."
+        }
+      },
+      {
+        "type": "fix",
+        "text": {
+          "de": "Verschluss und Öffnung werden auf die Sekunde datiert, solange du die Zeit nicht änderst. Wer kurz nach einer Öffnung wieder verschliesst (oder umgekehrt), bekommt nicht mehr „Zeitpunkt muss nach dem vorherigen Eintrag liegen\".",
+          "en": "Locking and opening are timed to the second as long as you leave the time alone. Locking again right after an opening (or the other way round) no longer fails with “time must be after the previous entry”."
+        }
+      },
+      {
+        "type": "ui",
+        "text": {
+          "de": "Der einmalige Hinweis „Die App sieht neu aus“ entfällt.",
+          "en": "The one-time “The app looks new” notice is gone."
+        }
+      },
+      {
+        "type": "fix",
+        "text": {
+          "de": "Der Riegel-Schalter in den Keyholder-Einstellungen ist bei Trägern mit LockMeBox gesperrt und zeigt „an“: dort gilt der Verschluss immer erst mit dem Riegel.",
+          "en": "The bolt switch in the keyholder settings is locked on for wearers with a LockMeBox: there the lock always takes effect only once the bolt is shut."
+        }
+      },
+      {
+        "type": "ui",
+        "text": {
+          "de": "Im Bereich „Box“ der Keyholder-Einstellungen steht, welche Box hinterlegt ist (Heimdall, LockMeBox oder keine) und welche Box-Nr.",
+          "en": "The “Box” section of the keyholder settings shows which box is registered (Heimdall, LockMeBox or none) and its box number."
+        }
+      },
+      {
+        "type": "fix",
+        "text": {
+          "de": "Die Tagesplanung der automatischen Kontrollen mit festem Zeitfenster lässt den Tag nicht mehr leer, wenn die Frist erst nach dem Ruhebeginn geendet hätte: die Kontrolle wird in den Teil des Fensters gelegt, in dem die Frist noch passt.",
+          "en": "The daily planning of automatic inspections with a fixed time window no longer leaves the day empty when the deadline would have ended after quiet time began: the inspection is placed in the part of the window where the deadline still fits."
+        }
+      }
+    ]
+  },
+  {
     "version": "6.2.12",
     "date": "2026-10-02",
     "changes": [
