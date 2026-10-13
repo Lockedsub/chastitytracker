@@ -155,6 +155,14 @@ export default async function AktionenPage({ params }: { params: Promise<{ id: s
             lockedReason={isLocked ? undefined : t("entryOnlyIfLocked")}
           />
 
+          {/* Kein Gate auf „verschlossen": die Pause liegt in der Vergangenheit, der Träger darf heute offen sein. */}
+          <ActionRow
+            href={`${base}/pause`}
+            icon={<LockOpenIcon className="size-4" />}
+            title={t("entryPause")}
+            description={t("entryPauseDesc")}
+          />
+
           <ActionRow
             href={`${base}/pruefung`}
             icon={<ClipboardCheck className="size-4" />}

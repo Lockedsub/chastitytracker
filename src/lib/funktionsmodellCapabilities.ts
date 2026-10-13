@@ -107,6 +107,13 @@ export const FM_CAPABILITIES: FmCapability[] = [
     note: "Löst bewusst KEINE Reinigungs-Kontrolle aus: der Planer rechnet ab jetzt, nicht ab der Eintrags-Zeit. Beide Wege gehen durch `createEntryForUser`. Die KI kann kein Foto liefern: eine Trage-Kategorie mit Foto-Pflicht weist den Eintrag deshalb ab, eine Prüfung wird auch ohne angenommen — sie erfüllt auf diesem Weg ohnehin keine Anforderung.",
   }),
   c({
+    id: "entry-admin-gap", mechanic: "Einträge", title: "Vergessene Pause nachtragen",
+    what: "Trägt ein Öffnen samt Wiederverschluss in der Vergangenheit ein, mitten in einer Tragephase.",
+    actors: ["admin", "mcp"], surfaces: ["admin-ui", "mcp"], routes: ["/api/admin/entries/gap"],
+    tools: ["add_missed_break"],
+    note: "Eigener Vorgang, weil ein einzelnes Öffnen oder Verschliessen mitten in einer Tragephase die Kette bricht (INVALID_ORDER / ALREADY_LOCKED); das Paar geht in EINER Transaktion hinein und die Kette wird am Ergebnis geprüft. Der heutige Stand bleibt: keine Sperrzeit-Freigabe, keine Erfüllung, keine Meldung. Beide Wege gehen durch `createEntryGapForUser`.",
+  }),
+  c({
     id: "entry-admin-edit", mechanic: "Einträge", title: "Fremden Eintrag ändern oder löschen",
     what: "Korrigiert oder entfernt den Eintrag eines Trägers.",
     actors: ["admin", "mcp"], surfaces: ["admin-ui", "mcp"], routes: ["/api/entries/[id]"],

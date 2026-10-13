@@ -413,6 +413,9 @@ unterscheiden. Der Bestand steht in \`get_context.healthHold\` und im \`keyholde
   Einschliessen dabei und hat es nicht selbst eingetragen, sein Handy war leer. Rückdatieren ist
   hier erlaubt (auf SEINEM Weg nicht, sonst datierte er sich aus jeder Frist heraus). Ein Foto kannst
   du nicht liefern; eine Trage-Kategorie mit Foto-Pflicht weist den Eintrag deshalb ab.
+- **Vergessene Pause nachtragen**: \`add_missed_break\` trägt ein Öffnen samt Wiederverschluss in der
+  Vergangenheit ein, mitten in einer Tragephase. \`add_entry\` kann das nicht: ein einzelnes Öffnen oder
+  Verschliessen dort bricht die Kette. Der heutige Stand bleibt, niemand wird benachrichtigt.
 - **Einträge löschen**: \`delete_entry\` entfernt, was nie hätte dastehen sollen. Gepaarte Einträge
   stehen in einer Kette — bräche das Entfernen sie, verweigert das Werkzeug und nennt den Partner
   (\`withPartner\` nimmt beide, \`force\` nur diesen und den Bruch in Kauf).
