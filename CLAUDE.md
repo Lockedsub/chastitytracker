@@ -278,6 +278,7 @@ WEBAUTHN_RP_ORIGIN=<origin-url>    # default: http://localhost:3000
 PORTAL_SHARED_SECRET=<secret>      # optional: Portal-Login JWT-Secret
 USE_ADMIN_RELATIONSHIPS=true       # optional: Admin↔User n:m Zuordnung aktivieren
 BUILD_DATE=<iso-date>              # optional: wird beim Build gesetzt
+ALLOW_ENTRY_GAP=true               # optional: schaltet den Pausen-Nachtrag frei (Admin-Formular + MCP `add_missed_break`). Standard aus.
 # Update-Check / anonyme Deployment-Zählung (siehe docs/update-check.md):
 DISABLE_UPDATE_CENSUS=true         # optional: Census aus, Update-Check liest den Release-Tag direkt auf GitHub
 UPSTREAM_CHANGELOG_URL=<url>       # optional: eigene Changelog-Quelle (dann keine Census-Header)

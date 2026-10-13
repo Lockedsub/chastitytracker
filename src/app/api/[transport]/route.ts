@@ -14,7 +14,7 @@ import {
   checkMcpKeyholder, mcpRequestLock, mcpSetLockPeriod,
   mcpReleaseNow, mcpRequestInspection, mcpSetTrainingGoal, mcpWithdraw,
   mcpListTrainingGoals, mcpEditTrainingGoal, mcpDeleteTrainingGoal, mcpSetCleaning, mcpSetBox, mcpSetWeightTracking, mcpSetWeightRelease, mcpSetOffenseRules, mcpSetInspectionEscalation, mcpSetAutoInspections, mcpResolveInspection, mcpEditLockPeriod, mcpEditLockRequest, mcpCreateTask,
-  mcpReviewTaskProof, mcpEditTask, mcpEditEntry, mcpAddEntry,
+  mcpReviewTaskProof, mcpEditTask, mcpEditEntry, mcpAddEntry, mcpAddMissedBreak,
   mcpCreateTaskSeries, mcpEditTaskSeries, mcpWithdrawTaskSeries,
   mcpImportDeviceReferences, mcpDeleteDeviceReference, mcpDeleteEntry,
   mcpRequestOrgasm, mcpJudgeOffense, mcpRecordOffense,
@@ -1663,6 +1663,30 @@ function registerTools(server: McpServer) {
         },
       },
       (args, extra) => runWriteTool("add_entry", extra, args, (u) => mcpAddEntry(u, args)),
+    );
+
+    server.registerTool(
+      "add_missed_break",
+      {
+        title: "Record a forgotten break (open + re-lock) in the past",
+        description:
+          "Records a break the user forgot to log: an opening and the re-lock that followed, BOTH in the past, " +
+          "inside one existing locked period. Use this instead of add_entry for that case — a single opening " +
+          "or lock-in in the middle of a locked period breaks the chain and is refused. Both entries are " +
+          "written in one step; the re-lock inherits the device of the surrounding lock (correct it with " +
+          "edit_entry). Today's state does not change: no lock period is released, no request is fulfilled, " +
+          "nobody is notified. Only works if the instance operator enabled it (ALLOW_ENTRY_GAP); otherwise the call is refused. The note is required, as for any opening. dryRun runs everything except the " +
+          "chain checks." + KEYHOLDER_BASE,
+        inputSchema: {
+          openedAt: z.string().describe("When the belt was opened (ISO 8601, in the past)."),
+          lockedAt: z.string().describe("When it was locked again (ISO 8601, after openedAt, before the next recorded opening)."),
+          openingReason: z.string().describe("The reason code (see get_context)."),
+          note: z.string().describe("Required note for the opening."),
+          reason: reasonField,
+          dryRun: dryRunFieldV1,
+        },
+      },
+      (args, extra) => runWriteTool("add_missed_break", extra, args, (u) => mcpAddMissedBreak(u, args)),
     );
 
     server.registerTool(
