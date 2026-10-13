@@ -69,3 +69,14 @@ describe("validateEntryGap", () => {
     expect(validateEntryGap(USER, { ...INPUT, openAt: new Date(Date.now() - 1000), lockAt: far })).toBe("TIME_IN_FUTURE");
   });
 });
+
+describe("entryGapEnabled", () => {
+  it("ist ohne ALLOW_ENTRY_GAP aus", async () => {
+    const { entryGapEnabled } = await import("./entryGapService");
+    delete process.env.ALLOW_ENTRY_GAP;
+    expect(entryGapEnabled()).toBe(false);
+    process.env.ALLOW_ENTRY_GAP = "true";
+    expect(entryGapEnabled()).toBe(true);
+    delete process.env.ALLOW_ENTRY_GAP;
+  });
+});

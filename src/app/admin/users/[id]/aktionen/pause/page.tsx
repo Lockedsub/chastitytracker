@@ -1,3 +1,5 @@
+import { redirect } from "next/navigation";
+import { entryGapEnabled } from "@/lib/entryGapService";
 import { prisma } from "@/lib/prisma";
 import { getTranslations } from "next-intl/server";
 import { assertKeyholderOrAdmin } from "@/lib/authGuards";
@@ -10,6 +12,7 @@ import PauseForm from "./PauseForm";
  *  die Pause liegt in der VERGANGENHEIT, der Träger darf heute offen sein. */
 export default async function AdminPausePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  if (!entryGapEnabled()) redirect(`/admin/users/${id}/aktionen`);
   await assertKeyholderOrAdmin(id);
   const [tz, user, tOpen] = await Promise.all([
     getUserTimezone(id),

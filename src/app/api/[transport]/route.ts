@@ -1675,7 +1675,7 @@ function registerTools(server: McpServer) {
           "or lock-in in the middle of a locked period breaks the chain and is refused. Both entries are " +
           "written in one step; the re-lock inherits the device of the surrounding lock (correct it with " +
           "edit_entry). Today's state does not change: no lock period is released, no request is fulfilled, " +
-          "nobody is notified. The note is required, as for any opening. dryRun runs everything except the " +
+          "nobody is notified. Only works if the instance operator enabled it (ALLOW_ENTRY_GAP); otherwise the call is refused. The note is required, as for any opening. dryRun runs everything except the " +
           "chain checks." + KEYHOLDER_BASE,
         inputSchema: {
           openedAt: z.string().describe("When the belt was opened (ISO 8601, in the past)."),

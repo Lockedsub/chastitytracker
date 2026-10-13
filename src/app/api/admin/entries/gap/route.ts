@@ -2,13 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireKeyholderOrAdminActor } from "@/lib/authGuards";
 import { isDevBypassEnabled } from "@/lib/devMode";
-import { createEntryGapForUser } from "@/lib/entryGapService";
+import { createEntryGapForUser, entryGapEnabled } from "@/lib/entryGapService";
 
 /**
  * Eine vergessene Pause nachtragen: Öffnen + Wiederverschluss in einem Zug, innerhalb einer
  * bestehenden Tragephase. Die Regeln stehen in `entryGapService.ts` (geteilt mit dem MCP).
  */
 export async function POST(req: NextRequest) {
+  if (!entryGapEnabled()) return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
+
   const body = await req.json();
   const { userId, openAt, lockAt, oeffnenGrund, note } = body;
 

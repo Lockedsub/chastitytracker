@@ -10,6 +10,7 @@ import { categoryStyle, wearActionHref } from "@/lib/categoryConstants";
 import CategoryIconRender from "@/app/components/CategoryIcon";
 import Section from "@/app/components/Section";
 import { getTranslations } from "next-intl/server";
+import { entryGapEnabled } from "@/lib/entryGapService";
 import ActionRow from "./ActionRow";
 import { LockClosedIcon, LockOpenIcon } from "@/app/components/lockIcons";
 
@@ -155,13 +156,15 @@ export default async function AktionenPage({ params }: { params: Promise<{ id: s
             lockedReason={isLocked ? undefined : t("entryOnlyIfLocked")}
           />
 
-          {/* Kein Gate auf „verschlossen": die Pause liegt in der Vergangenheit, der Träger darf heute offen sein. */}
-          <ActionRow
-            href={`${base}/pause`}
-            icon={<LockOpenIcon className="size-4" />}
-            title={t("entryPause")}
-            description={t("entryPauseDesc")}
-          />
+          {/* Nur mit `ALLOW_ENTRY_GAP`. Kein Gate auf „verschlossen": die Pause liegt in der Vergangenheit. */}
+          {entryGapEnabled() && (
+            <ActionRow
+              href={`${base}/pause`}
+              icon={<LockOpenIcon className="size-4" />}
+              title={t("entryPause")}
+              description={t("entryPauseDesc")}
+            />
+          )}
 
           <ActionRow
             href={`${base}/pruefung`}

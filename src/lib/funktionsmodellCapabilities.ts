@@ -111,7 +111,7 @@ export const FM_CAPABILITIES: FmCapability[] = [
     what: "Trägt ein Öffnen samt Wiederverschluss in der Vergangenheit ein, mitten in einer Tragephase.",
     actors: ["admin", "mcp"], surfaces: ["admin-ui", "mcp"], routes: ["/api/admin/entries/gap"],
     tools: ["add_missed_break"],
-    note: "Eigener Vorgang, weil ein einzelnes Öffnen oder Verschliessen mitten in einer Tragephase die Kette bricht (INVALID_ORDER / ALREADY_LOCKED); das Paar geht in EINER Transaktion hinein und die Kette wird am Ergebnis geprüft. Der heutige Stand bleibt: keine Sperrzeit-Freigabe, keine Erfüllung, keine Meldung. Beide Wege gehen durch `createEntryGapForUser`.",
+    note: "Eigener Vorgang, weil ein einzelnes Öffnen oder Verschliessen mitten in einer Tragephase die Kette bricht (INVALID_ORDER / ALREADY_LOCKED); das Paar geht in EINER Transaktion hinein und die Kette wird am Ergebnis geprüft. Der heutige Stand bleibt: keine Sperrzeit-Freigabe, keine Erfüllung, keine Meldung. Beide Wege gehen durch `createEntryGapForUser`. Nur mit `ALLOW_ENTRY_GAP=true` in der .env des Betreibers, sonst aus.",
   }),
   c({
     id: "entry-admin-edit", mechanic: "Einträge", title: "Fremden Eintrag ändern oder löschen",

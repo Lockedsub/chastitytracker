@@ -25,6 +25,12 @@ import { boltFieldsFor } from "@/lib/lockPending";
  *   · keine Meldung an die übrigen Kontrolleure: es ist eine Korrektur der Aufzeichnung, kein
  *     Ereignis, auf das jemand reagieren müsste.
  */
+/** Ist der Pausen-Nachtrag auf DIESER Instanz freigeschaltet? Standard aus: er schreibt Einträge
+ *  in die Vergangenheit und gehört in die Hand des Betreibers, nicht jeder Instanz. */
+export function entryGapEnabled(): boolean {
+  return process.env.ALLOW_ENTRY_GAP === "true";
+}
+
 export interface EntryGapInput {
   /** Wann der Gürtel geöffnet wurde. */
   openAt: Date;

@@ -230,6 +230,7 @@ ENABLE_BILDERSAFE=true             # sealed key-box code photo (default off)
 # Optional integrations
 PORTAL_SHARED_SECRET=<secret>      # JWT secret for the self-service portal's login flow
 USE_ADMIN_RELATIONSHIPS=true       # enable n:m admin-user supervision
+ALLOW_ENTRY_GAP=true               # allow keyholders to backfill a forgotten break (off by default)
 DISABLE_FEEDBACK=true              # hide the in-app feedback button (disables upstream forwarding)
 DISABLE_UPDATE_CENSUS=true         # opt out of the anonymous deployment census (see docs/update-check.md)
 UPSTREAM_CHANGELOG_URL=<url>       # override the changelog source (a self-set value also disables the census)

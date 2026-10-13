@@ -58,7 +58,7 @@ import {
 import { type RecurrenceFreq } from "@/lib/taskRecurrence";
 import { chainBreakPartner, correctEntry, correctionProblem, deleteEntryForUser, type EntryCorrection } from "@/lib/entryCorrection";
 import { createEntryForUser, validateEntryCreate } from "@/lib/entryCreateService";
-import { createEntryGapForUser, validateEntryGap } from "@/lib/entryGapService";
+import { createEntryGapForUser, validateEntryGap, entryGapEnabled } from "@/lib/entryGapService";
 import { deleteReference, importEntryAsReference, importRecentVerschluss, selectImportCandidates } from "@/lib/deviceReferenceService";
 import { effectiveProofOrderMatters, earliestActionableAt } from "@/lib/tasks";
 import { releaseNow, previewReleaseNow } from "@/lib/releaseNowService";
@@ -2557,6 +2557,9 @@ const GAP_ERROR_TEXT: Record<string, string> = {
  * erfüllt noch Kontrolleure benachrichtigt.
  */
 export async function mcpAddMissedBreak(username: string, args: AddMissedBreakArgs) {
+  if (!entryGapEnabled()) {
+    throw new Error("Adding missed breaks is not enabled on this instance (the operator must set ALLOW_ENTRY_GAP=true).");
+  }
   const userId = await resolveTargetUserId(username);
   const iso = await isoForUser(userId);
   const openAt = parseIsoDate(args.openedAt, "openedAt");

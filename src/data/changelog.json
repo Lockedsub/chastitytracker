@@ -6,8 +6,8 @@
       {
         "type": "feat",
         "text": {
-          "de": "Vergessene Pausen lassen sich nachtragen: Die Keyholderin (und die KI über den MCP) trägt Öffnen und Wiederverschluss in der Vergangenheit in einem Zug ein, mitten in einer bestehenden Tragephase.",
-          "en": "Forgotten breaks can be added after the fact: the keyholder (and the AI via MCP) records the opening and re-lock in the past in one step, inside an existing locked period."
+          "de": "Vergessene Pausen lassen sich nachtragen: Die Keyholderin (und die KI über den MCP) trägt Öffnen und Wiederverschluss in der Vergangenheit in einem Zug ein, mitten in einer bestehenden Tragephase. Standardmässig aus; der Betreiber schaltet es mit ALLOW_ENTRY_GAP=true in der .env frei.",
+          "en": "Forgotten breaks can be added after the fact: the keyholder (and the AI via MCP) records the opening and re-lock in the past in one step, inside an existing locked period. Off by default; the operator enables it with ALLOW_ENTRY_GAP=true."
         }
       }
     ]
