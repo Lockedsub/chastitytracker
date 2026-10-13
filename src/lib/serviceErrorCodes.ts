@@ -36,6 +36,11 @@ export const SHARED_SERVICE_CODES = [
   "USER_NOT_FOUND",
   "INVALID_DEVICE",
   "INVALID_IMAGE_URL",
+  // Box-Foto nach „Riegel zu" (`boxPhotoDueService.ts`): `BOX_PHOTO_REUSED` kommt aus den Entry-Routen
+  // und wird mitbenutzt; `BOX_PHOTO_NOT_DUE` — es steht keines aus (mehr), oder der Eintrag ist nicht
+  // der laufende Verschluss.
+  "BOX_PHOTO_REUSED",
+  "BOX_PHOTO_NOT_DUE",
   "INVALID_CATEGORY",
   "INVALID_ORGASM_TYPE",
   "USER_NO_EMAIL",
@@ -239,6 +244,14 @@ export const CATEGORY_RULE_CODES = [
 export const BOX_CODES = [
   "BOX_RELOCK_NOT_LOCKED",
   "BOX_RELOCK_KEY_NOT_IN_BOX",
+  // /api/box/ble — die Handy-Brücke zur LockMeBox (lockmeboxService.ts).
+  "BOX_BLE_BAD_STATUS",
+  "BOX_BLE_OTHER_BOX",
+  // Eine Box je Träger (boxPairing.ts): Koppeln einer zweiten, Entfernen der einen.
+  "BOX_ONE_PER_USER",
+  "BOX_REMOVE_BLOCKED",
+  // Nutzer löschen, solange seine LockMeBox zu sein könnte (Passwort ginge verloren).
+  "USER_BOX_LOCKED",
 ] as const;
 
 /** taskService (Aufgaben: Anweisungstext + 0..n Bedingungen, die bis `holdUntil` durchgehend gelten). */

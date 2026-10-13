@@ -66,14 +66,15 @@ direkt aus, ohne Rückfrage oder Bestätigung.
   oder er unterlässt ihn. Beide menschlichen Sichten warnen darauf; du siehst dasselbe Feld. Nicht
   zu verwechseln mit `hardwareEnforcedReason: "reported-open"`, das bei JEDEM offenen Riegel steht,
   auch bei einem völlig legitimen. Der Reisefall (Schlüssel beim Sub) ist ausgenommen.
-- **Der Riegel entscheidet** (nur wenn `get_context.box.requireBolt` an ist, umlegbar mit
+- **Der Riegel entscheidet** (nur wenn `get_context.box.requireBolt` an ist — bei einer LockMeBox (`get_context.box.boltAlways`) ist es immer an und lässt sich nicht abschalten; umlegbar mit
   `set_box`): sein „Verschlossen" ist dann bloss der AUFRUF an die Box. Verschlossen ist er, wenn
   sie den Riegel meldet — bis dahin läuft NICHTS an: keine Sperrzeit aus einer Anforderung, keine
   erfüllte Anforderung, keine Tragezeit, und die Wiederverschluss-Frist nach einer Reinigungspause
   läuft weiter. Für dich sieht er in dieser Zeit aus wie offen, obwohl er gehandelt hat — deshalb
   steht in `get_box_state` (und im Dashboard) `lockCallWaitingSince`. Steht es seit Stunden,
   drückt niemand den Knopf: ist die Box tot, ist `set_box requireBolt:false` der Ausweg — es
-  vollzieht den wartenden Aufruf mit dem Zeitpunkt des Umlegens.
+  vollzieht den wartenden Aufruf mit dem Zeitpunkt des Umlegens. Bei einer LockMeBox (`boltAlways`) tut es
+  nichts: dort nimmt der Sub einen toten Aufruf selbst zurück.
 - **`failsafeWarnings`** kündigt die beiden Sicherheits-Failsafes an, BEVOR sie zuschlagen: wie lange
   die Box schon ohne Serverkontakt ist und wann sie deshalb von selbst aufgeht (`offlineOpen`), bzw.
   wie nah der Akku an der Schwelle ist (`lowBatteryOpen`). Nur diese beiden — eine scharfgestellte
@@ -338,6 +339,25 @@ Lösen rücken die Fristen der laufenden Aufgaben um die Dauer der Pause nach.
 `active: true` braucht `healthReason` — zusätzlich zum Pflicht-`reason` des Audits. Der Träger bekommt
 beim Setzen und beim Lösen eine Meldung; ohne sie wäre die Pause für ihn von einem Defekt nicht zu
 unterscheiden. Der Bestand steht in `get_context.healthHold` und im `keyholder_dashboard`.
+
+## 6c. Box-Foto nach „Riegel zu" (`waive_box_photo`)
+Das Foto der Box mit sichtbarem Schlüssel verlangt der Verschluss-Dialog nicht mehr — bei noch offener
+Box belegt es nichts, der Schlüssel liesse sich danach wieder herausnehmen. Stattdessen wird es fällig,
+sobald die Box den Riegel als zu meldet (LockMeBox wie Heimdall, einmal je Verschluss, nur bei
+`keyInBox: true`): der Träger bekommt eine Push-Mitteilung und eine Aufforderung im Dashboard, die
+bleibt, bis das Bild da ist. Das Bild landet am Verschluss (`boxImageUrl`), die Bilderkennung urteilt
+danach wie bisher. Der Verschluss gilt auch ohne Bild.
+- Dass noch eines aussteht, siehst du in `get_box_state.boxState.boxPhotoDueSince` und im
+  `keyholder_dashboard` (ISO-8601, `null` = nichts fällig).
+- **Erlassen** (`waive_box_photo`) ist der Notausgang, wenn der Träger es nicht beschaffen kann (Kamera
+  defekt, Schlüssel im Fenster nicht zu erkennen). Das Foto fehlt dann in der Session, der Verschluss
+  bleibt unberührt. Kein Ersatz für Kontrollen: die verlangen ihr Box-Foto weiterhin.
+- Die Aufnahmezeit des nachgereichten Fotos (EXIF, sonst Dateizeit des Geräts) wird mit „Riegel zu"
+  verglichen. Liegt sie mehr als fünf Minuten davor, ist das Foto angenommen, aber markiert:
+  `boxImageBeforeBolt: true` an dem Eintrag (`list_entries`), die Session-Zeile zeigt „Foto vor Riegel zu".
+  Das ist ein Hinweis aus Gerätedaten, kein Beweis — die Zeit liefert das Handy.
+- Öffnet der Träger, bevor das Bild kam, erledigt sich die Aufforderung — ohne Bild, und das siehst du
+  an der Session.
 
 ## 7. Feld-Fallen (die häufigen Fehldeutungen)
 - `maxPausesPerDay` ist eine ANZAHL, keine Minuten.

@@ -33,7 +33,7 @@ import {
 } from "@/lib/autoKontrolleDayRules";
 
 import {
-  heimdallEnabled,
+  boxCouplingEnabled,
   CLEANING_MAX_MINUTES_RANGE, CLEANING_MAX_PER_DAY_RANGE, INSPECTION_DELAY_RANGE, INSPECTION_RANDOM_DELAY,
   HHMM, INVALID_TIME, AUTO_INSPECTION_PER_DAY_RANGE, AUTO_INSPECTION_DEADLINE_FROM_RANGE, AUTO_INSPECTION_DEADLINE_TO_RANGE,
   POST_LOCK_INSPECTION_DELAY_MIN_RANGE, POST_LOCK_INSPECTION_DELAY_MAX_RANGE, POST_LOCK_INSPECTION_DEADLINE_RANGE,
@@ -1336,8 +1336,8 @@ export interface SetBoxArgs {
  * bei einer defekten Box liegt.
  */
 export async function mcpSetBox(username: string, args: SetBoxArgs) {
-  if (!heimdallEnabled()) {
-    throw new Error("The key box is not available on this instance (HEIMDALL_SYNC_SECRET is not set).");
+  if (!boxCouplingEnabled()) {
+    throw new Error("The key box is not available on this instance (neither HEIMDALL_SYNC_SECRET nor BLE_BRIDGE_KEY is set).");
   }
   const userId = await resolveTargetUserId(username);
   requireAnyOf(args, ["requireBolt"]);
@@ -1351,27 +1351,32 @@ export async function mcpSetBox(username: string, args: SetBoxArgs) {
 
   if (args.dryRun) {
     const before = { requireBolt: user.lockRequiresBolt };
-    const after = { requireBolt: args.requireBolt ?? before.requireBolt };
+    // Bei einer LockMeBox bleibt der Wert, wie er ist: die Einstellung wirkt dort nicht (`boltAlways`).
+    const after = { requireBolt: box.boltAlways ? before.requireBolt : args.requireBolt ?? before.requireBolt };
     return dryRunPreview("set_box", undefined, {
       ...after,
       ...box,
       // Die eine Folge, die über das Umlegen hinausgeht.
-      ...(args.requireBolt === false && box.lockCallWaitingSince ? { alsoCompletesWaitingLockCall: true } : {}),
+      ...(!box.boltAlways && args.requireBolt === false && box.lockCallWaitingSince ? { alsoCompletesWaitingLockCall: true } : {}),
     }, diffFields(before, after));
   }
 
-  if (args.requireBolt !== undefined) await setLockRequiresBolt(userId, args.requireBolt);
+  const applied = args.requireBolt !== undefined && await setLockRequiresBolt(userId, args.requireBolt);
 
   const parts = [
     args.requireBolt === undefined ? ""
+      // Bei einer LockMeBox gilt der Riegel immer: nichts geändert, nichts vollzogen — die Sätze
+      // darunter wären dort falsch. Der Träger kann einen toten Aufruf selbst zurücknehmen.
+      : !applied
+        ? " NOTHING CHANGED: he has a LockMeBox, so his lock ALWAYS waits for the bolt, whatever this setting says — and a waiting call is not completed by it either (he can withdraw it himself)."
       : args.requireBolt
         ? " His lock now takes effect only when the box reports the bolt shut — until then nothing starts: no lock period, no request fulfilled, no wearing time."
         : " His lock takes effect immediately again when he records it.",
-    args.requireBolt === false && box.lockCallWaitingSince
+    applied && args.requireBolt === false && box.lockCallWaitingSince
       ? " The lock call that was waiting has been completed with the time of this change."
       : "",
     // Ohne Box läuft die Einstellung leer — sie ist gesetzt, wirkt aber erst, wenn eine Box meldet.
-    args.requireBolt === true && !box.hasBox
+    applied && args.requireBolt === true && !box.hasBox
       ? " NOTE: no box has reported for this wearer yet, so nothing waits for a bolt until one does."
       : "",
   ];
@@ -2331,7 +2336,7 @@ export async function mcpDeleteEntry(username: string, args: DeleteEntryArgs) {
   const iso = await isoForUser(userId);
   const existing = await prisma.entry.findFirst({
     where: { id: args.id, userId },
-    select: { id: true, userId: true, type: true, startTime: true, deviceId: true, boltConfirmedAt: true,
+    select: { id: true, userId: true, type: true, startTime: true, deviceId: true, boltConfirmedAt: true, openAwaitsBolt: true,
       imageUrl: true, codeImageUrl: true, boxImageUrl: true },
   });
   if (!existing) throw new Error(`Entry not found: ${args.id}`);

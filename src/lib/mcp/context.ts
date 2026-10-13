@@ -2,6 +2,8 @@ import { prisma } from "@/lib/prisma";
 import { currentVisionConfig, visionSpec } from "@/lib/vision/config";
 import { writeHealthHold, healthHoldNotice, activeHealthHold } from "@/lib/healthHold";
 import { notifyUser } from "@/lib/notify";
+import { dueBoxPhotoLock, waiveBoxPhoto } from "@/lib/boxPhotoDueService";
+import { hasLockmebox } from "@/lib/boxStatus";
 import { iso, makeIso, buildEnvelope, tzOf, APP_TZ, parseIsoDate, parseStringArray, type Envelope, type Iso } from "@/lib/mcp/common";
 import { assertVersionRequiresId, diffFields, occEdit, type WriteDef } from "@/lib/mcp/writeFramework";
 import { autoKontrolleSettingsFromUser, autoInspectionsView, AUTO_KONTROLLE_SETTINGS_SELECT, type AutoInspectionsView } from "@/lib/autoKontrolleService";
@@ -10,7 +12,7 @@ import { cleaningUsedToday, buildCleaningView, type CleaningView, CLEANING_USER_
 import { getActiveLockPeriod, cleaningWindowBindingStatus, pendingLockCallAt, type WindowsBindingReason } from "@/lib/queries";
 import { type OffenseMode, type SwitchableOffenseType } from "@/lib/offenseRules";
 import { getOffenseRules } from "@/lib/offenseRulesService";
-import { heimdallEnabled, AI_AUTHOR, toNotifyLevel, type NotifyLevel } from "@/lib/constants";
+import { boxCouplingEnabled, AI_AUTHOR, toNotifyLevel, type NotifyLevel } from "@/lib/constants";
 
 /** Kontext & Kalender (explain_model §13) — wiederkehrender Wochen-Kontext, Einzeltermine,
  *  HealthHold. Damit der Keyholder Anker/Kontrollen ums echte Leben plant.
@@ -179,7 +181,8 @@ export interface ContextResult extends Envelope {
   /**
    * Die Schlüsselbox-Einstellungen — `null`, wenn die Instanz gar keine Box führt.
    *
-   * `requireBolt` ist die Regel aus docs/riegel-konzept.md: sein „Verschlossen" ist dann erst der
+   * `requireBolt` ist die WIRKSAME Regel aus docs/riegel-konzept.md (bei LockMeBox immer an,
+   * auch bei ausgeschaltetem Flag der Keyholderin): sein „Verschlossen" ist dann erst der
    * AUFRUF an die Box, und verschlossen ist er, wenn sie den Riegel meldet. Umgelegt wird sie mit
    * `set_box`; den Zustand der Box selbst liefert `get_box_state`.
    *
@@ -190,6 +193,8 @@ export interface ContextResult extends Envelope {
     requireBolt: boolean;
     /** Hat für diesen Träger überhaupt eine Box gemeldet? Ohne sie wartet nichts auf einen Riegel. */
     hasBox: boolean;
+    /** Führt er eine LockMeBox? Dann gilt der Riegel IMMER — `requireBolt` ist dort schon `true`. */
+    boltAlways: boolean;
     lockCallWaitingSince: string | null;
   } | null;
   recurringContext: ReturnType<typeof recurringView>[];
@@ -213,11 +218,11 @@ const contextUserSelect = {
 /** Box-Bestand und wartender Aufruf — die Lese-Seite zu `set_box` (docs/riegel-konzept.md).
  *  Der Schalter selbst kommt aus der ohnehin geladenen User-Zeile. */
 export async function loadBoxSettings(userId: string) {
-  const [hasBox, waitingSince] = await Promise.all([
-    prisma.boxStatus.count({ where: { userId } }),
+  const [boxes, waitingSince] = await Promise.all([
+    prisma.boxStatus.findMany({ where: { userId }, select: { kind: true } }),
     pendingLockCallAt(userId),
   ]);
-  return { hasBox: hasBox > 0, lockCallWaitingSince: waitingSince?.toISOString() ?? null };
+  return { hasBox: boxes.length > 0, boltAlways: hasLockmebox(boxes), lockCallWaitingSince: waitingSince?.toISOString() ?? null };
 }
 
 /** Liefert HealthHold + Auto-Kontroll-Einstellungen + Reinigungs-Regeln + Wochen-Kontext + anstehende
@@ -251,7 +256,7 @@ export async function getContext(username: string, opts: GetContextOptions = {})
     getOffenseRules(userId, now),
     weightReleaseStatus(userId, now),
     // Führt die Instanz keine Box, wird gar nicht gefragt — `null` ist dann die ganze Antwort.
-    heimdallEnabled() ? loadBoxSettings(userId) : Promise.resolve(null),
+    boxCouplingEnabled() ? loadBoxSettings(userId) : Promise.resolve(null),
     currentVisionConfig(now),
   ]);
 
@@ -312,7 +317,7 @@ export async function getContext(username: string, opts: GetContextOptions = {})
       remainingKg: release.remainingKg,
       reason: release.reason,
     },
-    box: box && { requireBolt: user.lockRequiresBolt, ...box },
+    box: box && { requireBolt: user.lockRequiresBolt || box.boltAlways, ...box },
     recurringContext: recurring.map(recurringView),
     appointments: appts.map((a) => apptView(a, iso)),
   };
@@ -364,6 +369,31 @@ export const setHealthHoldDef: WriteDef<SetHealthHoldArgs, HealthHoldView | null
       diff,
       afterCommit,
     };
+  },
+};
+
+// ── Write: waive_box_photo ──────────────────────────────────────────────────
+
+/** Die Keyholderin erlässt das fällige Box-Foto (`boxPhotoDue.ts`) — derselbe Dienst wie die Route
+ *  `/api/admin/box-photo`, damit die KI-Keyholderin nicht weniger kann als die Oberfläche. */
+const NO_BOX_PHOTO_DUE = "No box photo is due for this wearer.";
+
+export const waiveBoxPhotoDef: WriteDef<Record<string, never>, { entryId: string; waived: true }> = {
+  tool: "waive_box_photo",
+  async preview(ctx) {
+    const lock = await dueBoxPhotoLock(ctx.targetUserId);
+    if (!lock) return { preview: { due: false }, problem: NO_BOX_PHOTO_DUE };
+    const iso = makeIso(await tzOf(ctx.targetUserId));
+    return {
+      preview: { due: true, entryId: lock.id, dueSince: iso(lock.boxPhotoDueAt) },
+      before: { waived: false },
+      after: { waived: true },
+    };
+  },
+  async apply(tx, ctx) {
+    const result = await waiveBoxPhoto(ctx.targetUserId, tx);
+    if (!result.ok) throw new Error(NO_BOX_PHOTO_DUE);
+    return { newState: { entryId: result.data.entryId, waived: true }, resultRef: result.data.entryId, diff: { waived: [false, true] } };
   },
 };
 

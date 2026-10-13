@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import { useLocale, useTranslations } from "next-intl";
 
-import { toDatetimeLocal, fromDatetimeLocal, formatDateTime, toDateLocale } from "@/lib/utils";
+import { fromDatetimeLocal, formatDateTime, toDateLocale } from "@/lib/utils";
+import { useEntryStartTime } from "@/app/hooks/useEntryStartTime";
 import { usePhotoUpload } from "@/app/hooks/usePhotoUpload";
 import { useEntrySubmit } from "@/app/hooks/useEntrySubmit";
 import PhotoCapture from "@/app/components/PhotoCapture";
@@ -19,20 +20,12 @@ import Textarea from "@/app/components/Textarea";
 import Button from "@/app/components/Button";
 import EntryFormShell from "@/app/components/EntryFormShell";
 import ConfirmDialog from "@/app/components/ConfirmDialog";
-import BoxPhotoField from "@/app/components/BoxPhotoField";
 import Select from "@/app/components/Select";
 import Card from "@/app/components/Card";
 import Toggle from "@/app/components/Toggle";
 import type { DeviceOption } from "@/lib/queries";
 import type { VerschlussPayload, SubmitResult } from "./types";
 import { LockClosedIcon } from "@/app/components/lockIcons";
-
-/** Die zwei strukturgleichen Rückfragen vor dem Speichern — nur die Texte unterscheiden sie
- *  (gleiches Muster wie HINT_CARDS/MISMATCH_CARDS im Kontroll-Formular). */
-const CONFIRM_KEYS = {
-  keyOutside: { title: "confirmKeyOutsideTitle", text: "confirmKeyOutsideText" },
-  noBoxPhoto: { title: "confirmNoBoxPhotoTitle", text: "confirmNoBoxPhotoText" },
-} as const;
 
 interface Props {
   initial?: {
@@ -76,7 +69,7 @@ export default function VerschlussFormCore({
   const tForm = useTranslations("lockForm");
   const dl = toDateLocale(useLocale());
 
-  const [startTime, setStartTime] = useState(toDatetimeLocal(initial?.startTime, tz) || nowDefault);
+  const { startTime, onStartChange, startIsNow } = useEntryStartTime(initial?.startTime, nowDefault, tz);
   const [note, setNote] = useState(initial?.note ?? "");
   // Wahrheitsgemässe Angabe, KEIN Submit-Gate mehr: „nein" ist eine legitime Antwort (Schlüssel
   // reist mit) und darf das Speichern nicht blockieren. Default an = der Normalfall, und die Box
@@ -155,34 +148,20 @@ export default function VerschlussFormCore({
     return () => { cancelled = true; };
   }, [bildersafe, codeUrl]);
 
-  // ── Box-Foto: Schlüssel im Sichtfenster ──
-  // Eigene Upload-Instanz ohne Siegel-/Geräte-Erkennung. Das Urteil („Schlüssel erkannt") fällt
-  // server-seitig nach dem Speichern — hier wird bewusst NICHTS geprüft, was der Client dann
-  // mitschicken könnte.
-  const boxPhoto = usePhotoUpload({
-    startTime,
-    enableSealDetection: false,
-    enableDeviceDetection: false,
-    uploadErrorText: () => t("uploadError"),
-  });
-  const boxUrl = boxPhoto.imageUrl;
-
-  // Welche Rückfrage steht an? Die beiden schliessen einander aus (Toggle an ODER aus), es kann
-  // also nie mehr als eine offen sein. null = keine, direkt speichern.
-  const [pendingConfirm, setPendingConfirm] = useState<"noBoxPhoto" | "keyOutside" | null>(null);
+  // Die Rückfrage, wenn der Schlüssel NICHT in die Box soll — die Box verriegelt dann nicht. Das
+  // Box-Foto fragt dieses Formular nicht mehr ab: es wird erst nach „Riegel zu" fällig und über das
+  // Dashboard nachgereicht (`boxPhotoDue.ts`) — ein Foto bei noch offener Box belegt nichts.
+  const [confirmKeyOutside, setConfirmKeyOutside] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    // Nur mit Box: ohne Heimdall gibt es weder Toggle noch Box-Foto, also auch nichts zu fragen.
-    if (boxConfirm) {
-      if (!keyInBox) return setPendingConfirm("keyOutside");
-      if (!boxUrl) return setPendingConfirm("noBoxPhoto");
-    }
+    // Nur mit Box: ohne Box gibt es keinen Toggle, also auch nichts zu fragen.
+    if (boxConfirm && !keyInBox) return setConfirmKeyOutside(true);
     await doSubmit();
   }
 
   async function doSubmit() {
-    setPendingConfirm(null);
+    setConfirmKeyOutside(false);
     await submit({
       type: "VERSCHLUSS",
       // Wahrheitsgemäss, nicht als Pflicht: der Verschluss ist real, auch wenn der Schlüssel
@@ -190,15 +169,13 @@ export default function VerschlussFormCore({
       // keinen vorgetäuschten Hardware-Hold.
       ...(boxConfirm ? { keyInBox } : {}),
       startTime: fromDatetimeLocal(startTime, tz).toISOString(),
+      ...(startIsNow ? { startIsNow } : {}),
       imageUrl: imageUrl || null,
       imageExifTime: imageExifTime || null,
       note: note.trim() || null,
       kontrollCode: sealNumber.trim() || null,
       deviceId: deviceId || null,
       ...(bildersafe ? { codeImageUrl: codeUrl || null, codeReadable } : {}),
-      // Rotation mitschicken: die Vision liest das Foto server-seitig neu, ein gedrehtes Bild
-      // sonst anders als die Vorschau, die der Sub gesehen hat.
-      ...(boxConfirm && keyInBox && boxUrl ? { boxImageUrl: boxUrl, boxImageRotation: boxPhoto.rotation } : {}),
     });
   }
 
@@ -215,7 +192,7 @@ export default function VerschlussFormCore({
           variant={submitVariant}
           semantic={submitVariant === "semantic" ? "lock" : undefined}
           fullWidth
-          loading={saving || uploading || codePhoto.uploading || boxPhoto.uploading}
+          loading={saving || uploading || codePhoto.uploading}
           disabled={bildersafe && (!codeUrl || codeReadable === false)}
           icon={submitVariant === "primary" ? <LockClosedIcon size={16} /> : undefined}
         >
@@ -272,7 +249,7 @@ export default function VerschlussFormCore({
         <DateTimePicker
           label={t("dateTime")}
           value={startTime}
-          onChange={(e) => setStartTime(e.target.value)}
+          onChange={onStartChange}
           required
           {...(minTime && { min: minTime })}
         />
@@ -361,10 +338,6 @@ export default function VerschlussFormCore({
               onChange={setKeyInBox}
             />
           </Card>
-
-          {/* Nur bei „Schlüssel ist drin": das Foto belegt genau diese Aussage. Steht der Toggle
-              auf aus, gibt es nichts zu fotografieren. */}
-          {keyInBox && <BoxPhotoField photo={boxPhoto} mobileDesktopMode={mobileDesktopMode} />}
         </div>
       )}
 
@@ -378,12 +351,12 @@ export default function VerschlussFormCore({
       <FormError message={error} />
 
       <ConfirmDialog
-        open={pendingConfirm !== null}
-        title={tForm(CONFIRM_KEYS[pendingConfirm ?? "noBoxPhoto"].title)}
-        message={tForm(CONFIRM_KEYS[pendingConfirm ?? "noBoxPhoto"].text)}
+        open={confirmKeyOutside}
+        title={tForm("confirmKeyOutsideTitle")}
+        message={tForm("confirmKeyOutsideText")}
         confirmLabel={tForm("confirmSaveAnyway")}
         onConfirm={doSubmit}
-        onCancel={() => setPendingConfirm(null)}
+        onCancel={() => setConfirmKeyOutside(false)}
       />
     </EntryFormShell>
   );

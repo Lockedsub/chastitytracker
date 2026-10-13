@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { requireApi } from "@/lib/authGuards";
 import { prisma } from "@/lib/prisma";
-import { detectKeyInBox } from "@/lib/verifyCode";
+import { boxPhotoReused, detectKeyInBoxInBackground, markBoxPhotoDueIfBoxLocked } from "@/lib/boxPhotoDueService";
 import { deriveSealCode, inspectionCodeRequired, plannedVerification, initialVerificationStatus, type InspectionVerification } from "@/lib/kontrolleService";
-import { DEVICE_BEARING_TYPES, validateEntryPayload, VALID_ROTATIONS, BOX_PHOTO_TYPES, parseOrgasmusArtBase, type Rotation } from "@/lib/constants";
+import { DEVICE_BEARING_TYPES, validateEntryPayload, parseRotation, BOX_PHOTO_TYPES, parseOrgasmusArtBase, lockmeboxEnabled } from "@/lib/constants";
 import { orgasmusValueAllowed, validOeffnenCodes } from "@/lib/reasonsService";
 import { isDevBypassEnabled } from "@/lib/devMode";
 import { validateDeviceOwnership, releaseLockPeriodsOnOpen, prepareWearEntry, openLockRequestWhere, LOCK_REQUEST_ORDER, aktiveKontrolleWhere, getLatestKgEntry } from "@/lib/queries";
@@ -12,14 +12,15 @@ import { resolveInspectionTarget, isKgTarget, inspectionTargetWhere } from "@/li
 import { entryGuardError, entryGuardCode } from "@/lib/entryErrors";
 import { isUniqueConstraintOn } from "@/lib/prismaErrors";
 import { setBoxCommandForUser, boxCommandForEntry } from "@/lib/boxCommand";
-import { notifyHeimdall } from "@/lib/heimdallNotify";
+import { announceBoxCommand } from "@/lib/boxCommandNotify";
 import { deviceCheckApplies, runDeviceCheck } from "@/lib/deviceCheckService";
 import { runInspectionVerification } from "@/lib/inspectionVerificationService";
 import { structuredLog } from "@/lib/serverLog";
 import { applyEntryFulfilment, applyEntryAftermath } from "@/lib/entryFulfilment";
-import { lockAwaitsBolt, findPendingLockTx } from "@/lib/lockCommit";
+import { lockAwaitsBolt, openAwaitsBolt, findPendingLockTx, findPendingOpenTx } from "@/lib/lockCommit";
 import { boltFieldsFor } from "@/lib/lockPending";
 import { parseOfflineCapture } from "@/lib/offlineCapture";
+import { resolveEntryStart, startAfter, startIsNow } from "@/lib/entryStart";
 
 export async function GET() {
   const session = await requireApi();
@@ -72,7 +73,12 @@ export async function POST(req: NextRequest) {
   const { capturedOffline, capturedAt } = parseOfflineCapture(body);
   // Der wirksame Eintrags-Zeitpunkt: offline die Erfassungszeit des Clients, sonst die (frei
   // wählbare) Formular-Zeit. Ohne Offline-Flag `capturedAt === null` — also online unverändert.
-  const effectiveStart = capturedAt ?? new Date(startTime);
+  //
+  // „Jetzt" (`startIsNow`, `entryStart.ts`): der Träger hat die Zeit nicht angefasst, dann gilt die
+  // Server-Uhr auf die Sekunde — dieselbe, nach der der Riegel datiert. Das Formular kennt nur
+  // Minuten und schickte sonst 12:06:00 gegen einen Eintrag von 12:06:10.
+  const isNowStart = startIsNow(body, type, capturedOffline);
+  let effectiveStart = resolveEntryStart({ capturedAt, startTime, isNow: isNowStart, now: new Date() });
   // Stichtag für Fristen/Vergehen (`applyEntryFulfilment`): offline die Erfassungszeit, sonst die
   // Server-Uhr im Moment der Einreichung.
   const fulfilmentAt = capturedAt ?? new Date();
@@ -87,14 +93,10 @@ export async function POST(req: NextRequest) {
     if (schonDa) return NextResponse.json(schonDa);
   }
 
-  // Replay-Schutz fürs Box-Foto: dieselbe Aufnahme darf nicht ein zweites Mal als Nachweis dienen.
-  // Ohne diese Prüfung könnte der Sub die URL seines ersten Fotos aus dem Request-Body abschreiben
-  // und bei jeder Kontrolle erneut schicken — der Nachweis „der Schlüssel liegt NOCH drin" wäre
-  // dann eine Momentaufnahme von vor Wochen. Das Haupt-Foto ist über die EXIF-Zeit gedeckt, das
-  // Box-Foto hat keine; hier ist die Eindeutigkeit der Datei die Deckung.
-  if (BOX_PHOTO_TYPES.has(type) && boxImageUrl) {
-    const reused = await prisma.entry.findFirst({ where: { boxImageUrl }, select: { id: true } });
-    if (reused) return NextResponse.json({ error: "BOX_PHOTO_REUSED" }, { status: 400 });
+  // Replay-Schutz fürs Box-Foto (Kontrolle): dieselbe Aufnahme darf nicht ein zweites Mal als Nachweis
+  // dienen — Begründung an `boxPhotoReused`.
+  if (BOX_PHOTO_TYPES.has(type) && boxImageUrl && await boxPhotoReused(boxImageUrl)) {
+    return NextResponse.json({ error: "BOX_PHOTO_REUSED" }, { status: 400 });
   }
 
   // Wrap state-check + create in a transaction to prevent TOCTOU races
@@ -134,8 +136,9 @@ export async function POST(req: NextRequest) {
       // eine gültige Offline-Tragezeit gegen eine andere Uhr geprüft und fälschlich mit 400
       // abgewiesen — und die Warteschlange verwirft ein 400 als „schlechte Daten" (Datenverlust).
       if (type === "WEAR_BEGIN" || type === "WEAR_END") {
-        const wearResult = await prepareWearEntry(tx, session.user.id, type, deviceId, effectiveStart, imageUrl);
+        const wearResult = await prepareWearEntry(tx, session.user.id, type, deviceId, effectiveStart, imageUrl, isNowStart);
         if (!wearResult.ok) throw entryGuardError(wearResult.code);
+        effectiveStart = wearResult.start;
       }
 
       // tx durchreichen: der Read-then-Write-Guard muss in DERSELBEN Transaktion lesen (TOCTOU).
@@ -146,8 +149,9 @@ export async function POST(req: NextRequest) {
         // Guard oben greift für ihn also nicht, und ohne den hier legte der Träger beliebig viele
         // Aufrufe übereinander an, während die Box auf den ersten wartet.
         if (await findPendingLockTx(tx, session.user.id)) throw entryGuardError("LOCK_ALREADY_PENDING");
-        if (latest?.type === "OEFFNEN" && effectiveStart <= latest.startTime) {
-          throw entryGuardError("TIME_BEFORE");
+        if (latest?.type === "OEFFNEN") {
+          effectiveStart = startAfter(effectiveStart, latest.startTime, isNowStart);
+          if (effectiveStart <= latest.startTime) throw entryGuardError("TIME_BEFORE");
         }
         endsCleaningPause = latest?.type === "OEFFNEN" && latest.oeffnenGrund === "REINIGUNG";
         awaitsBolt = await lockAwaitsBolt(tx, session.user.id, keyInBoxDeclared, new Date());
@@ -155,12 +159,15 @@ export async function POST(req: NextRequest) {
       if (type === "OEFFNEN") {
         const latest = await getLatestKgEntry(session.user.id, tx);
         if (!latest || latest.type !== "VERSCHLUSS") throw entryGuardError("NOT_LOCKED");
+        effectiveStart = startAfter(effectiveStart, latest.startTime, isNowStart);
         if (effectiveStart <= latest.startTime) throw entryGuardError("TIME_BEFORE");
+        // Wie beim Verschluss: eine schwebende Öffnung zählt für `getLatestKgEntry` nicht — ohne
+        // diese Sperre legte der Träger Aufruf auf Aufruf, während die Box auf den ersten wartet.
+        if (lockmeboxEnabled() && await findPendingOpenTx(tx, session.user.id)) throw entryGuardError("OPEN_ALREADY_PENDING");
         lockStartTime = latest.startTime;
-      }
-
-      if (type === "OEFFNEN") {
         withdrawnLockPeriod = await releaseLockPeriodsOnOpen(session.user.id, oeffnenGrund, tx, "user");
+        // LockMeBox: die Öffnung gilt erst mit „Riegel offen" (`lockCommit.ts`, docs/lockmebox.md).
+        awaitsBolt = await openAwaitsBolt(tx, session.user.id, latest.keyInBox, withdrawnLockPeriod, new Date());
       }
 
       // WELCHES ZIEL beantwortet diese Einreichung? Ohne Gerät der KG (Bestandsverhalten), mit
@@ -283,8 +290,9 @@ export async function POST(req: NextRequest) {
 
       // Box-Kopplung: die Heimdall-Box folgt dem Eintrag. Die Regel — samt der zwei Fälle, in denen
       // sie ihm NICHT folgt — steht in `boxCommandForEntry`. No-op ohne Heimdall/Box.
-      boxCmd = boxCommandForEntry({ type, keyInBox: keyInBoxDeclared, brokeLockPeriod: withdrawnLockPeriod });
-      if (boxCmd) await setBoxCommandForUser(tx, session.user.id, boxCmd);
+      const cmd = boxCommandForEntry({ type, keyInBox: keyInBoxDeclared, brokeLockPeriod: withdrawnLockPeriod });
+      // Angesagt wird nur, was wirklich gesetzt wurde — ohne Box bleibt `boxCmd` leer.
+      if (cmd && await setBoxCommandForUser(tx, session.user.id, cmd)) boxCmd = cmd;
 
       return created;
     });
@@ -303,11 +311,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: entryGuardCode(e) }, { status: 400 });
   }
 
-  // Instant-Push an Heimdall: eine LIVE Box vollzieht dasselbe Kommando sofort per MQTT — der
-  // pendingCommand-Pull beim nächsten Box-Sync (in der Transaktion oben gesetzt) bleibt der Fallback.
-  // Dieselbe Entscheidung, nicht dieselbe Bedingung noch einmal: sonst driften Pull und Push
-  // auseinander und die Box täte per MQTT etwas anderes als beim Sync. No-op ohne HEIMDALL_BASE_URL.
-  if (boxCmd) notifyHeimdall(session.user.name, boxCmd);
+  // Das Kommando ansagen (Heimdall-Instant-Push bzw. LockMeBox-Mitteilung ans Handy) — der
+  // pendingCommand-Pull (in der Transaktion oben gesetzt) bleibt der Fallback. Dieselbe Entscheidung,
+  // nicht dieselbe Bedingung noch einmal: sonst driften Pull und Push auseinander.
+  if (boxCmd) announceBoxCommand(session.user.id, boxCmd);
 
   // REINIGUNG-Limit wird NICHT mehr automatisch bestraft: eine Reinigungsöffnung über dem
   // Tageskontingent (auch ein Geräte-Wechsel) wird im Strafbuch nur noch ERKANNT (live in
@@ -371,32 +378,18 @@ export async function POST(req: NextRequest) {
       photoUrl: imageUrl,
       // Die Foto-Drehung des Nutzers respektieren — sonst scheitert die Server-Prüfung an einem
       // gedrehten Bild, das in der Client-Vorschau gematcht hat.
-      rotation: VALID_ROTATIONS.includes(imageRotation) ? imageRotation : 0,
+      rotation: parseRotation(imageRotation),
       verification,
     });
   }
 
-  // Schlüssel-Erkennung auf dem Box-Foto — wie die Code-Verifikation server-seitig und
-  // fire-and-forget. Der Client schickt NUR das Foto, nie das Urteil: ein Nachweis, den der
-  // Nachzuweisende selbst formuliert, ist keiner.
-  //
-  // Anders als bei `verifikationStatus` muss hier NICHT immer zurückgeschrieben werden: die Spalte
-  // startet auf null und `null` heisst genau dasselbe wie ihr Startwert („nicht geprüft"). Es gibt
-  // also keinen „pending"-Zustand, in dem ein Eintrag hängenbleiben könnte.
-  if (BOX_PHOTO_TYPES.has(type) && boxImageUrl) {
-    const entryId = entry.id;
-    const photoUrl = boxImageUrl;
-    const safeRotation: Rotation = VALID_ROTATIONS.includes(boxImageRotation) ? boxImageRotation : 0;
-    (async () => {
-      const detected = await detectKeyInBox(photoUrl, safeRotation);
-      if (detected === null) return;
-      try {
-        await prisma.entry.update({ where: { id: entryId }, data: { keyDetected: detected } });
-      } catch (err) {
-        console.error("[POST /api/entries] keyDetected write failed for entry", entryId, err);
-      }
-    })();
-  }
+  // Schlüssel-Erkennung auf dem Box-Foto — server-seitig und fire-and-forget (`boxPhotoDueService.ts`).
+  // Beim VERSCHLUSS kommt das Foto nicht mehr mit: es wird erst nach „Riegel zu" nachgereicht.
+  if (BOX_PHOTO_TYPES.has(type) && boxImageUrl) detectKeyInBoxInBackground(entry.id, boxImageUrl, boxImageRotation);
+
+  // Meldet die Box den Riegel schon JETZT zu, wartet der Verschluss auf nichts (`lockAwaitsBolt`) und
+  // es käme keine neue Meldung mehr — das Foto muss hier fällig werden, nicht erst beim nächsten Sync.
+  if (type === "VERSCHLUSS" && !awaitsBolt && keyInBoxDeclared === true) await markBoxPhotoDueIfBoxLocked(session.user.id);
 
   if (type === "VERSCHLUSS" || type === "OEFFNEN") {
     revalidatePath("/dashboard", "layout");
