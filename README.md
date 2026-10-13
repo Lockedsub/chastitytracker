@@ -65,6 +65,7 @@
 - **Tasks** — set an assignment with conditions, start grace, deadline, and any number of proof photos; hold time can run to a fixed end or count from the moment the conditions are met. Proofs handed in late are shown for a verdict instead of counting silently, a task can be withdrawn (and then deleted with its photos), and a task can be issued **as a penalty** for a recorded offense — task and verdict are written in one step, and fulfilling it closes the penalty by itself
 - **Penalty tracking** — fourteen kinds of offense, all but the last derived live from the entries: unauthorized opening, inspection late / rejected / unanswered, cleaning limit exceeded, no re-lock after cleaning, wrong device, missed lock request, missed orgasm instruction, unauthorized orgasm, unfulfilled task, missed weight report (only where weight tracking is enabled), admin-password change during a lock period, plus offenses recorded by hand
 - **Offense rules per sub** — which kinds of offense count for a given wearer is switchable; `unauthorized orgasm` additionally distinguishes "only during a lock period" from "always". A change applies from that moment on and never rewrites the past
+- **Backfill a forgotten break** — when a log is recorded after the fact, a missed opening plus re-lock can be added in the past in one step, inside an existing locked period (a single opening or lock-in there would break the chain). Off by default; the operator enables it with `ALLOW_ENTRY_GAP=true` in `.env`. Keyholder form under *Actions*, and `add_missed_break` for the AI keyholder over MCP. Today's state is unchanged: no lock period is released, no request fulfilled, nobody notified
 - **Record an offense by hand** — for anything the app cannot see (a broken agreement, rudeness). It is judged like any derived one
 - **Unified Admin UI** — user-detail tabs share layout, width, and actions consistently across Overview / Actions / Entries / Inspections / Statistics / Log / Devices / Settings
 - **Keyholder relationships** — a non-admin user can be assigned as keyholder for specific subs, gaining scoped access to their data, photos, and notifications — always active, independent of any flag. The optional `USE_ADMIN_RELATIONSHIPS` flag additionally restricts global admins to only their assigned users. Global admins additionally appear as implicit, read-only keyholders in a sub's keyholder list, so it is always clear who controls whom
@@ -230,7 +231,7 @@ ENABLE_BILDERSAFE=true             # sealed key-box code photo (default off)
 # Optional integrations
 PORTAL_SHARED_SECRET=<secret>      # JWT secret for the self-service portal's login flow
 USE_ADMIN_RELATIONSHIPS=true       # enable n:m admin-user supervision
-ALLOW_ENTRY_GAP=true               # allow keyholders to backfill a forgotten break (off by default)
+ALLOW_ENTRY_GAP=true               # allow keyholders (and the MCP tool add_missed_break) to backfill a forgotten break in the past; off by default
 DISABLE_FEEDBACK=true              # hide the in-app feedback button (disables upstream forwarding)
 DISABLE_UPDATE_CENSUS=true         # opt out of the anonymous deployment census (see docs/update-check.md)
 UPSTREAM_CHANGELOG_URL=<url>       # override the changelog source (a self-set value also disables the census)
@@ -420,6 +421,7 @@ VAPID_SUBJECT=mailto:admin@example.com
 
 # --- Optional ---
 # USE_ADMIN_RELATIONSHIPS=true      # enable n:m admin↔user supervision
+# ALLOW_ENTRY_GAP=true              # let keyholders backfill a forgotten break (open + re-lock) in the past; off by default
 # ENABLE_BILDERSAFE=true            # enable the sealed key-box code photo feature (default off)
 # DISABLE_FEEDBACK=true             # hide the in-app feedback button entirely
 # FEEDBACK_UPSTREAM_URL=<url>       # send in-app feedback to your own inbox instead of the project portal
