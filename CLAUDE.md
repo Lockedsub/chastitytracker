@@ -137,7 +137,7 @@ Ein `main`-Build veröffentlicht also **nichts** an Self-Hoster — das ist der 
 
 ⚠️ **`:feature` ist nicht mehr nur die eigene Instanz.** Auf dem Kanal sitzen inzwischen auch Nutzer, die freiwillig mittesten. Ein Feature-Dispatch startet damit fremde Produktiv-Instanzen neu und spielt ihnen unfertigen Stand ein — das ist gewollt, aber es ist kein folgenloser Test mehr. Wer hier dispatcht, tut es im Wissen, dass nicht nur der eigene Container betroffen ist; welche Instanzen das sind, sagt der Pin in ihrer `docker-compose.yml`, nicht diese Datei (Instanznamen Dritter gehören nicht ins öffentliche Repo).
 
-**Regel — bei jedem `main`-Build IMMER `tagFeature=true`**, damit `:feature` (trublue) nie hinter `main` zurückfällt. Der Deploy leitet `pinnedTo` daraus ab und startet dann genau die Instanzen neu, deren Tag sich bewegt hat (`portal,feature`).
+**Regel — bei jedem `main`-Build IMMER `tagFeature=true`**, damit `:feature` (trublue) nie hinter `main` zurückfällt. Der Deploy leitet `pinnedTo` daraus ab und startet dann genau die Instanzen neu, deren Tag sich bewegt hat (`portal,feature`) — **ausser pausierten**: ein Container, der vollständig `exited` ist (Portal-Pause), bekommt nur das neue Image gezogen und bleibt gestoppt; sonst wüchse jeder Fleet-Deploy die Pause weg. Crash-Schleifen (`restarting`) und fehlende Container zählen nicht als pausiert und werden neu angelegt.
 
 ```bash
 # Standardfall: main bauen → :portal + :feature + :v<version>, Flotte ausrollen.

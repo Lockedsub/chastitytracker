@@ -154,6 +154,7 @@ jobs:
             # Ordnernamen; nur die Ausgabe ist anonymisiert.
             PIDS=()
             IDX=0
+            PAUSED_RC=10   # Exit-Code „pausiert, nicht gestartet" (Subshell → Auswertung unten)
             for INSTANCE in "${TARGETS[@]}"; do
               IDX=$((IDX + 1))
               DIR="$INSTANCES_DIR/$INSTANCE"
@@ -179,6 +180,19 @@ jobs:
                     exit 1
                   fi
                 fi
+                # Pausiert = Container vorhanden und ALLE sauber `exited` (Portal: `compose stop`, mit
+                # `unless-stopped` bleibt er so). Ein `up -d` würde ihn wecken, obwohl das Portal ihn als
+                # pausiert führt. `restarting` (Crash-Schleife), `created` oder gar kein Container sind
+                # NICHT pausiert: dort ist `up -d --force-recreate` die Heilung. Pausierte bekommen nur
+                # das Image (`pull`) und ihren Pin; Exit PAUSED_RC meldet es dem Aufrufer.
+                STATES="$(docker compose ps -a --format '{{.State}}' 2>"$DIR/.deploy.log")" || {
+                  echo "⚠ Instanz $IDX/$TOTAL: Zustand nicht lesbar (Details serverseitig in .deploy.log)."; exit 1; }
+                if [ -n "$STATES" ] && ! printf '%s\n' "$STATES" | grep -qvx exited; then
+                  docker compose pull >"$DIR/.deploy.log" 2>&1 || {
+                    echo "⚠ Instanz $IDX/$TOTAL (pausiert): Pull fehlgeschlagen (Details serverseitig in .deploy.log)."; exit 1; }
+                  echo "→ Instanz $IDX/$TOTAL ist pausiert: Image gezogen, nicht gestartet."
+                  exit "$PAUSED_RC"
+                fi
                 # docker-compose druckt sonst „Pulling kg-<name>…" / „Container kg-<name> Started"
                 # → Instanzname im öffentlichen CI-Log. Ausgabe daher server-seitig ins private
                 # .deploy.log umleiten; ins CI-Log nur die anonyme Index-Zeile.
@@ -194,8 +208,15 @@ jobs:
             done
 
             FAILED=0
+            PAUSED=0
             for pid in "${PIDS[@]}"; do
-              wait "$pid" || FAILED=$((FAILED + 1))
+              RC=0
+              wait "$pid" || RC=$?
+              case "$RC" in
+                0)  ;;
+                "$PAUSED_RC") PAUSED=$((PAUSED + 1)) ;;
+                *)  FAILED=$((FAILED + 1)) ;;
+              esac
             done
 
             if [ "$FAILED" -gt 0 ]; then
@@ -205,5 +226,17 @@ jobs:
               exit 1
             fi
 
+            # Flottenweit (kein `instances`) heisst „alle pausiert" eher: Erkennung kaputt — laut
+            # abbrechen statt grün. Ein gezielter Lauf auf eine pausierte Instanz ist dagegen
+            # legitim und bleibt grün.
+            if [ "$PAUSED" -ge "$TOTAL" ] && [ -z "$INSTANCES_INPUT" ]; then
+              echo "⚠ Alle $TOTAL Instanzen als pausiert erkannt — es wurde nichts gestartet."
+              exit 1
+            fi
+
             docker image prune -f >/dev/null 2>&1
-            echo "✓ Alle $TOTAL Instanzen aktualisiert."
+            if [ "$PAUSED" -gt 0 ]; then
+              echo "✓ $((TOTAL - PAUSED)) von $TOTAL Instanzen aktualisiert, $PAUSED pausierte nicht gestartet."
+            else
+              echo "✓ Alle $TOTAL Instanzen aktualisiert."
+            fi
