@@ -510,7 +510,7 @@
     "blockOpenInspection": "Pending inspection",
     "blockOrgasmRequest": "Orgasm request",
     "blockOrgasmList": "Orgasms",
-    "editLayout": "{surface, select, subStats {Customise statistics} keyholderSub {Customise sub view} keyholderStats {Customise sub statistics} other {Customise dashboard}}",
+    "editLayout": "{surface, select, subStats {Customise statistics} keyholderSub {Customise my view of the sub} keyholderStats {Customise my view of sub statistics} other {Customise dashboard}}",
     "editLayoutDone": "Done",
     "editLayoutShow": "Show {name}",
     "editLayoutHide": "Hide {name}",

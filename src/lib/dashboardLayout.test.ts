@@ -115,42 +115,48 @@ describe("resolveLayout", () => {
 
 describe("checkLayoutPatch — die Schreibseite", () => {
   it("nimmt eine gültige Konfiguration an und normalisiert sie", () => {
-    const res = checkLayoutPatch({ subDashboard: { hidden: ["categoriesPromo", "categoriesPromo"], order: ["alerts"] } }, "sub");
+    const res = checkLayoutPatch({ subDashboard: { hidden: ["categoriesPromo", "categoriesPromo"], order: ["alerts"] } }, ["sub"]);
     expect(res).toEqual({ layout: { subDashboard: { hidden: ["categoriesPromo"], order: ["alerts"], collapsed: [] } } });
   });
 
   it("lehnt eine unbekannte Block-Id ab, statt sie still zu schlucken", () => {
-    expect(checkLayoutPatch({ subDashboard: { hidden: ["gibtsNicht"] } }, "sub"))
+    expect(checkLayoutPatch({ subDashboard: { hidden: ["gibtsNicht"] } }, ["sub"]))
       .toEqual({ error: "layoutUnknownBlock" });
   });
 
   it("lehnt eine Oberfläche ab, die einer anderen Rolle gehört — auch leer", () => {
     // Leere Listen sind der verführerische Fall: es steht keine fremde Block-Id drin, und ohne
     // Prüfung auf Oberflächen-Ebene ginge das durch.
-    expect(checkLayoutPatch({ keyholderStats: { hidden: [] } }, "sub"))
+    expect(checkLayoutPatch({ keyholderStats: { hidden: [] } }, ["sub"]))
       .toEqual({ error: "layoutForeignBlock" });
-    expect(checkLayoutPatch({ subDashboard: { hidden: [] } }, "keyholder"))
+    expect(checkLayoutPatch({ subDashboard: { hidden: [] } }, ["keyholder"]))
       .toEqual({ error: "layoutForeignBlock" });
   });
 
   it("lehnt eine Oberfläche ab, die es gar nicht gibt", () => {
-    expect(checkLayoutPatch({ gibtsNicht: { hidden: [] } }, "sub"))
+    expect(checkLayoutPatch({ gibtsNicht: { hidden: [] } }, ["sub"]))
       .toEqual({ error: "layoutUnknownSurface" });
   });
 
   it("die Keyholderin darf ihre eigenen Oberflächen setzen", () => {
-    expect(checkLayoutPatch({ keyholderStats: { hidden: ["records"] } }, "keyholder"))
+    expect(checkLayoutPatch({ keyholderStats: { hidden: ["records"] } }, ["keyholder"]))
       .toEqual({ layout: { keyholderStats: { hidden: ["records"], order: [], collapsed: [] } } });
+  });
+
+  it("wer Keyholder und Träger zugleich ist, darf beide Oberflächen setzen", () => {
+    const both = ["sub", "keyholder"] as const;
+    expect(checkLayoutPatch({ keyholderStats: { hidden: ["records"] } }, both)).toHaveProperty("layout");
+    expect(checkLayoutPatch({ subStats: { hidden: ["records"] } }, both)).toHaveProperty("layout");
   });
 
   it("lehnt Unsinn ab", () => {
     for (const müll of [null, 42, "text", [], { subDashboard: 5 }]) {
-      expect(checkLayoutPatch(müll, "sub")).toHaveProperty("error");
+      expect(checkLayoutPatch(müll, ["sub"])).toHaveProperty("error");
     }
   });
 
   it("filtert alwaysOn still heraus, statt den ganzen Vorgang abzulehnen", () => {
-    const res = checkLayoutPatch({ subStats: { hidden: ["heading", "calendar"] } }, "sub");
+    const res = checkLayoutPatch({ subStats: { hidden: ["heading", "calendar"] } }, ["sub"]);
     expect(res).toEqual({ layout: { subStats: { hidden: ["calendar"], order: [], collapsed: [] } } });
   });
 });
@@ -186,12 +192,12 @@ describe("collapsed — die Vorgabe, nicht der Zustand", () => {
   });
 
   it("die Schreibseite filtert nicht-zuklappbare Ids still heraus", () => {
-    const res = checkLayoutPatch({ subDashboard: { collapsed: ["sessionList", "alerts"] } }, "sub");
+    const res = checkLayoutPatch({ subDashboard: { collapsed: ["sessionList", "alerts"] } }, ["sub"]);
     expect(res).toEqual({ layout: { subDashboard: { hidden: [], order: [], collapsed: ["sessionList"] } } });
   });
 
   it("eine unbekannte Id im `collapsed` wird abgelehnt, nicht verworfen", () => {
-    expect(checkLayoutPatch({ subDashboard: { collapsed: ["gibtsNicht"] } }, "sub"))
+    expect(checkLayoutPatch({ subDashboard: { collapsed: ["gibtsNicht"] } }, ["sub"]))
       .toEqual({ error: "layoutUnknownBlock" });
   });
 });

@@ -510,7 +510,7 @@
     "blockOpenInspection": "Ausstehende Kontrolle",
     "blockOrgasmRequest": "Orgasmus-Anforderung",
     "blockOrgasmList": "Orgasmen",
-    "editLayout": "{surface, select, subStats {Statistik anpassen} keyholderSub {Sub-Ansicht anpassen} keyholderStats {Sub-Statistik anpassen} other {Dashboard anpassen}}",
+    "editLayout": "{surface, select, subStats {Statistik anpassen} keyholderSub {Meine Sicht auf den Sub anpassen} keyholderStats {Meine Sicht auf die Sub-Statistik anpassen} other {Dashboard anpassen}}",
     "editLayoutDone": "Fertig",
     "editLayoutShow": "{name} einblenden",
     "editLayoutHide": "{name} ausblenden",

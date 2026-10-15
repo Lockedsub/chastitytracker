@@ -1,5 +1,18 @@
 [
   {
+    "version": "6.4.2",
+    "date": "2026-10-15",
+    "changes": [
+      {
+        "type": "fix",
+        "text": {
+          "de": "Keyholder ohne Admin-Rolle können ihre Sicht auf Dashboard und Statistik des Subs wieder speichern und zurücksetzen; die Titel sagen jetzt, dass es die eigene Sicht ist.",
+          "en": "Keyholders without the admin role can save and reset their view of the sub's dashboard and statistics again; the titles now make clear it is their own view."
+        }
+      }
+    ]
+  },
+  {
     "version": "6.4.1",
     "date": "2026-10-13",
     "changes": [

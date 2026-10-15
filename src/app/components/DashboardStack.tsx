@@ -262,7 +262,7 @@ export default function DashboardStack({
       <DashboardBlock>
         <div className="rounded-xl border border-border bg-surface overflow-hidden">
           <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-border">
-            <p className="text-sm font-semibold text-foreground truncate">{t("editLayout", { surface })}</p>
+            <p className="text-sm font-semibold text-foreground">{t("editLayout", { surface })}</p>
             <div className="flex items-center gap-1.5 shrink-0">
               <Button variant="ghost" size="sm" onClick={cancel}>{tc("cancel")}</Button>
               <Button variant="secondary" size="sm" onClick={save} loading={saving}>{t("editLayoutDone")}</Button>

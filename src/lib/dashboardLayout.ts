@@ -188,11 +188,14 @@ export function resolveLayout<S extends BlockSurface>(layout: DashboardLayout, s
  * Träger, der sich per API den Notizen-Block der Keyholderin auflegen will, soll ein Nein
  * bekommen und keinen leeren Block.
  *
+ * `roles` ist eine LISTE: wer Keyholder UND selbst Träger ist (Rolle `user` mit eigenen Subs),
+ * stellt beide Sichten ein und darf deshalb beide Oberflächen schreiben.
+ *
  * Rückgabe: der normalisierte Wert, oder ein Fehler-CODE (der Client löst ihn über i18n auf).
  */
 export function checkLayoutPatch(
   value: unknown,
-  role: "sub" | "keyholder",
+  roles: readonly ("sub" | "keyholder")[],
 ): { layout: DashboardLayout } | { error: string } {
   if (!value || typeof value !== "object" || Array.isArray(value)) return { error: "layoutInvalid" };
 
@@ -203,7 +206,7 @@ export function checkLayoutPatch(
     // Eine Oberfläche gehört als GANZE einer Rolle. Ohne diese Prüfung liesse sich eine
     // Keyholder-Oberfläche mit leeren Listen in die eigene Zeile schreiben — folgenlos heute,
     // aber es ist genau die Art Lücke, die später jemand ausbaut.
-    if (registry[0].role !== role) return { error: "layoutForeignBlock" };
+    if (!roles.includes(registry[0].role)) return { error: "layoutForeignBlock" };
     if (!raw || typeof raw !== "object" || Array.isArray(raw)) return { error: "layoutInvalid" };
 
     const { hidden, order, collapsed } = raw as SurfaceLayout;
@@ -214,7 +217,7 @@ export function checkLayoutPatch(
     for (const id of [...sauberHidden, ...sauberOrder, ...sauberCollapsed]) {
       const block = allowed.get(id);
       if (!block) return { error: "layoutUnknownBlock" };
-      if (block.role !== role) return { error: "layoutForeignBlock" };
+      if (!roles.includes(block.role)) return { error: "layoutForeignBlock" };
     }
     // `alwaysOn` lässt sich nicht wegschalten — still herausfiltern statt abzulehnen: der Client
     // hat es gar nicht erst angeboten, ein Fehler wäre hier eine Falle ohne Nutzen.
