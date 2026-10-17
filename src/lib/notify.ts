@@ -3,7 +3,8 @@ import { withOffenseName } from "@/lib/offenseLabels";
 import { withMessageDefaults } from "@/lib/messageDefaults";
 import { sendMailSafe, escHtml, dashboardEmailHtml } from "@/lib/mail";
 import { emailT, emailGreeting, localeT } from "@/lib/emailI18n";
-import { firePush } from "@/lib/push";
+import { sendPushToUser } from "@/lib/push";
+import { structuredLog } from "@/lib/serverLog";
 import { sendTelegram } from "@/lib/telegram";
 import { recordInboxDelivery, recordSystemMessage, type MessageActor, type MessageBodyKey, type MessageRef } from "@/lib/messageService";
 import { messagePriority } from "@/lib/messageCategories";
@@ -133,6 +134,101 @@ export type NotifyContent = NotifyContentBase & (
 );
 
 /**
+ * Die Obergrenze, die ein Aufrufer auf EINEN Kanal wartet. Jeder Kanal hat sein eigenes, kürzeres
+ * Zeitlimit (SMTP 10/10/15 s, Push und Telegram je 10 s) — dies ist der Gurt darüber, für den Fall,
+ * dass eines davon greift, ohne zu trennen (ein SMTP-Server, der Byte um Byte antwortet, unterläuft
+ * das Socket-Limit beliebig lange).
+ */
+export const CHANNEL_DEADLINE_MS = 20_000;
+
+/** Die drei Felder des Empfängers, an denen die Zustellung hängt (Teil von {@link DeliveryRecipient}). */
+export type ChannelRecipient = Pick<DeliveryRecipient, "id" | "email" | "telegramChatId">;
+
+export interface ChannelContent {
+  /** Der Mail-Inhalt, als FUNKTION: gebaut wird er nur, wenn die Mail wirklich hinausgeht (Kanal an UND
+   *  Adresse da) — der Aufrufer muss die Bedingung nicht ein zweites Mal vorab prüfen. `subject` ohne
+   *  Anwendungsnamen, den setzt {@link deliverToChannels} davor. */
+  mail?: () => { subject: string; html: string };
+  /** Push-Titel, zugleich die erste Zeile der Telegram-Nachricht. */
+  title: string;
+  /** Push-Text, zugleich der Rest der Telegram-Nachricht. */
+  body: string;
+  /** Ziel des Antippens. */
+  url?: string;
+  /** Anzahl ungelesener Nachrichten (nur Push; ohne Wert bleibt das Badge unangetastet). */
+  badge?: number;
+}
+
+/**
+ * Das EINE Versand-Ende: bringt eine fertig formulierte Meldung auf die Kanäle, die die Entscheidung
+ * ({@link deliveryChannels}, `recordInboxDelivery`) freigegeben hat. WER welchen Kanal bekommt, steht
+ * nicht hier — sondern in `channels`, das der Aufrufer mitbringt.
+ *
+ * **Die Warte-Regel (eine, für alle Aufrufer):** alle Kanäle laufen PARALLEL, und der Aufruf kehrt
+ * zurück, wenn jeder fertig ist oder seine Obergrenze ({@link CHANNEL_DEADLINE_MS}) erreicht hat.
+ * Fehler werden geloggt, nie geworfen — eine Meldung ist Beiwerk des Vorgangs, der sie auslöst.
+ *
+ * Warum abwarten statt fire-and-forget: (1) Die Poller stempeln `benachrichtigtAt` NACH dem Versand
+ * und verlassen sich darauf, dass bis dahin jeder Kanal einen Versuch hinter sich hat — ein Stempel
+ * vor dem Versuch wäre eine Zusage ohne Deckung, und ein Neustart dazwischen verlöre die Meldung.
+ * (2) Sonst war das Warteverhalten Glückssache: dieselbe Meldung wartete je nach Weg auf Mail und
+ * Telegram, auf nur eines davon oder auf gar nichts. Warum parallel und nicht nacheinander: die
+ * Wartezeit ist so der langsamste Kanal, nicht die Summe. Warum trotzdem begrenzt: ein hängender
+ * Dienst darf weder den Request noch den Poller-Takt (der seine Fälle nacheinander abarbeitet, auch
+ * Kontroll-Fristen) festhalten.
+ *
+ * Die Mail geht über {@link sendMailSafe}, Telegram über {@link sendTelegram} — beide fangen selbst;
+ * die Push (`sendPushToUser`) tut es nicht (ihre Datenbank-Zugriffe liegen ausserhalb des
+ * try/catch) und wird deshalb hier gefangen.
+ */
+export async function deliverToChannels(
+  recipient: ChannelRecipient,
+  channels: NotificationChannels,
+  content: ChannelContent,
+): Promise<void> {
+  const jobs: { channel: string; run: () => Promise<unknown> }[] = [];
+  if (channels.mail && recipient.email && content.mail) {
+    const to = recipient.email;
+    const build = content.mail;
+    jobs.push({
+      channel: "mail",
+      run: () => {
+        const { subject, html } = build();
+        return sendMailSafe(to, `${APP_NAME} – ${subject}`, html);
+      },
+    });
+  }
+  if (channels.push) {
+    jobs.push({ channel: "push", run: () => sendPushToUser(recipient.id, content.title, content.body, content.url, content.badge) });
+  }
+  if (channels.telegram && recipient.telegramChatId) {
+    const chatId = recipient.telegramChatId;
+    jobs.push({ channel: "telegram", run: () => sendTelegram(chatId, `${content.title}\n\n${content.body}`) });
+  }
+  await Promise.all(jobs.map(({ channel, run }) => guarded(channel, recipient.id, run)));
+}
+
+/** Ein Kanal, gefangen und begrenzt — scheitert er oder hängt er, steht das im Log und sonst nirgends. */
+async function guarded(channel: string, userId: string, run: () => Promise<unknown>): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await Promise.race([
+      run(),
+      new Promise<void>((resolve) => {
+        timer = setTimeout(() => {
+          structuredLog("notify", "channel_deadline", { channel, userId, afterMs: CHANNEL_DEADLINE_MS });
+          resolve();
+        }, CHANNEL_DEADLINE_MS);
+      }),
+    ]);
+  } catch (e) {
+    structuredLog("notify", "channel_failed", { channel, userId, error: (e as Error).message });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
  * Generischer Benachrichtigungs-Helper für einfache Status-Meldungen an den Nutzer
  * (Posteingang + E-Mail + Push). Subject + Message werden in der Sprache des Empfängers gerendert
  * und sowohl im Mail-Body als auch im Push verwendet. Push ist fire-and-forget; ohne hinterlegte
@@ -208,17 +304,18 @@ async function notifyLoadedUser(user: NotifyRecipient, content: NotifyContent): 
   const subject = t(subjectKey, resolved);
   const message = t(messageKey, resolved);
 
-  if (user.email && channels.mail) {
-    await sendMailSafe(
-      user.email,
-      `${APP_NAME} – ${subject}`,
-      dashboardEmailHtml(subject, `${emailGreeting(t, user.username)}<p>${escHtml(message)}</p>`, t("dashboardButton")),
-    );
-  }
-  if (channels.push) firePush(user.id, subject, message, url, badge);
-  // Telegram: derselbe aufgelöste Betreff + Text wie Mail/Push. Nur, wenn der Empfänger seinen Chat
-  // verknüpft hat — sonst gibt es kein Ziel (wie eine fehlende E-Mail-Adresse).
-  if (user.telegramChatId && channels.telegram) await sendTelegram(user.telegramChatId, `${subject}\n\n${message}`);
+  await deliverToChannels(user, channels, {
+    // Der Betreff trägt den Benutzernamen und steht roh in der Überschrift: ohne Escaping ein
+    // HTML-Einschub in die Mail.
+    mail: () => ({
+      subject,
+      html: dashboardEmailHtml(escHtml(subject), `${emailGreeting(t, user.username)}<p>${escHtml(message)}</p>`, t("dashboardButton")),
+    }),
+    title: subject,
+    body: message,
+    url,
+    badge,
+  });
 }
 
 /**
@@ -298,7 +395,7 @@ async function keyholderRowReadable(subjectUserId: string): Promise<boolean> {
     const subject = await prisma.user.findUnique({ where: { id: subjectUserId }, select: { role: true } });
     return subject?.role !== "admin";
   } catch (err) {
-    console.error("[messages] keyholder row readability check failed", err);
+    structuredLog("notify", "keyholder_row_check_failed", { subjectUserId, error: (err as Error).message });
     return true;
   }
 }

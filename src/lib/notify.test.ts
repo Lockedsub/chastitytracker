@@ -15,7 +15,7 @@ vi.mock("@/lib/mail", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/mail")>()),
   sendMailSafe: vi.fn(),
 }));
-vi.mock("@/lib/push", () => ({ firePush: vi.fn() }));
+vi.mock("@/lib/push", () => ({ sendPushToUser: vi.fn() }));
 vi.mock("@/lib/deliveryChannels", () => ({
   deliveryChannels: vi.fn(async () => ({ mail: true, push: true, telegram: false })),
   deliveryChannelsForUser: vi.fn(async () => ({ mail: true, push: true, telegram: false })),
@@ -35,7 +35,7 @@ vi.mock("@/lib/messageService", async (importOriginal) => ({
 import { notifyControllers, notifyUser } from "./notify";
 import { prisma } from "@/lib/prisma";
 import { sendMailSafe } from "@/lib/mail";
-import { firePush } from "@/lib/push";
+import { sendPushToUser } from "@/lib/push";
 import { deliveryChannels, deliveryChannelsForUser } from "@/lib/deliveryChannels";
 import { recordSystemMessage, recordInboxDelivery } from "@/lib/messageService";
 
@@ -96,7 +96,7 @@ describe("notifyControllers", () => {
     expect(mock(sendMailSafe).mock.calls.map((c) => c[0])).toEqual(
       expect.arrayContaining(["kh1@example.com", "kh2@example.com"]),
     );
-    expect(mock(firePush).mock.calls.map((c) => c[0])).toEqual(expect.arrayContaining(["kh1", "kh2"]));
+    expect(mock(sendPushToUser).mock.calls.map((c) => c[0])).toEqual(expect.arrayContaining(["kh1", "kh2"]));
   });
 
   it("reicht ref und once an die Keyholder-Zeile durch — sonst wäre der Poller-Retry ungeschützt", async () => {
@@ -148,7 +148,7 @@ describe("notifyControllers", () => {
     expect(mock(sendMailSafe).mock.calls.map((c) => c[0])).toEqual(
       expect.arrayContaining(["kh1@example.com", "kh2@example.com"]),
     );
-    expect(mock(firePush).mock.calls.map((c) => c[0])).toEqual(expect.arrayContaining(["kh1", "kh2"]));
+    expect(mock(sendPushToUser).mock.calls.map((c) => c[0])).toEqual(expect.arrayContaining(["kh1", "kh2"]));
   });
 
   it("fällt die Rollen-Abfrage aus, wird geschrieben — eine Meldung darf nicht an einem Lesefehler hängen", async () => {
@@ -196,7 +196,7 @@ describe("notifyUser — die Kanal-Schalter des Empfängers gaten alles", () => 
     mock(deliveryChannelsForUser).mockResolvedValue({ mail: false, push: true, telegram: false });
     await notifyUser("sub1", { ...RECIP });
     expect(sendMailSafe).not.toHaveBeenCalled();
-    expect(firePush).toHaveBeenCalledOnce();
+    expect(sendPushToUser).toHaveBeenCalledOnce();
     expect(recordInboxDelivery).toHaveBeenCalledOnce();
   });
 
@@ -204,7 +204,7 @@ describe("notifyUser — die Kanal-Schalter des Empfängers gaten alles", () => 
     mock(deliveryChannelsForUser).mockResolvedValue({ mail: false, push: false, telegram: false });
     await notifyUser("sub1", { ...RECIP });
     expect(sendMailSafe).not.toHaveBeenCalled();
-    expect(firePush).not.toHaveBeenCalled();
+    expect(sendPushToUser).not.toHaveBeenCalled();
     expect(recordInboxDelivery).toHaveBeenCalledOnce();
   });
 
@@ -217,7 +217,7 @@ describe("notifyUser — die Kanal-Schalter des Empfängers gaten alles", () => 
       inbox: false, priority: "info", channels: { mail: true, push: false, telegram: false },
     });
     expect(sendMailSafe).toHaveBeenCalledOnce();
-    expect(firePush).not.toHaveBeenCalled();
+    expect(sendPushToUser).not.toHaveBeenCalled();
   });
 
   it("und erweitert sie nie: Mail auf Aus gilt auch für die Wiege-Erinnerung", async () => {
@@ -229,7 +229,7 @@ describe("notifyUser — die Kanal-Schalter des Empfängers gaten alles", () => 
       inbox: false, priority: "info", channels: { mail: true, push: true, telegram: false },
     });
     expect(sendMailSafe).not.toHaveBeenCalled();
-    expect(firePush).toHaveBeenCalledOnce();
+    expect(sendPushToUser).toHaveBeenCalledOnce();
   });
 
   it("ohne Posteingangs-Zeile (Keyholder-Pfad): die Stufen des EMPFÄNGERS entscheiden", async () => {
@@ -242,6 +242,6 @@ describe("notifyUser — die Kanal-Schalter des Empfängers gaten alles", () => 
     await notifyUser("sub1", { subjectKey: "inspectionRequestedSubject", messageKey: "inspectionRequestedMessage", inbox: false });
     expect(deliveryChannels).toHaveBeenCalledOnce();
     expect(sendMailSafe).toHaveBeenCalledOnce();
-    expect(firePush).toHaveBeenCalledOnce();
+    expect(sendPushToUser).toHaveBeenCalledOnce();
   });
 });

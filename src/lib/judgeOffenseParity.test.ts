@@ -59,7 +59,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { buildStrafbuch } from "@/lib/strafbuch";
 import { sendMailSafe } from "@/lib/mail";
-import { firePush } from "@/lib/push";
+import { sendPushToUser } from "@/lib/push";
 import { emptyOffenseLists } from "@/test/strafbuchFixture";
 import { offenseAnnouncement } from "@/test/messageTableMock";
 
@@ -120,7 +120,7 @@ async function capture(run: () => Promise<unknown>) {
     withdrawnTasks: mock(prisma.task.updateMany).mock.calls.map(([arg]) => arg),
     inbox: inbox.map(({ id: _id, ...row }) => row),
     mails: mock(sendMailSafe).mock.calls,
-    pushes: mock(firePush).mock.calls,
+    pushes: mock(sendPushToUser).mock.calls,
   };
 }
 

@@ -32,8 +32,9 @@ export const mailLeaf = () => ({
   dashboardEmailHtml: () => "",
 });
 
-/** `@/lib/push`: der Versand als Spion. */
-export const pushLeaf = () => ({ firePush: vi.fn() });
+/** `@/lib/push`: der Versand als Spion. `sendPushToUser` ist der Weg des gemeinsamen Versand-Endes
+ *  (`deliverToChannels`), `firePush` der der Einzelfälle ohne Kanal-Entscheidung. */
+export const pushLeaf = () => ({ firePush: vi.fn(), sendPushToUser: vi.fn() });
 
 /** `@/lib/emailI18n`: Übersetzen heisst hier „gib den Schlüssel zurück" — geprüft werden Schlüssel,
  *  nicht Sätze. */

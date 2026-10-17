@@ -57,9 +57,12 @@ type Spy = ReturnType<typeof vi.fn>;
 const spy = (mod: unknown, name: string): Spy | undefined => (mod as Record<string, Spy | undefined>)[name];
 
 const CHAT = "chat-1";
-const USER = {
+const USER: {
+  id: string; email: string | null; username: string; locale: string; telegramChatId: string | null;
+  notifyMail: string; notifyPush: string; notifyTelegram: string; orgasmusArtenConfig: string | null;
+} = {
   id: "u1", email: "sub@example.org", username: "sub", locale: "de", telegramChatId: CHAT,
-  notifyMail: "all", notifyPush: "all", notifyTelegram: "all", orgasmusArtenConfig: null as string | null,
+  notifyMail: "all", notifyPush: "all", notifyTelegram: "all", orgasmusArtenConfig: null,
 };
 
 /** Alles, was an die Mail ging: [Adresse, Betreff, HTML]. */
@@ -68,7 +71,8 @@ const mails = () => (mailModule.sendMailSafe as unknown as Spy).mock.calls;
 const pushes = () => [spy(pushModule, "firePush"), spy(pushModule, "sendPushToUser")]
   .flatMap((s) => s?.mock.calls ?? []);
 /** Die Zeile, die die Datenbank für `u1` liefert. */
-let DB_USER: typeof USER = USER;
+let DB_USER = USER;
+const NO_CONTACT = { ...USER, email: null, telegramChatId: null };
 /** Alles, was an Telegram ging: [Chat, Text] — `fireTelegram(userId, titel, text)` löst den Chat selbst
  *  über die Zeile des Nutzers auf; ohne verknüpften Chat geht nichts hinaus. */
 const telegrams = () => [
@@ -126,7 +130,7 @@ describe("notifyUser", () => {
   });
 
   it("ohne Adresse entfällt nur die Mail, ohne verknüpften Chat nur Telegram", async () => {
-    DB_USER = { ...USER, email: null, telegramChatId: null };
+    DB_USER = NO_CONTACT;
     await notifyUser("u1", { ...CONTENT });
     await settle();
     expect(mails()).toHaveLength(0);
@@ -167,9 +171,9 @@ describe("Verschluss-Direktive", () => {
   });
 
   it("ohne Adresse und ohne Chat bleibt die Push", async () => {
-    DB_USER = { ...USER, email: null, telegramChatId: null };
+    DB_USER = NO_CONTACT;
     await sendVerschlussAnforderungNotifications({
-      ...BASE, user: { ...USER, email: null, telegramChatId: null }, art: "SPERRZEIT", message: null,
+      ...BASE, user: NO_CONTACT, art: "SPERRZEIT", message: null,
     });
     await settle();
     expect(mails()).toHaveLength(0);
