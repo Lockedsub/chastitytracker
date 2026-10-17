@@ -7,7 +7,7 @@ import { requestKontrolle, resolveKontrolle, resolveInspectionEntry, extendInspe
 import { resolveInspectionTarget, inspectionPreconditionProblem, inspectionTargetLabel } from "@/lib/inspectionTarget";
 import { createVorgabe, updateVorgabe, deleteVorgabe, listVorgaben, validateGoalTargets, findActiveVorgabe } from "@/lib/vorgabeService";
 import { setCleaningSettings, maxPausesPerDaySentinel, parseCleaningWindows, cleaningWindowListProblem, formatCleaningWindows, type CleaningWindows, CLEANING_USER_SELECT } from "@/lib/cleaningService";
-import { openWeightRelease, setWeightRelease, weightReleaseStatus, withdrawWeightRelease } from "@/lib/weightReleaseService";
+import { checkWeightRelease, openWeightRelease, setWeightRelease, weightReleaseStatus, withdrawWeightRelease } from "@/lib/weightReleaseService";
 import { setWeightSettingsKeyholder } from "@/lib/weightSettingsService";
 import { setOffenseRule, getOffenseRules } from "@/lib/offenseRulesService";
 import { isSwitchableOffenseType, isValidOffenseMode, OFFENSE_RULE_MODES, type OffenseMode, type SwitchableOffenseType } from "@/lib/offenseRules";
@@ -16,7 +16,7 @@ import { parseWeighingWindows, weighingWindowEnd, weighingWindowsProblem, type W
 import { effectiveTarget, isUnderweightTarget, keyholderTargetOf, subTargetOf, weightProblem } from "@/lib/weight";
 import { ALL_WEEKDAYS, isoDaysOfMask, weekdayMaskKeys, weekdayMaskOf, weekdayMaskValid } from "@/lib/weekdays";
 import { parseWeekdayGoalRules, type WeekdayGoalRule } from "@/lib/weekdayGoal";
-import { createOrgasmusAnforderung, withdrawOrgasmusAnforderung, checkOrgasmWindowEnd } from "@/lib/orgasmusAnforderungService";
+import { createOrgasmusAnforderung, withdrawOrgasmusAnforderung, checkOrgasmusAnforderung } from "@/lib/orgasmusAnforderungService";
 import { judgeOffense, checkPenaltyText, judgmentStatus, collectDetectedOffenses, requireDetectedOffense, punishWithTask } from "@/lib/strafurteilService";
 import { buildStrafbuch } from "@/lib/strafbuch";
 import { matchByNameCI, parseIsoDate, tzOf, makeIso, isoForUser, buildEnvelope, type Envelope, type Iso } from "@/lib/mcp/common";
@@ -71,7 +71,7 @@ import { loadBoxSettings } from "@/lib/mcp/context";
  * dryRun (K-01, leichte Variante): validiert Referenzen/Werte und zeigt die effektiven Argumente,
  * OHNE die mutierende Service-Funktion aufzurufen. Bewusst NICHT dieselbe Tiefe wie die volle
  * V2-executeWrite-Vorschau (B-05) — Service-interne Zustandsprüfungen (z.B. "bereits verschlossen")
- * laufen nur beim echten Commit. Wo eine reine Prüf-Funktion bereits existiert (checkOrgasmWindowEnd,
+ * laufen nur beim echten Commit. Wo eine reine Prüf-Funktion bereits existiert (checkOrgasmusAnforderung,
  * checkGoalPlausibility), wird sie hier genutzt — dieselbe Regel, nicht neu beurteilt.
  */
 export interface DryRunPreview {
@@ -294,7 +294,9 @@ export async function mcpSetLockPeriod(username: string, args: SetLockPeriodArgs
     const endsAtDate = !isIndefinite && args.untilAt ? new Date(args.untilAt) : null;
     // Advisory (siehe request_lock): SPERRZEIT verlangt einen BEREITS verschlossenen User. checkLockEnd
     // ist dieselbe reine Prüfung, die createVerschlussAnforderung auf dem echten Pfad aufruft.
-    const problem = !(await getIsLocked(userId)) ? "USER_NOT_LOCKED" : (checkLockEnd(endsAtDate, wirksamAb, now) ?? undefined);
+    // Reihenfolge wie im Service: erst das Ende, dann der Zustand — und der Zustand nur bei einer
+    // SOFORT wirksamen Sperrzeit (eine terminierte sagt etwas über später, `poller` prüft dort).
+    const problem = checkLockEnd(endsAtDate, wirksamAb, now) ?? (!wirksamAb && !(await getIsLocked(userId)) ? "USER_NOT_LOCKED" : undefined);
     return dryRunPreview("set_lock_period", problem, { art: "SPERRZEIT", endsAt: iso(endsAtDate), durationHours: isIndefinite ? null : (args.durationHours ?? null), cleaningAllowed: args.cleaningAllowed ?? false, delayMinutes: args.delayMinutes ?? null, scheduledAt: args.scheduledAt ?? null });
   }
   const data = unwrap(await createVerschlussAnforderung({
@@ -491,13 +493,13 @@ export async function mcpRequestOrgasm(username: string, args: RequestOrgasmArgs
     throw new Error("Provide endsAt (ISO date) or windowHours (> 0).");
   }
   if (args.dryRun) {
-    // Dieselbe Reihenfolge wie createOrgasmusAnforderung: erst endsAtDate<=beginsAtDate (Struktur), dann
-    // endsAtDate<=now (B-01) — sonst könnte ein explizites endsAt vor beginsAtDate hier fälschlich als
-    // "würde gelingen" durchgehen, obwohl der echte Commit mit ORGASM_END_BEFORE_START ablehnt.
-    // Gegen den AUSLÖSE-Zeitpunkt, wie der Dienst: ein Fenster, das vor seiner eigenen Zustellung
-    // endet, kommt beim Sub als bereits verstrichene Frist an.
-    const trigger = computeDelayedTrigger(new Date(), { delayMinutes: args.delayMinutes, wirksamAbAt: args.scheduledAt ? parseIsoDate(args.scheduledAt, "scheduledAt") : null });
-    const problem = endsAtDate <= beginsAtDate ? "ORGASM_END_BEFORE_START" : (checkOrgasmWindowEnd(endsAtDate, trigger.wirksamAb ?? new Date()) ?? undefined);
+    // Dieselbe Prüfung wie `createOrgasmusAnforderung` — nicht abgeschrieben: `checkOrgasmusAnforderung`
+    // trägt Reihenfolge und Codes (Struktur, Versandzeitpunkt, Fenster-Ende gegen den AUSLÖSE-Zeitpunkt).
+    const checked = checkOrgasmusAnforderung(
+      { userId, art: args.art, beginsAt: beginsAtDate, endsAt: endsAtDate, delayMinutes: args.delayMinutes, wirksamAbAt: args.scheduledAt },
+      new Date(),
+    );
+    const problem = checked.ok ? undefined : checked.code;
     return dryRunPreview("request_orgasm", problem, { art: args.art, beginsAt: iso(beginsAtDate)!, endsAt: iso(endsAtDate)!, requiredType: args.requiredType ?? null, openingAllowed: !!args.openingAllowed, delayMinutes: args.delayMinutes ?? null, scheduledAt: args.scheduledAt ?? null });
   }
   const data = unwrap(await createOrgasmusAnforderung({
@@ -1430,7 +1432,13 @@ export async function mcpSetWeightRelease(username: string, args: SetWeightRelea
   const status = await weightReleaseStatus(userId);
 
   if (args.dryRun) {
-    return dryRunPreview("set_weight_release", undefined, {
+    // Dieselbe Prüfung wie `setWeightRelease` — nicht abgeschrieben (Muster `checkOrgasmusAnforderung`).
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { weightTrackingEnabled: true, heightCm: true } });
+    const checked = checkWeightRelease({
+      userId, thresholdKg: args.thresholdKg, direction: args.direction, averageDays: args.averageDays,
+      minMeasurements: args.minMeasurements, stepKg: args.stepKg, notBeforeAt: args.notBeforeAt, windowHours: args.windowHours,
+    }, user, new Date());
+    return dryRunPreview("set_weight_release", checked.ok ? undefined : checked.code, {
       thresholdKg: args.thresholdKg,
       direction: args.direction ?? "below",
       averageDays: args.averageDays ?? RELEASE_AVERAGE_DAYS_RANGE.fallback,

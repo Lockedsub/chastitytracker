@@ -67,6 +67,69 @@ export async function openWeightRelease(userId: string) {
   });
 }
 
+/** Die geprüften, geklemmten Werte einer Vorgabe — das, was geschrieben wird. */
+export interface CheckedRelease {
+  thresholdKg: number;
+  direction: string;
+  notBeforeAt: Date;
+  averageDays: number;
+  minMeasurements: number;
+  stepKg: number;
+  windowHours: number;
+}
+
+/**
+ * Alle Schranken einer Vorgabe, die der Bestand nicht mehr braucht (der Nutzer ist schon geladen) —
+ * prüfend und schreibfrei, derselbe Schnitt wie `checkOrgasmusAnforderung()` und `checkTask()`.
+ *
+ * Genau deshalb ruft die MCP-dryRun-Vorschau sie auf, statt die Kette abzuschreiben: eine zweite
+ * Nachrechnung meldete Erfolg für einen Commit, der mit 400 endet. **Eine neue Schranke gehört
+ * hierher**, nicht in die Vorschau.
+ */
+export function checkWeightRelease(
+  params: SetWeightReleaseParams,
+  user: { weightTrackingEnabled: boolean; heightCm: number | null } | null,
+  now: Date,
+): { ok: true; value: CheckedRelease } | { ok: false; code: keyof typeof ERRORS & string } {
+  if (!user) return { ok: false, code: "USER_NOT_FOUND" };
+  if (!user.weightTrackingEnabled) return { ok: false, code: "WEIGHT_TRACKING_DISABLED" };
+
+  const direction = params.direction ?? "below";
+  if (!isReleaseDirection(direction)) return { ok: false, code: "RELEASE_INVALID_DIRECTION" };
+
+  // Über `weightProblem`, nicht über eine eigene Bereichsprüfung: es ist dieselbe Frage wie beim
+  // Messwert und beim Zielgewicht („Zahlendreher oder falsch gelesene Waage"), und eine zweite
+  // Fassung liefe irgendwann anders.
+  const thresholdKg = params.thresholdKg;
+  const problem = weightProblem(thresholdKg);
+  if (problem) return { ok: false, code: problem };
+  // Dieselbe Schranke wie beim Zielgewicht: eine Vorgabe, die ins Untergewicht führt, wird nicht
+  // gestellt. Bei `below` ist die Schwelle die niedrigste Zahl der Vorgabe — bei `above` ist sie
+  // die Untergrenze, unter der er bleiben DARF, und dann ist es dieselbe Frage.
+  if (isUnderweightTarget(thresholdKg, user.heightCm)) return { ok: false, code: "RELEASE_UNDERWEIGHT" };
+
+  const notBeforeAt = new Date(params.notBeforeAt);
+  if (Number.isNaN(notBeforeAt.getTime()) || notBeforeAt <= now) return { ok: false, code: "RELEASE_NOT_BEFORE_MUST_BE_FUTURE" };
+
+  const averageDays = clamp(params.averageDays ?? RELEASE_AVERAGE_DAYS_RANGE.fallback, RELEASE_AVERAGE_DAYS_RANGE);
+  const minMeasurements = clamp(params.minMeasurements ?? RELEASE_MIN_MEASUREMENTS_RANGE.fallback, RELEASE_MIN_MEASUREMENTS_RANGE);
+  // Mehr Messungen zu verlangen, als das Fenster Tage hat, ist unerfüllbar — und zwar still: die
+  // Vorgabe stünde da und könnte nie greifen. Lieber eine Absage beim Stellen.
+  if (minMeasurements > averageDays) return { ok: false, code: "RELEASE_TOO_MANY_MEASUREMENTS" };
+
+  // `clamp` rundet auf ganze Zahlen — der Anstieg ist aber ein halbes Kilo, also hier von Hand,
+  // mit derselben Quelle für die Grenzen. Die Finite-Prüfung ist nicht Zierde: der Body kommt roh
+  // aus der Route, und `Math.max(0, Math.min(5, "abc"))` ist NaN — das landete als NaN in einer
+  // Float-Spalte und machte jede spätere Schwellen-Rechnung still unbrauchbar.
+  const rawStep = Number(params.stepKg ?? 0);
+  const stepKg = Number.isFinite(rawStep)
+    ? Math.min(RELEASE_STEP_KG_RANGE.max, Math.max(RELEASE_STEP_KG_RANGE.min, rawStep))
+    : 0;
+
+  const windowHours = clamp(params.windowHours ?? RELEASE_WINDOW_HOURS_RANGE.fallback, RELEASE_WINDOW_HOURS_RANGE);
+  return { ok: true, value: { thresholdKg, direction, notBeforeAt, averageDays, minMeasurements, stepKg, windowHours } };
+}
+
 /**
  * Stellt eine Vorgabe. Eine offene wird dabei zurückgezogen — eine je Sub, wie bei der
  * `OrgasmusAnforderung`: zwei Bedingungen, die dasselbe Fenster öffnen, wären für den Träger nicht
@@ -86,42 +149,10 @@ export async function setWeightRelease(
       where: { id: userId },
       select: { weightTrackingEnabled: true, heightCm: true },
     });
-    if (!user) throw fail("USER_NOT_FOUND");
-    if (!user.weightTrackingEnabled) throw fail("WEIGHT_TRACKING_DISABLED");
-
-    const direction = params.direction ?? "below";
-    if (!isReleaseDirection(direction)) throw fail("RELEASE_INVALID_DIRECTION");
-
-    // Über `weightProblem`, nicht über eine eigene Bereichsprüfung: es ist dieselbe Frage wie beim
-    // Messwert und beim Zielgewicht („Zahlendreher oder falsch gelesene Waage"), und eine zweite
-    // Fassung liefe irgendwann anders.
-    const thresholdKg = params.thresholdKg;
-    const problem = weightProblem(thresholdKg);
-    if (problem) throw fail(problem);
-    // Dieselbe Schranke wie beim Zielgewicht: eine Vorgabe, die ins Untergewicht führt, wird nicht
-    // gestellt. Bei `below` ist die Schwelle die niedrigste Zahl der Vorgabe — bei `above` ist sie
-    // die Untergrenze, unter der er bleiben DARF, und dann ist es dieselbe Frage.
-    if (isUnderweightTarget(thresholdKg, user.heightCm)) throw fail("RELEASE_UNDERWEIGHT");
-
-    const notBeforeAt = new Date(params.notBeforeAt);
-    if (Number.isNaN(notBeforeAt.getTime())) throw fail("RELEASE_NOT_BEFORE_MUST_BE_FUTURE");
     const now = new Date();
-    if (notBeforeAt <= now) throw fail("RELEASE_NOT_BEFORE_MUST_BE_FUTURE");
-
-    const averageDays = clamp(params.averageDays ?? RELEASE_AVERAGE_DAYS_RANGE.fallback, RELEASE_AVERAGE_DAYS_RANGE);
-    const minMeasurements = clamp(params.minMeasurements ?? RELEASE_MIN_MEASUREMENTS_RANGE.fallback, RELEASE_MIN_MEASUREMENTS_RANGE);
-    // Mehr Messungen zu verlangen, als das Fenster Tage hat, ist unerfüllbar — und zwar still: die
-    // Vorgabe stünde da und könnte nie greifen. Lieber eine Absage beim Stellen.
-    if (minMeasurements > averageDays) throw fail("RELEASE_TOO_MANY_MEASUREMENTS");
-
-    // `clamp` rundet auf ganze Zahlen — der Anstieg ist aber ein halbes Kilo, also hier von Hand,
-    // mit derselben Quelle für die Grenzen. Die Finite-Prüfung ist nicht Zierde: der Body kommt roh
-    // aus der Route, und `Math.max(0, Math.min(5, "abc"))` ist NaN — das landete als NaN in einer
-    // Float-Spalte und machte jede spätere Schwellen-Rechnung still unbrauchbar.
-    const rawStep = Number(params.stepKg ?? 0);
-    const stepKg = Number.isFinite(rawStep)
-      ? Math.min(RELEASE_STEP_KG_RANGE.max, Math.max(RELEASE_STEP_KG_RANGE.min, rawStep))
-      : 0;
+    const checked = checkWeightRelease(params, user, now);
+    if (!checked.ok) throw fail(checked.code);
+    const { thresholdKg, direction, notBeforeAt, averageDays, minMeasurements, stepKg, windowHours } = checked.value;
 
     const created = await prisma.$transaction(async (tx) => {
       await tx.weightRelease.updateMany({
@@ -137,7 +168,7 @@ export async function setWeightRelease(
           minMeasurements,
           stepKg,
           notBeforeAt,
-          windowHours: clamp(params.windowHours ?? RELEASE_WINDOW_HOURS_RANGE.fallback, RELEASE_WINDOW_HOURS_RANGE),
+          windowHours,
           openingAllowed: Boolean(params.openingAllowed),
           message: params.message?.trim() || null,
           createdBy: actor ?? null,
