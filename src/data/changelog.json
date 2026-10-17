@@ -1,5 +1,25 @@
 [
   {
+    "version": "6.5.4",
+    "date": "2026-10-17",
+    "changes": [
+      {
+        "type": "security",
+        "text": {
+          "de": "Die Anbindung der KI-Keyholderin (MCP) läuft auf aktuellen, sicherheitsgeprüften Bausteinen. Die älteren SSE-Adressen /api/sse und /api/message entfallen; Claude.ai nutzt /api/mcp.",
+          "en": "The AI keyholder connection (MCP) now runs on current, security-patched components. The older SSE addresses /api/sse and /api/message are gone; Claude.ai uses /api/mcp."
+        }
+      },
+      {
+        "type": "fix",
+        "text": {
+          "de": "Ziel-Daten, Tageswerte und Zeitleiste stimmen auch an Tagen mit Zeitumstellung, doppelte Verschlüsse zählen nicht mehr doppelt, und abgelehnte Offline-Einträge werden gemeldet statt als synchronisiert angezeigt.",
+          "en": "Goal dates, daily values and the timeline are correct on daylight-saving days, duplicate lock entries no longer count twice, and rejected offline entries are reported instead of shown as synced."
+        }
+      }
+    ]
+  },
+  {
     "version": "6.5.3",
     "date": "2026-10-17",
     "changes": [

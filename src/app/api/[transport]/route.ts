@@ -1,5 +1,5 @@
 import { createMcpHandler, withMcpAuth } from "mcp-handler";
-import type { ContentBlock } from "@modelcontextprotocol/sdk/types.js";
+import type { ContentBlock } from "@modelcontextprotocol/server";
 import { timingSafeEqual, createHash } from "crypto";
 import { z } from "zod";
 import { listEntries } from "@/lib/mcp/entries";
@@ -78,8 +78,11 @@ async function runTool<T>(label: string, fn: (username: string) => Promise<T>): 
 }
 
 /** Auth context the MCP SDK passes to tool callbacks. The OAuth branch of verifyToken stores the
- *  authorizing user's id under authInfo.extra.userId. */
-type ToolExtra = { authInfo?: { extra?: { userId?: string } } };
+ *  authorizing user's id under http.authInfo.extra.userId (SDK v2: `ctx.http`). */
+type ToolExtra = { http?: { authInfo?: { extra?: { userId?: string } } } };
+
+/** Die User-ID der autorisierenden OAuth-Sitzung; beim statischen Token undefined. */
+const callerUserId = (extra: ToolExtra | undefined) => extra?.http?.authInfo?.extra?.userId;
 
 /** Freitext-Felder der Write-Args — nur hier könnte ein Keyholder einen Code eintippen, also NUR
  *  diese redigieren. IDs (cuids), Zeitstempel und Zahlenwerte bleiben intakt, damit die Audit-Zeile
@@ -138,7 +141,7 @@ function denyWrite(tool: string, args: unknown, reason: string): ToolResult {
  *  here. A crash between the two would leave a mutation without an audit row — an accepted gap for
  *  this lighter-weight V1 pass; the full V1→V2 migration (K-01) closes it structurally. */
 async function runWriteTool<T>(label: string, extra: ToolExtra, args: Record<string, unknown>, fn: (username: string) => Promise<T>): Promise<ToolResult> {
-  const check = await checkMcpKeyholder(extra?.authInfo?.extra?.userId);
+  const check = await checkMcpKeyholder(callerUserId(extra));
   if (!check.ok) return denyWrite(label, args, check.reason);
   const reason = typeof args.reason === "string" ? args.reason.trim() : "";
   if (!reason) return denyWrite(label, args, `"${label}" requires a non-empty reason (audit is mandatory)`);
@@ -162,7 +165,7 @@ async function runWriteTool<T>(label: string, extra: ToolExtra, args: Record<str
     const username = process.env.MCP_USERNAME;
     if (username) {
       try {
-        const ctx = await buildWriteContext(username, extra?.authInfo?.extra?.userId);
+        const ctx = await buildWriteContext(username, callerUserId(extra));
         // Kein $transaction: recordAction schreibt hier nur EINE Zeile, und dieser Pfad ist ohnehin
         // nicht atomar mit dem V1-Write selbst (siehe Docblock) — eine Transaktion um einen einzelnen
         // Insert wäre reiner Overhead ohne zusätzliche Garantie.
@@ -185,7 +188,7 @@ async function runV2Write<A, T>(
   extra: ToolExtra,
   raw: Record<string, unknown>,
 ): Promise<ToolResult> {
-  const check = await checkMcpKeyholder(extra?.authInfo?.extra?.userId);
+  const check = await checkMcpKeyholder(callerUserId(extra));
   if (!check.ok) return denyWrite(def.tool, raw, check.reason);
   const username = process.env.MCP_USERNAME;
   if (!username) {
@@ -196,7 +199,7 @@ async function runV2Write<A, T>(
   // nicht mit Domänenfeldern wie der Note-Provenienz (note.source) kollidiert.
   const { reason, decisionSource, dryRun, ...domain } = raw;
   try {
-    const ctx = await buildWriteContext(username, extra?.authInfo?.extra?.userId);
+    const ctx = await buildWriteContext(username, callerUserId(extra));
     const result = await executeWrite(def, ctx, domain as A, {
       reason: reason as string,
       source: decisionSource as WriteSource | undefined,
@@ -1984,7 +1987,7 @@ function registerTools(server: McpServer) {
       },
       (args, extra) =>
         runTool("get_shared_journal", (u) =>
-          sharedJournal(u, (extra as ToolExtra).authInfo?.extra?.userId, { month: args.month, cursor: args.cursor })),
+          sharedJournal(u, callerUserId(extra as ToolExtra), { month: args.month, cursor: args.cursor })),
     );
 
     server.registerTool(
@@ -2374,7 +2377,6 @@ async function buildAuthHandler(): Promise<(req: Request) => Promise<Response>> 
       if (imagesVisible) registerImageTool(server);
     },
     { instructions },
-    { basePath: "/api", maxDuration: 60 },
   );
   return withMcpAuth(handler, verifyToken, { required: true });
 }
