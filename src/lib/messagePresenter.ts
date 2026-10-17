@@ -1,4 +1,4 @@
-import { getTranslations } from "next-intl/server";
+import { localeT } from "@/lib/emailI18n";
 import type { InboxMessage, MessageSenderKind } from "@/lib/messageService";
 import { messageCategory, type MessageCategory } from "@/lib/messageCategories";
 import { inspectionHref } from "@/lib/entryFormRoute";
@@ -59,11 +59,9 @@ export async function presentMessages(
   // nur kein Feld dazu. An `statementFor` gehängt blieb ihre Sicht leer — und damit auch die Zeile,
   // die dem Urteil vorausgehen soll.
   const offenseRefs = [...new Set(messages.flatMap((m) => (m.offenseRefId ? [m.offenseRefId] : [])))];
-  const [t, tOffenses, statements] = await Promise.all([
-    getTranslations({ locale, namespace: "emails" }),
-    getTranslations({ locale, namespace: "offenses" }),
-    loadStatementViews(offenseRefs, statementFor ? { userId: statementFor.userId, refIds: offenseRefs } : null),
-  ]);
+  const t = localeT(locale, "emails");
+  const tOffenses = localeT(locale, "offenses");
+  const statements = await loadStatementViews(offenseRefs, statementFor ? { userId: statementFor.userId, refIds: offenseRefs } : null);
   return messages.map((m) => ({
     id: m.id,
     createdAt: m.createdAt.toISOString(),

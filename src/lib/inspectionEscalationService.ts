@@ -1,5 +1,5 @@
-import { getTranslations } from "next-intl/server";
 import { prisma } from "@/lib/prisma";
+import { localeT } from "@/lib/emailI18n";
 import { clamp, APP_TZ } from "@/lib/utils";
 import { notifyUser, notifyControllers } from "@/lib/notify";
 import { getControllersOfUser } from "@/lib/keyholder";
@@ -7,7 +7,7 @@ import { createOeffnenEntryTx } from "@/lib/oeffnenService";
 import { prepareWearEntry } from "@/lib/queries";
 import { resolveInspectionTarget, isKgTarget } from "@/lib/inspectionTarget";
 import {
-  AUTO_ENTFERNT_REASON, toLocale, NO_FIELDS_TO_UPDATE,
+  AUTO_ENTFERNT_REASON, NO_FIELDS_TO_UPDATE,
   INSPECTION_REMINDER_DELAY_RANGE, INSPECTION_AUTO_MARK_DELAY_RANGE,
 } from "@/lib/constants";
 import { codeOf } from "@/lib/codedError";
@@ -149,7 +149,7 @@ export async function autoMarkInspectionRemoved(ka: { id: string; userId: string
     // Persisted, not just displayed once — the note stays on the Entry forever (Strafbuch/audit
     // history), so it's localized to the SUB's own stored language, not left hardcoded German.
     // Dieselbe Notiz für beide Ziele: der Anlass ist derselbe, nur der Eintragstyp unterscheidet sich.
-    const tOpen = await getTranslations({ locale: toLocale(fresh.user.locale), namespace: "openForm" });
+    const tOpen = localeT(fresh.user.locale, "openForm");
     const note = tOpen("autoEntferntNote");
 
     let entryId: string;

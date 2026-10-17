@@ -91,23 +91,21 @@ interface NotifyContentBase {
   params?: Record<string, string | number>;
   url?: string;
   /**
-   * Welche Kanäle überhaupt in Frage kommen — fehlt die Angabe, gaten bei einer Meldung MIT
-   * Posteingangs-Zeile die Empfänger-Schalter (`MESSAGE_RECEIVED`, siehe `notifyLoadedUser`), ohne
-   * Zeile (`inbox: false`, Keyholder-Pfad) sind es alle.
+   * Ein zusätzlicher Schalter, der die Kanäle dieser Meldung VERENGT — fehlt die Angabe, entscheiden
+   * allein die Stufen des Empfängers (`deliveryChannels`, bei Meldungen MIT Posteingangs-Zeile über
+   * `recordInboxDelivery`, siehe `notifyLoadedUser`).
    *
-   * Für die eine Klasse Meldungen, deren Schalter NICHT am Empfänger hängt, sondern am TRÄGER, um
-   * den es geht: das Raster in seinen Einstellungen (`NotificationToggles`) sagt, welche seiner
-   * Ereignisse die Keyholder per Mail/Push erreichen. Der Aufrufer liest es über
-   * `getEventChannels()` und reicht das Ergebnis hier durch — er kennt den Ereignis-Typ, diese
-   * Funktion kennt nur den Empfänger.
+   * Für die eine Klasse Meldungen mit EIGENEM Schalter: heute die Wiege-Erinnerung
+   * (`RECIPIENT_NOTIFICATION_EVENT_TYPES`). Der Aufrufer liest ihn über `getRecipientChannels()` und
+   * reicht das Ergebnis hier durch — er kennt den Ereignis-Typ, diese Funktion kennt nur den
+   * Empfänger.
    *
    * Die POSTEINGANGS-Zeile bleibt davon unberührt, und das ist der Punkt: „der Kanal wird leiser,
    * ohne dass Information verloren geht" (`notificationPrefs.ts`). Ein abgeschalteter Schalter darf
    * eine Meldung dämpfen, nicht verschwinden lassen.
    *
-   * Seit dem Stufen-Modell VERENGT dieses Feld nur noch: gerechnet wird `Stufe ∧ Schalter`. Ein
-   * Ereignis-Schalter kann eine Meldung damit zusätzlich abbestellen, aber keine an einer Stufe
-   * vorbeischicken — sonst hiesse „Mail aus" wieder nicht „keine Mail".
+   * Gerechnet wird `Stufe ∧ Schalter`: der Schalter kann eine Meldung zusätzlich abbestellen, aber
+   * keine an einer Stufe vorbeischicken — sonst hiesse „Mail aus" wieder nicht „keine Mail".
    */
   channels?: NotificationChannels;
 
@@ -230,9 +228,9 @@ async function guarded(channel: string, userId: string, run: () => Promise<unkno
 
 /**
  * Generischer Benachrichtigungs-Helper für einfache Status-Meldungen an den Nutzer
- * (Posteingang + E-Mail + Push). Subject + Message werden in der Sprache des Empfängers gerendert
- * und sowohl im Mail-Body als auch im Push verwendet. Push ist fire-and-forget; ohne hinterlegte
- * E-Mail wird nur Push versendet.
+ * (Posteingang + E-Mail + Push + Telegram). Subject + Message werden in der Sprache des Empfängers
+ * gerendert und auf jedem Kanal verwendet. Versendet wird über {@link deliverToChannels}; ohne
+ * hinterlegte E-Mail entfällt nur die Mail.
  *
  * Die Nachricht wird ZUERST geschrieben: scheitert der Versand, bleibt die Meldung trotzdem
  * nachlesbar — der ganze Grund für den Posteingang.

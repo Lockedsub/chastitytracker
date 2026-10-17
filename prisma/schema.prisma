@@ -1707,7 +1707,7 @@ model NotificationPreference {
   id        String  @id @default(cuid())
   userId    String
   user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  eventType String // VERSCHLUSS | OEFFNUNG_IMMER | OEFFNUNG_VERBOTEN | ORGASMUS | KONTROLLE_FREIWILLIG | KONTROLLE_ANGEFORDERT
+  eventType String // heute nur WEIGHT_REMINDER (RECIPIENT_NOTIFICATION_EVENT_TYPES); alle anderen Meldungen folgen den Stufen am User
   mail      Boolean @default(true)
   push      Boolean @default(true)
   telegram  Boolean @default(true)

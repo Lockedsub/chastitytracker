@@ -55,8 +55,7 @@ vi.mock("@/lib/mail", () => ({
 }));
 vi.mock("@/lib/push", () => ({ sendPushToUser: vi.fn() }));
 vi.mock("@/lib/appMeta", () => ({ markLastAction: vi.fn() }));
-vi.mock("@/lib/emailI18n", () => ({ emailT: vi.fn(async () => (k: string) => k), emailGreeting: () => "" }));
-vi.mock("next-intl/server", () => ({ getTranslations: vi.fn(async () => (k: string) => k) }));
+vi.mock("@/lib/emailI18n", async () => (await import("@/test/notifyLeafMocks")).emailI18nLeaf());
 
 import { requestKontrolle } from "./kontrolleService";
 import { autoMarkInspectionRemoved } from "./inspectionEscalationService";
