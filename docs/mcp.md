@@ -135,7 +135,7 @@ Notable V2 read fields:
 `judge_offense`, `withdraw`, `set_training_goal` / `edit_training_goal` /
 `delete_training_goal` / `list_training_goals`, `set_cleaning`,
 `set_auto_inspections`, `set_offense_rules`, `set_inspection_escalation`,
-`set_weight_tracking`, `edit_lock_request`. `resolve_inspection` takes an optional
+`set_weight_tracking`, `edit_lock_request`, `edit_inspection`. `resolve_inspection` takes an optional
 `id` (from `list_entries`) to judge a specific, older submission instead of the
 latest. Lock, lock-period,
 inspection, orgasm, resolve, withdraw and "punish" verdicts notify the sub

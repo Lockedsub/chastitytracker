@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth";
 import BlockHeading from "@/app/components/BlockHeading";
 import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
 import { redirect } from "next/navigation";
 import { getControlledSubs } from "@/lib/keyholder";
 import Link from "next/link";
@@ -12,9 +13,12 @@ import EditLockPeriodButton from "./EditLockPeriodButton";
 import ReleaseNowButton from "./ReleaseNowButton";
 import QuickSettingChip from "./QuickSettingChip";
 import WithdrawButton from "./WithdrawButton";
+import ExtendInspectionButton from "./ExtendInspectionButton";
 import KontrolleBanner from "@/app/components/KontrolleBanner";
 import { inspectionTargetLabel } from "@/lib/inspectionTarget";
 import { KONTROLLE_TARGET_INCLUDE, latestKgTimesByUser } from "@/lib/queries";
+import { AUTO_KONTROLLE_SETTINGS_SELECT } from "@/lib/autoKontrolleService";
+import { predictAutoMarkAt, INSPECTION_ESCALATION_USER_SELECT } from "@/lib/inspectionEscalationService";
 import LockRequestBanner from "@/app/components/LockRequestBanner";
 import EmptyState from "@/app/components/EmptyState";
 import UserAvatar from "@/app/components/UserAvatar";
@@ -60,11 +64,14 @@ export default async function AdminPage() {
   // Die Werte der Schnellschalter reisen in DERSELBEN Abfrage mit — ein paar Spalten mehr auf einer
   // Zeile, die ohnehin geladen wird, statt einer zweiten Runde je Träger.
   const userSelect = {
+    // Für die Vorschau „ohne dich" an der überfälligen Kontrolle (`predictAutoMarkAt`).
+    ...AUTO_KONTROLLE_SETTINGS_SELECT,
     id: true, username: true, role: true, email: true, createdAt: true, timezone: true, hideOwnTracker: true,
     quickSettings: true, ...QUICK_SETTING_SELECT,
+    ...INSPECTION_ESCALATION_USER_SELECT,
   };
 
-  let users;
+  let users: Prisma.UserGetPayload<{ select: typeof userSelect }>[];
   if (isGlobalAdmin) {
     // Feature flag: when USE_ADMIN_RELATIONSHIPS=true, admins only see their assigned users.
     const useRelationships = process.env.USE_ADMIN_RELATIONSHIPS === "true";
@@ -200,7 +207,8 @@ export default async function AdminPage() {
   const isScheduled = (wirksamAb: Date | null) => isScheduledDirective(wirksamAb, now);
 
 
-  function getUserStats(userId: string) {
+  function getUserStats(user: (typeof users)[number]) {
+    const userId = user.id;
     const lastV = verschlussMap.get(userId);
     const lastO = oeffnenMap.get(userId);
     const latestType = !lastV && !lastO ? null : (!lastO || (lastV && lastV > lastO)) ? "VERSCHLUSS" : "OEFFNEN";
@@ -241,6 +249,9 @@ export default async function AdminPage() {
             id: offeneKontrolle.id, deadline: offeneKontrolle.deadline,
             overdue: offeneKontrolle.deadline < now,
             target: inspectionTargetLabel(offeneKontrolle),
+            // Nur die Buchung ändert sich ohne die Keyholderin; ist die Automatik aus, ist `null`
+            // die richtige Auskunft („nichts von selbst").
+            autoMarkAt: offeneKontrolle.deadline < now ? predictAutoMarkAt(offeneKontrolle, user) : null,
           }
         : null,
       hasOffeneAnforderung: offeneVerschlussAnforderungen.length > 0,
@@ -262,7 +273,7 @@ export default async function AdminPage() {
     };
   }
 
-  const usersWithStats = users.map(u => ({ ...u, stats: getUserStats(u.id) }));
+  const usersWithStats = users.map(u => ({ ...u, stats: getUserStats(u) }));
 
   const lockedCount = usersWithStats.filter(u => u.stats.currentStatus === "VERSCHLUSS").length;
 
@@ -273,15 +284,16 @@ export default async function AdminPage() {
    * seinem Kasten. Die Frage, mit der man ihn öffnet, lautet aber nicht „wen habe ich", sondern
    * „wo werde ich gebraucht" — und die musste man sich aus den Karten selbst zusammensuchen.
    *
-   * „Braucht dich" heisst: etwas ist offen und wartet auf eine Entscheidung oder eine Handlung von
-   * DIR. Eine laufende Sperrzeit gehört ausdrücklich NICHT dazu — sie läuft ja, wie angeordnet.
+   * „Braucht dich" heisst: etwas ist OFFEN und die Keyholderin hat einen Griff dafür (die Zeile
+   * beschriftet es bewusst nur als „offenen Vorgang" — eine überfällige Kontrolle muss der Träger
+   * erfüllen, sie kann sie nur verlängern oder zurückziehen; #55). Eine laufende Sperrzeit gehört ausdrücklich NICHT dazu — sie läuft ja, wie angeordnet.
    * Eine geplante Direktive ebenso wenig; sie ist bereits entschieden und wartet nur auf ihren
    * Zeitpunkt.
    *
    * **Der offene Riegel zählt hier NICHT mit** — er sortiert nur. Er wartet auf den Träger: den
    * Knopf am Gerät drückt niemand sonst, und die Zeile in der Übersicht trägt deshalb bewusst keine
-   * Aktion. Stünde er in dieser Zahl, läse die Keyholderin „1 · braucht deine Entscheidung", fände
-   * in der Zeile nichts zu entscheiden — und der Screenreader sagte ihr dasselbe an. Die Zahl darf
+   * Aktion. Stünde er in dieser Zahl, läse die Keyholderin „1 · offener Vorgang", fände
+   * in der Zeile nichts zu tun — und der Screenreader sagte ihr dasselbe an. Die Zahl darf
    * nur zählen, wofür es auch einen Griff gibt.
    */
   const needsDecision = (st: ReturnType<typeof getUserStats>) =>
@@ -295,7 +307,7 @@ export default async function AdminPage() {
   // Das Merkmal hängt am Nutzer, nicht am Abschnitt: so wertet `needsDecision` genau EINMAL
   // je Nutzer aus und Reihenfolge, Kopfzahl und Punkt lesen alle denselben Wert.
   //
-  // ZWEI Merkmale, nicht eines: `hasAlarm` beschriftet und zählt („braucht deine Entscheidung"),
+  // ZWEI Merkmale, nicht eines: `hasAlarm` beschriftet und zählt („offener Vorgang"),
   // `sortFirst` ordnet. Der offene Riegel gehört nur ins zweite — er soll oben stehen, ohne eine
   // Entscheidung zu behaupten, die es nicht gibt.
   const usersWithFlags = usersWithStats.map(u => ({
@@ -488,8 +500,16 @@ export default async function AdminPage() {
                             deadline={u.stats.offeneKontrolle.deadline}
                             target={u.stats.offeneKontrolle.target}
                             overdue={u.stats.offeneKontrolle.overdue}
+                            outlook={{ autoMarkAt: u.stats.offeneKontrolle.autoMarkAt }}
+                            tz={rowTz}
+                            viewerTz={viewerTz}
                             variant="compact"
-                            withdrawAction={<WithdrawButton id={u.stats.offeneKontrolle.id} apiPath="/api/admin/kontrollen" title={t("withdrawKontrolleTitle")} colorToken="inspect" />}
+                            actions={
+                              <>
+                                <ExtendInspectionButton id={u.stats.offeneKontrolle.id} deadline={u.stats.offeneKontrolle.deadline} tz={rowTz} minNow={rowMinNow} />
+                                <WithdrawButton id={u.stats.offeneKontrolle.id} apiPath="/api/admin/kontrollen" title={t("withdrawKontrolleTitle")} colorToken="inspect" showLabel />
+                              </>
+                            }
                           />
                         )}
                         {u.stats.offeneAnforderungen.map((a) => (

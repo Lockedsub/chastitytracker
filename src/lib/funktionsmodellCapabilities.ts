@@ -248,6 +248,13 @@ export const FM_CAPABILITIES: FmCapability[] = [
     routes: ["/api/admin/kontrollen/[id]", "/api/admin/entries/[id]"], tools: ["resolve_inspection"],
   }),
   c({
+    id: "inspection-extend", mechanic: "Kontrollen", title: "Frist einer Kontrolle verlängern",
+    what: "Setzt die Frist einer offenen, zugestellten Kontrolle nach hinten, statt sie zurückzuziehen und neu zu stellen.",
+    actors: ["admin", "mcp"], surfaces: ["admin-ui", "mcp"],
+    routes: ["/api/admin/kontrollen/[id]"], tools: ["edit_inspection"],
+    note: "Mahn-Stempel wird zurückgesetzt: beide Eskalationsstufen zählen ab der neuen Frist. Nur nach hinten und in die Zukunft.",
+  }),
+  c({
     id: "inspection-fulfil", mechanic: "Kontrollen", title: "Kontrolle erfüllen",
     what: "Der Träger reicht das Foto ein — bei einem Gerät mit Code-Pflicht mit handschriftlichem Code im Bild.",
     actors: ["sub"], surfaces: ["sub-ui"],

@@ -13,7 +13,7 @@ import { structuredLog, redactDigits } from "@/lib/serverLog";
 import {
   checkMcpKeyholder, mcpRequestLock, mcpSetLockPeriod,
   mcpReleaseNow, mcpRequestInspection, mcpSetTrainingGoal, mcpWithdraw,
-  mcpListTrainingGoals, mcpEditTrainingGoal, mcpDeleteTrainingGoal, mcpSetCleaning, mcpSetBox, mcpSetWeightTracking, mcpSetWeightRelease, mcpSetOffenseRules, mcpSetInspectionEscalation, mcpSetAutoInspections, mcpResolveInspection, mcpEditLockPeriod, mcpEditLockRequest, mcpCreateTask,
+  mcpListTrainingGoals, mcpEditTrainingGoal, mcpDeleteTrainingGoal, mcpSetCleaning, mcpSetBox, mcpSetWeightTracking, mcpSetWeightRelease, mcpSetOffenseRules, mcpSetInspectionEscalation, mcpSetAutoInspections, mcpResolveInspection, mcpEditInspection, mcpEditLockPeriod, mcpEditLockRequest, mcpCreateTask,
   mcpReviewTaskProof, mcpEditTask, mcpEditEntry, mcpAddEntry, mcpAddMissedBreak, mcpAddMissedSession,
   mcpCreateTaskSeries, mcpEditTaskSeries, mcpWithdrawTaskSeries,
   mcpImportDeviceReferences, mcpDeleteDeviceReference, mcpDeleteEntry,
@@ -228,7 +228,7 @@ const MCP_SERVER_INSTRUCTIONS =
   "• DIREKTIVEN (Sperrzeit, Inspektion, Orgasmus, Strafe, Trainingsziele, Reinigung): `set_lock_period`, " +
   "`request_lock`, `request_inspection`, `request_orgasm`, `judge_offense`, `record_offense`, `set_training_goal`, " +
   "`set_cleaning`, `set_auto_inspections`, `set_offense_rules`, `set_inspection_escalation`, " +
-  "`set_weight_tracking`, `set_box`, `withdraw`, `edit_lock_period`, `edit_lock_request`, `resolve_inspection`, … Ein Vergehen, das " +
+  "`set_weight_tracking`, `set_box`, `withdraw`, `edit_lock_period`, `edit_lock_request`, `edit_inspection`, `resolve_inspection`, … Ein Vergehen, das " +
   "der Tracker nicht sehen kann (gebrochene Abmachung, Unhöflichkeit), notierst du mit `record_offense`; " +
   "beurteilt wird es danach wie jedes andere. `set_cleaning` deckt ALLE " +
   "Reinigungs-Regeln ab, auch die Tages-Fenster (`windows` — ersetzt die ganze Liste, `[]` löst die Reinigung von der " +
@@ -1283,6 +1283,27 @@ function registerTools(server: McpServer) {
         },
       },
       (args, extra) => runWriteTool("resolve_inspection", extra, args, (u) => mcpResolveInspection(u, args)),
+    );
+
+    server.registerTool(
+      "edit_inspection",
+      {
+        title: "Extend the deadline of an open inspection",
+        description:
+          "Extends the deadline of an open, already delivered inspection — instead of withdrawing and re-requesting it, " +
+          "which would lose the history (new code, the original shown as withdrawn). Only LATER is possible, and the new " +
+          "deadline must be in the future. The reminder and the automatic removal booking start counting from the new " +
+          "deadline, and the user is told. Use get_context/keyholder_dashboard to see what the app does on its own when " +
+          "a deadline passes." + KEYHOLDER_NOTE,
+        inputSchema: {
+          id: z.string().optional().describe("Which inspection (id from list_inspections). Optional only while exactly one is open; with more, the error names the candidates."),
+          deadlineAt: z.string().optional().describe("New absolute deadline (ISO 8601)."),
+          extendHours: z.number().positive().optional().describe("Alternatively: extend by this many hours beyond the later of the old deadline and now. Ignored if deadlineAt is given — pass only one."),
+          reason: reasonField,
+          dryRun: dryRunFieldV1,
+        },
+      },
+      (args, extra) => runWriteTool("edit_inspection", extra, args, (u) => mcpEditInspection(u, args)),
     );
 
     server.registerTool(

@@ -56,6 +56,7 @@ export const MESSAGE_BODY_KEYS = [
   "inspectionConfirmedMessage",
   "inspectionRejectedMessage",
   "inspectionResolvedWithdrawnMessage",
+  "inspectionExtendedMessage",
   "inspectionReminderMessage",
   "inspectionReminderMessageNoCode",
   "inspectionAutoRemovedMessageSub",

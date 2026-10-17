@@ -65,6 +65,14 @@ interface Props {
   /** Der Rückzug. In der kompakten Zeile das Zeichen allein, in der grossen Fassung beschriftet —
    *  die Sub-Detailseite der Keyholderin hatte bis v6 GAR KEINE Aktion an diesem Block. */
   withdrawAction?: ReactNode;
+  /** Keyholder-Sicht der kompakten Zeile: was die App bei verstrichener Frist OHNE ihr Zutun tut.
+   *  `autoMarkAt` ist die Buchung (`predictAutoMarkAt`), `null` heisst „nichts von selbst". Nur
+   *  gesetzt, wenn die Keyholderin entscheiden soll — der Träger sieht stattdessen die grosse
+   *  Fassung mit `autoMarkAt` oben. */
+  outlook?: { autoMarkAt: Date | null };
+  /** Beschriftete Handlungen der Keyholderin unter der kompakten Zeile (Frist verlängern,
+   *  Zurückziehen). Eigene Zeile statt neben dem Text, weil Wörter dort die Spalte erdrücken. */
+  actions?: ReactNode;
 }
 
 /**
@@ -91,6 +99,8 @@ export default function KontrolleBanner({
   variant,
   href,
   withdrawAction,
+  outlook,
+  actions,
   tz = APP_TZ,
   viewerTz,
 }: Props) {
@@ -125,6 +135,15 @@ export default function KontrolleBanner({
           </span>
           {withdrawAction && <div className="relative z-20 flex-shrink-0">{withdrawAction}</div>}
         </div>
+        {/* Nur im überfälligen Zustand: vorher gibt es nichts, was ohne sie geschähe. */}
+        {overdue && outlook && (
+          <p className="text-neben text-foreground-muted mt-0.5">
+            {outlook.autoMarkAt
+              ? t("outlookAutoMark", { time: formatDayTimeDual(outlook.autoMarkAt, dl, viewerTz, tz, t("subTimePrefix")) })
+              : t("outlookNothing")}
+          </p>
+        )}
+        {actions && <div className="relative z-20 mt-1.5 flex flex-wrap items-center gap-2">{actions}</div>}
       </div>
     );
   }

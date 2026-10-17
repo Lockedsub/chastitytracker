@@ -26,7 +26,7 @@ import { ANFORDERUNG_PILLS, VERIFIKATION_PILLS } from "@/lib/kontrollePills";
 import { inspectionTargetLabel } from "@/lib/inspectionTarget";
 import {
   formatDate, formatTime, formatDurationMs, formatTotalHours, formatTotalMs,
-  interruptionPauseMs, isTimeCorrected,
+  interruptionPauseMs, isTimeCorrected, nowDatetimeLocal,
 } from "@/lib/utils";
 import LaufendeSessionCard from "@/app/dashboard/LaufendeSessionCard";
 import StatusBanner from "@/app/dashboard/StatusBanner";
@@ -42,6 +42,7 @@ import LockRequestBanner from "@/app/components/LockRequestBanner";
 import TaskCardStack from "@/app/components/TaskCardStack";
 import KeyholderTaskCard from "@/app/admin/tasks/KeyholderTaskCard";
 import WithdrawButton from "@/app/admin/WithdrawButton";
+import ExtendInspectionButton from "@/app/admin/ExtendInspectionButton";
 import BoxStatusCard from "@/app/components/BoxStatusCard";
 import BoxPhotoWaive from "@/app/components/BoxPhotoWaive";
 import { boxPhotoDueAtOf } from "@/lib/boxPhotoDue";
@@ -276,13 +277,16 @@ export const KEYHOLDER_SUB_BLOCK_TABLE: Record<KeyholderSubBlockId, StackBlock<K
         // überfällig: der Rückzug ändert seine Bedeutung nicht, wenn die Frist reisst, und rot
         // gefärbt läse er sich wie eine Strafe.
         withdrawAction={
-          <WithdrawButton
-            id={offeneKontrolle.id}
-            apiPath="/api/admin/kontrollen"
-            title={t("withdrawKontrolleTitle")}
-            showLabel
-            colorToken="inspect"
-          />
+          <span className="flex flex-wrap items-center gap-2">
+            <ExtendInspectionButton id={offeneKontrolle.id} deadline={offeneKontrolle.deadline} tz={subjectTz} minNow={nowDatetimeLocal(subjectTz)} />
+            <WithdrawButton
+              id={offeneKontrolle.id}
+              apiPath="/api/admin/kontrollen"
+              title={t("withdrawKontrolleTitle")}
+              showLabel
+              colorToken="inspect"
+            />
+          </span>
         }
       />
     ),

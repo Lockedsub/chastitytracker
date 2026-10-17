@@ -10,7 +10,7 @@ import { sendVerschlussAnforderungNotifications, checkLockEnd, carryOverLockPeri
 import { sendOrgasmusAnforderungNotifications, checkOrgasmWindowEnd } from "@/lib/orgasmusAnforderungService";
 import { ensureDailyAutoKontrollen, deleteWithdrawnAutoKontrollen, isSleepingAt, autoKontrolleSettingsFromUser, isEntryTriggeredInspection, AUTO_KONTROLLE_SETTINGS_SELECT } from "@/lib/autoKontrolleService";
 import { APP_TZ } from "@/lib/utils";
-import { sendInspectionReminder, autoMarkInspectionRemoved, notifyInspectionAutoMarked, predictAutoMarkAt } from "@/lib/inspectionEscalationService";
+import { sendInspectionReminder, autoMarkInspectionRemoved, notifyInspectionAutoMarked, predictAutoMarkAt, INSPECTION_ESCALATION_USER_SELECT } from "@/lib/inspectionEscalationService";
 import { maybeRunHealthChecks } from "@/lib/healthCheck";
 import { maybeAnnounceOffenses } from "@/lib/offenseAnnounce";
 import { deadlineFromDispatch, dueForDispatchWhere } from "@/lib/delayedTrigger";
@@ -264,7 +264,7 @@ async function processInspectionEscalation(now: Date): Promise<void> {
       // ohne menschliches Zutun in einem Vergehen endet — der Fall aus dem Kommentar zu #91.
       user: { inspectionAutoMarkEnabled: true, ...USER_NOT_PAUSED_WHERE },
     },
-    include: { user: { select: { ...AUTO_KONTROLLE_SETTINGS_SELECT, username: true, inspectionAutoMarkEnabled: true, inspectionAutoMarkDelayMinutes: true, inspectionReminderDelayMinutes: true } } },
+    include: { user: { select: { ...AUTO_KONTROLLE_SETTINGS_SELECT, username: true, ...INSPECTION_ESCALATION_USER_SELECT } } },
     take: 50,
   });
   for (const ka of autoMarkDue) {

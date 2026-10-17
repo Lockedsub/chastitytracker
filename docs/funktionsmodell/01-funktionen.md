@@ -6,7 +6,7 @@
 Was der Tracker kann — flach aufgelistet, nach Mechanik gruppiert. Für den Betrieb, nicht für
 Endnutzer: die Spalte **Endpunkt** nennt die API-Route bzw. das MCP-Werkzeug dahinter.
 
-119 Funktionen über 19 Mechaniken, davon 14 ohne jede Bedienung — sie laufen von selbst.
+120 Funktionen über 19 Mechaniken, davon 14 ohne jede Bedienung — sie laufen von selbst.
 
 **Wer** ist der Auslöser, **Wo** die Oberfläche. Eine Funktion mit zwei Oberflächen ist EINE
 Funktion: „Kontrolle anfordern" gibt es in der App und über den MCP, und beide Wege enden im
@@ -75,6 +75,7 @@ Steckbrief: [30-kontrollen.md](30-kontrollen.md)
 | **Mögliche Kontroll-Ziele abfragen** | Nennt die Kategorien und Geräte, auf die gerade eine Kontrolle gestellt werden kann. <br>*Für die KI ist es keine eigene Abfrage: `keyholder_dashboard.wornNow` nennt alles, was gerade verschlossen oder getragen wird — und die Ziel-Menge IST das (`listInspectionTargets`). Zu nehmen ist `category` + `deviceDeclared`, NICHT `deviceName`: letzteres ist das per Bildabgleich EFFEKTIVE Gerät, und `request_inspection` prüft gegen das deklarierte — bei einem Bild-Konflikt endete der Aufruf sonst mit `INSPECTION_DEVICE_NOT_ACTIVE`.* | Keyholder (UI), Keyholder (MCP) | App (Keyholder), MCP | `/api/admin/inspection-targets` `keyholder_dashboard` |
 | **Kontroll-Verlauf einsehen** | Alle Kontrollen eines Trägers mit Status, Frist und dem erfüllenden Eintrag. <br>*Beide Seiten leiten Zustand, Ziel und Verifikation aus `buildKontrolleRows` ab — eine eigene Status-Rechnung im MCP wäre eine zweite Wahrheit über denselben Sachverhalt.* | Keyholder (UI), Keyholder (MCP) | App (Keyholder), MCP | `/api/admin/kontrollen` `list_inspections` |
 | **Kontrolle zurückziehen oder von Hand bestätigen** | Nimmt eine Kontrolle zurück oder erkennt ein Foto an, das die automatische Prüfung nicht bestätigen konnte. | Keyholder (UI), Keyholder (MCP) | App (Keyholder), MCP | `/api/admin/kontrollen/[id]` `/api/admin/entries/[id]` `resolve_inspection` |
+| **Frist einer Kontrolle verlängern** | Setzt die Frist einer offenen, zugestellten Kontrolle nach hinten, statt sie zurückzuziehen und neu zu stellen. <br>*Mahn-Stempel wird zurückgesetzt: beide Eskalationsstufen zählen ab der neuen Frist. Nur nach hinten und in die Zukunft.* | Keyholder (UI), Keyholder (MCP) | App (Keyholder), MCP | `/api/admin/kontrollen/[id]` `edit_inspection` |
 | **Kontrolle erfüllen** | Der Träger reicht das Foto ein — bei einem Gerät mit Code-Pflicht mit handschriftlichem Code im Bild. <br>*Erfüllt wird nur die Kontrolle desselben Ziels.* | Sub | App (Träger) | — |
 | **Code im Foto erkennen** | Liest den handschriftlichen Kontroll-Code aus dem Bild und vergleicht ihn mit dem geforderten. <br>*Bei fehlgeschlagener Erkennung entsteht ein Grund-Code, kein stilles Scheitern.* | System | läuft von selbst | `/api/verify-kontrolle` |
 | **Kontroll-Code erneut zustellen** | Schickt den Code einer offenen Kontrolle noch einmal als Push. | Sub | App (Träger) | `/api/kontrollen/code-push` `/api/kontrollen/[id]/code-push` |

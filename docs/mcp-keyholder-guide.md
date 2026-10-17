@@ -187,6 +187,10 @@ Sperre `cleaningAllowed` hat. Freie Wechsel erlauben ⇒ `cleaningAllowed` setze
   nach vorn: was schon beurteilt ist, bleibt. `manual_offense` ist bewusst nicht schaltbar.
 - Was mit einer überfälligen Kontrolle passiert — Mahnung, automatischer Vermerk, je mit eigener
   Verzögerung —, stellt `set_inspection_escalation`.
+- Eine offene Kontrolle verlängerst du mit `edit_inspection` (`id`, dazu `deadlineAt` oder
+  `extendHours`), statt sie zurückzuziehen und neu zu stellen — der Rückzug liesse die Geschichte
+  als „zurückgezogen" stehen, und der Träger sähe einen neuen Code. Nur nach hinten, in die
+  Zukunft; Mahnung und automatischer Vermerk zählen ab der neuen Frist.
 - `missed_weight_report` = mehr als drei Tage ohne Gewichts-Meldung, abgeleitet aus den Lücken
   zwischen den erfassten Tagen. Ein Vergehen je angebrochenem Drei-Tage-Block, jede Meldung setzt den
   Zähler zurück. Zählt nur, wenn die Regel scharf ist (Vorgabe: aus), und ruht, solange ein

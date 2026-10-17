@@ -1,5 +1,18 @@
 [
   {
+    "version": "6.5.1",
+    "date": "2026-10-17",
+    "changes": [
+      {
+        "type": "feat",
+        "text": {
+          "de": "Keyholder-Übersicht: Die Überschrift spricht jetzt von offenen Vorgängen statt von Entscheidungen, und an einer überfälligen Kontrolle steht, was die App ohne dich tut. Dort kannst du die Frist verlängern (auch per KI-Keyholderin) oder die Kontrolle zurückziehen.",
+          "en": "Keyholder overview: the heading now talks about open matters instead of decisions, and an overdue inspection shows what the app does without you. There you can extend the deadline (also via the AI keyholder) or withdraw the inspection."
+        }
+      }
+    ]
+  },
+  {
     "version": "6.5.0",
     "date": "2026-10-17",
     "changes": [

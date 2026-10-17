@@ -104,6 +104,12 @@ Zwei bewusste Grenzen von Stufe 2:
 
 Das Vergehen entsteht in jedem Fall, unabhängig von der Eskalation.
 
+**Was die Keyholderin an einer überfälligen Kontrolle tun kann:** zurückziehen oder die Frist
+verlängern (UI und MCP `edit_inspection`). Die Verlängerung setzt den Mahn-Stempel zurück, beide
+Stufen zählen danach ab der neuen Frist; sie geht nur nach hinten, in die Zukunft und nur für eine
+bereits zugestellte, noch offene Kontrolle. In der Keyholder-Übersicht steht an der überfälligen
+Zeile, was OHNE ihr Zutun geschieht — dieselbe Rechnung (`predictAutoMarkAt`), die der Poller anwendet.
+
 ## Wirkt auf
 
 - **Strafbuch** — versäumt, abgelehnt, oder automatisch als abgenommen gebucht.

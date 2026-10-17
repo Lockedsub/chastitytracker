@@ -3,7 +3,7 @@ import { getUserDeviceOptions, getKeyholderLockPeriods, getKeyholderLockRequests
 import { isHiddenFromSub, computeDelayedTrigger } from "@/lib/delayedTrigger";
 import { conflictingLockSpecs, hasLockSpec } from "@/lib/lockSpec";
 import { createVerschlussAnforderung, updateLockPeriodEnd, updateLockRequest, mergeLockRequestPatch, withdrawVerschlussAnforderung, withdrawVerschlussAnforderungById, checkLockEnd, type UpdateLockRequestParams, type MergedLockRequest } from "@/lib/verschlussAnforderungService";
-import { requestKontrolle, resolveKontrolle, resolveInspectionEntry, hasActiveKontrolle, verifikationStatusFor } from "@/lib/kontrolleService";
+import { requestKontrolle, resolveKontrolle, resolveInspectionEntry, extendInspectionDeadline, extendInspectionProblem, hasActiveKontrolle, verifikationStatusFor } from "@/lib/kontrolleService";
 import { resolveInspectionTarget, inspectionPreconditionProblem, inspectionTargetLabel } from "@/lib/inspectionTarget";
 import { createVorgabe, updateVorgabe, deleteVorgabe, listVorgaben, validateGoalTargets, findActiveVorgabe } from "@/lib/vorgabeService";
 import { setCleaningSettings, maxPausesPerDaySentinel, parseCleaningWindows, cleaningWindowListProblem, formatCleaningWindows, type CleaningWindows, CLEANING_USER_SELECT } from "@/lib/cleaningService";
@@ -1792,6 +1792,57 @@ export async function mcpResolveInspection(username: string, args: ResolveInspec
   unwrap(await resolveInspectionEntry(entry.id, action, AI_AUTHOR));
   const which = args.id ? `Inspection ${entry.id}` : "Latest inspection";
   return { ok: true, message: `${which} ${args.action === "verify" ? "verified" : "rejected"}; the user was notified by e-mail + push.` };
+}
+
+// ── Inspections: extend the deadline of an open one ─────────────────────────
+
+export interface EditInspectionArgs {
+  /** Welche offene Kontrolle (`id` aus `keyholder_dashboard`/`list_inspections`). Optional nur,
+   *  solange genau eine offen ist. */
+  id?: string;
+  /** Neue absolute Frist (ISO 8601). */
+  deadlineAt?: string;
+  /** ODER: um so viele Stunden über die spätere von alter Frist und „jetzt" hinaus verlängern. */
+  extendHours?: number;
+  dryRun?: boolean;
+}
+export async function mcpEditInspection(username: string, args: EditInspectionArgs) {
+  const userId = await resolveTargetUserId(username);
+  const iso = await isoForUser(userId);
+  if (args.deadlineAt && args.extendHours != null) throw new Error("Pass either deadlineAt or extendHours, not both.");
+  if (!args.deadlineAt && args.extendHours == null) throw new Error("Provide deadlineAt (ISO date) or extendHours.");
+
+  const now = new Date();
+  // Offen UND zugestellt — eine verborgene (terminierte) Kontrolle lässt sich nicht verlängern,
+  // gehört aber auch nicht in diese Auswahl, sonst würde `id` optional trotz „genau einer offen".
+  const open = (await prisma.kontrollAnforderung.findMany({
+    where: { userId, entryId: null, withdrawnAt: null, autoMarkedRemovedAt: null },
+    orderBy: { deadline: "asc" },
+  })).filter((k) => !isHiddenFromSub(k));
+  if (open.length === 0) throw new Error("No open inspection to extend.");
+  if (!args.id && open.length > 1) {
+    const candidates = open.map((k) => JSON.stringify({ id: k.id, deadlineAt: iso(k.deadline) })).join(", ");
+    throw new Error(`${open.length} inspections are open — pass id=… to say which one to extend: ${candidates}.`);
+  }
+  const target = args.id ? open.find((k) => k.id === args.id) : open[0];
+  if (!target) throw new Error(`No open inspection with id ${args.id} (it may be fulfilled, withdrawn, or belong to someone else).`);
+
+  const newDeadline = args.deadlineAt
+    ? parseIsoDate(args.deadlineAt, "deadlineAt")
+    : new Date(Math.max(target.deadline.getTime(), now.getTime()) + args.extendHours! * 60 * 60 * 1000);
+
+  if (args.dryRun) {
+    const problem = extendInspectionProblem(target, newDeadline, now) ?? undefined;
+    return dryRunPreview("edit_inspection", problem, { id: target.id, deadlineAt: iso(newDeadline) },
+      diffFields({ deadlineAt: iso(target.deadline) }, { deadlineAt: iso(newDeadline) }));
+  }
+  unwrap(await extendInspectionDeadline(target.id, newDeadline, AI_AUTHOR));
+  return {
+    ok: true,
+    id: target.id,
+    message: `Inspection deadline extended to ${iso(newDeadline)}; the user was notified by e-mail + push. ` +
+      "The reminder and the automatic removal booking now count from the new deadline.",
+  };
 }
 
 // ── Offence rules: which offence types count for this wearer ───────────────

@@ -23,6 +23,12 @@ import { serviceFail, type ServiceResult } from "@/lib/serviceResult";
  * einen Schalter umgelegt. Diese Zeilen bleiben deshalb System-Zeilen (siehe `senderFromAuthor`).
  */
 
+/** Die User-Spalten, die {@link predictAutoMarkAt} und die Eskalation lesen — eine Quelle für die
+ *  Lader (Poller, Keyholder-Übersicht), damit ein neues Feld nicht an mehreren Stellen nachzutragen ist. */
+export const INSPECTION_ESCALATION_USER_SELECT = {
+  inspectionAutoMarkEnabled: true, inspectionAutoMarkDelayMinutes: true, inspectionReminderDelayMinutes: true,
+} as const;
+
 interface InspectionEscalationUser {
   id: string;
   inspectionReminderEnabled: boolean;

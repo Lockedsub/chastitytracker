@@ -80,6 +80,9 @@ export const INSPECTION_CODES = [
   "INSPECTION_NO_SUBMISSION",
   "INSPECTION_ALREADY_ACTIVE",
   "INSPECTION_NOT_WITHDRAWN",
+  // Frist verlängern: die Kontrolle ist erledigt/verborgen, oder die neue Frist liegt nicht später.
+  "INSPECTION_NOT_EXTENDABLE",
+  "INSPECTION_DEADLINE_NOT_LATER",
   // Ziel-Kontrollen (v5.0.1): das Gegenstück zu USER_NOT_LOCKED für Trage-Kategorien, dazu die
   // beiden Fehler, die nur ein ZIEL haben kann — es existiert nicht (mehr), oder das verlangte
   // Gerät ist nicht das getragene.

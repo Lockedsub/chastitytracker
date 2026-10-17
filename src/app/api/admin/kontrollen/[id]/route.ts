@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireKeyholderOrAdminActor, requireKeyholderOrAdminApi, sessionActor } from "@/lib/authGuards";
-import { resolveKontrolle } from "@/lib/kontrolleService";
+import { resolveKontrolle, extendInspectionDeadline } from "@/lib/kontrolleService";
 import { serviceFailure, errorResponse } from "@/lib/serviceResult";
 import { mapAnforderungStatus } from "@/lib/utils";
 
@@ -31,12 +31,20 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const { action } = await req.json();
+  const { action, deadline } = await req.json();
 
   const ka = await prisma.kontrollAnforderung.findUnique({ where: { id }, select: { userId: true } });
   if (!ka) return errorResponse(404, "NOT_FOUND");
   const actor = await requireKeyholderOrAdminActor(ka.userId);
   if (actor instanceof NextResponse) return actor;
+
+  if (action === "extend") {
+    const newDeadline = typeof deadline === "string" ? new Date(deadline) : null;
+    if (!newDeadline || Number.isNaN(newDeadline.getTime())) return errorResponse(400, "INVALID_DATETIME");
+    const extended = await extendInspectionDeadline(id, newDeadline, sessionActor(actor));
+    if (!extended.ok) return serviceFailure(extended);
+    return NextResponse.json({ ok: true });
+  }
 
   const result = await resolveKontrolle(id, action, sessionActor(actor));
   if (!result.ok) return serviceFailure(result);

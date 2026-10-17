@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { generateKontrollCode } from "@/lib/utils";
+import { generateKontrollCode, APP_TZ } from "@/lib/utils";
 import { sendMailSafe, escHtml, appBaseUrl, optionalNoticeBoxHtml, dashboardEmailHtml } from "@/lib/mail";
 import { formatDateTime, formatDate, formatTime } from "@/lib/utils";
 import { firePush, hasPushTarget } from "@/lib/push";
@@ -86,6 +86,67 @@ export async function resolveKontrolle(id: string, action: KontrolleAction, acto
   }
 
   return { ok: true, data: { userId: ka.userId, notified } };
+}
+
+/** Ob sich die Frist dieser Kontrolle auf `newDeadline` verlängern lässt — der Code des Grundes,
+ *  sonst `null`. Rein und schreibfrei: der Commit ({@link extendInspectionDeadline}) und die
+ *  MCP-Vorschau rufen DIESELBE Funktion, damit die Vorschau nie Erfolg für einen Commit verspricht,
+ *  der mit 400 endet. */
+export function extendInspectionProblem(
+  ka: { entryId: string | null; withdrawnAt: Date | null; autoMarkedRemovedAt: Date | null; wirksamAb: Date | null; benachrichtigtAt: Date | null; deadline: Date },
+  newDeadline: Date,
+  now: Date,
+): "INSPECTION_NOT_EXTENDABLE" | "INSPECTION_DEADLINE_NOT_LATER" | null {
+  // Erfüllt, zurückgezogen, von der Eskalation gebucht — oder noch gar nicht zugestellt: deren
+  // Frist rechnet der Zusteller beim Auslösen aus (`deadlineFromDispatch`), sie hier zu setzen
+  // würde überschrieben.
+  if (ka.entryId || ka.withdrawnAt || ka.autoMarkedRemovedAt || isHiddenFromSub(ka)) return "INSPECTION_NOT_EXTENDABLE";
+  if (newDeadline.getTime() <= Math.max(ka.deadline.getTime(), now.getTime())) return "INSPECTION_DEADLINE_NOT_LATER";
+  return null;
+}
+
+/**
+ * Verlängert die Frist einer offenen, bereits zugestellten Kontrolle — statt sie zurückzuziehen und
+ * neu zu stellen. Der Rückzug-und-neu-Weg verlöre die Geschichte: neuer Code, neue Zeile, und die
+ * ursprüngliche stünde als „zurückgezogen" im Verlauf, als hätte die Keyholderin es sich anders
+ * überlegt. Eine Korrektur soll eine Korrektur bleiben.
+ *
+ * Nur NACH hinten: ein Vorziehen wäre eine neue Anweisung, keine Gnadenfrist, und liesse eine
+ * schon verstrichene Frist rückwirkend ungültig werden. Die neue Frist muss ausserdem in der Zukunft
+ * liegen, sonst bliebe die Kontrolle überfällig und die Eskalation liefe weiter.
+ *
+ * Setzt den Mahn-Stempel zurück (`benachrichtigtReminderAt`): beide Stufen zählen ab der FRIST, die
+ * Mahnung der alten Frist wäre sonst für die neue verbraucht und Stufe 2 liefe schon ab ihr.
+ */
+export async function extendInspectionDeadline(
+  id: string,
+  newDeadline: Date,
+  actor: MessageActor,
+): Promise<ServiceResult<{ userId: string; deadline: Date }>> {
+  const ka = await prisma.kontrollAnforderung.findUnique({
+    where: { id },
+    include: { user: { select: { timezone: true } } },
+  });
+  if (!ka) return serviceFail(404, "INSPECTION_NOT_FOUND");
+  const problem = extendInspectionProblem(ka, newDeadline, new Date());
+  if (problem) return serviceFail(400, problem);
+
+  // Bedingt statt `update`: zwischen Prüfung und Schreiben kann der Träger einreichen oder die
+  // Eskalation die Kontrolle buchen — dann darf weder die Frist noch der Mahn-Stempel zurückgesetzt
+  // und dem Träger keine Verlängerung gemeldet werden.
+  const { count } = await prisma.kontrollAnforderung.updateMany({
+    where: { id, entryId: null, withdrawnAt: null, autoMarkedRemovedAt: null },
+    data: { deadline: newDeadline, benachrichtigtReminderAt: null },
+  });
+  if (count === 0) return serviceFail(400, "INSPECTION_NOT_EXTENDABLE");
+  markLastAction();
+  await notifyUser(ka.userId, {
+    subjectKey: "inspectionExtendedSubject",
+    messageKey: "inspectionExtendedMessage",
+    params: { date: formatDateTime(newDeadline, undefined, ka.user.timezone ?? APP_TZ) },
+    inbox: { ref: { type: "control", id: ka.id }, actor },
+  });
+  return { ok: true, data: { userId: ka.userId, deadline: newDeadline } };
 }
 
 /**
