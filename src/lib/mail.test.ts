@@ -2,13 +2,26 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { escHtml, noticeBoxHtml, dashboardEmailHtml, appBaseUrl, sendMail, sendMailSafe } from "./mail";
 import { EMAIL_BUTTON_COLORS } from "./constants";
 
-const { transportSend } = vi.hoisted(() => ({ transportSend: vi.fn() }));
-vi.mock("nodemailer", () => ({
-  default: { createTransport: () => ({ sendMail: transportSend }) },
-}));
+const { transportSend, createTransport } = vi.hoisted(() => {
+  const transportSend = vi.fn();
+  return { transportSend, createTransport: vi.fn((_opts: Record<string, number>) => ({ sendMail: transportSend })) };
+});
+vi.mock("nodemailer", () => ({ default: { createTransport } }));
 
 /** Kollabiert Whitespace zwischen Tags — die Einrückung des Templates ist irrelevant fürs Rendering. */
 const norm = (html: string) => html.replace(/>\s+</g, "><").trim();
+
+// Ohne Zeitlimits gelten die nodemailer-Standards (2 min Verbindung, 10 min Socket): ein hängender
+// SMTP-Server hielte jeden awaitenden Aufrufer — den Poller-Takt eingeschlossen — minutenlang fest.
+describe("SMTP-Zeitlimits", () => {
+  it("setzt Verbindungs-, Begrüssungs- und Socket-Limit am Transport", () => {
+    expect(createTransport).toHaveBeenCalledOnce();
+    const opts = createTransport.mock.calls[0][0];
+    expect(opts.connectionTimeout).toBe(10_000);
+    expect(opts.greetingTimeout).toBe(10_000);
+    expect(opts.socketTimeout).toBe(15_000);
+  });
+});
 
 describe("appBaseUrl", () => {
   it("falls back to localhost when NEXTAUTH_URL is unset", () => {

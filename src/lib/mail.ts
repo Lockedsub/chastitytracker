@@ -6,8 +6,18 @@ export function escHtml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
+/** Zeitlimits des SMTP-Transports. Die nodemailer-Standards (2 min Verbindung, 10 min Socket) liessen
+ *  einen hängenden Server jeden awaitenden Aufrufer minutenlang festhalten — auch den Poller-Takt,
+ *  der seine Meldungen nacheinander abarbeitet. Dieselbe Grössenordnung wie Telegram und APNs. */
+const SMTP_CONNECTION_TIMEOUT_MS = 10_000;
+const SMTP_GREETING_TIMEOUT_MS = 10_000;
+const SMTP_SOCKET_TIMEOUT_MS = 15_000;
+
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
+  connectionTimeout: SMTP_CONNECTION_TIMEOUT_MS,
+  greetingTimeout: SMTP_GREETING_TIMEOUT_MS,
+  socketTimeout: SMTP_SOCKET_TIMEOUT_MS,
   port: Number(process.env.SMTP_PORT ?? 587),
   secure: Number(process.env.SMTP_PORT) === 465,
   auth: {

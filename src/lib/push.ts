@@ -5,6 +5,10 @@ import { isAllowedPushEndpoint } from "@/lib/pushEndpoint";
 
 const plog = (label: string, fields: Record<string, unknown>) => structuredLog("push", label, fields);
 
+/** Zeitlimit EINES Push-Aufrufs an einen externen Dienst (APNs, FCM, Web-Push-Endpunkt). Ein
+ *  hängender Dienst darf den awaitenden Aufrufer nicht festhalten — dieselben 10 s wie bei Telegram. */
+const PUSH_TIMEOUT_MS = 10_000;
+
 /** Ergebnis eines nativen Send-Versuchs. invalid=true NUR bei definitiv totem Token (Gerät
  *  deinstalliert / Token rotiert) → dann darf gelöscht werden. Transiente Fehler (Timeout, 429,
  *  5xx, Config-Mismatch) lassen invalid=false → Token bleibt erhalten. */
@@ -84,7 +88,7 @@ async function sendApns(token: string, title: string, body: string, url?: string
       };
       const fail = (e: Error) => { plog("apns:error", { error: e.message }); finish({ ok: false, invalid: false }); };
       client.on("error", fail);
-      client.setTimeout(10_000, () => { plog("apns:timeout", {}); finish({ ok: false, invalid: false }); });
+      client.setTimeout(PUSH_TIMEOUT_MS, () => { plog("apns:timeout", {}); finish({ ok: false, invalid: false }); });
 
       const req = client.request({
         ":method": "POST",
@@ -139,6 +143,7 @@ async function sendFcm(token: string, title: string, body: string, url?: string)
         data: url ? { url } : undefined,
         priority: "high",
       }),
+      signal: AbortSignal.timeout(PUSH_TIMEOUT_MS),
     });
     if (!res.ok) {
       plog("fcm:failed", { status: res.status });
@@ -265,7 +270,7 @@ async function sendWebPushToUser(
         await webpush.sendNotification(
           { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
           payload,
-          { urgency: "high", TTL: 86400 }
+          { urgency: "high", TTL: 86400, timeout: PUSH_TIMEOUT_MS }
         );
       } catch (err: unknown) {
         // 404/410 means the subscription is no longer valid — remove it
