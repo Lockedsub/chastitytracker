@@ -1,6 +1,7 @@
 import webpush from "web-push";
 import { prisma } from "@/lib/prisma";
 import { structuredLog } from "@/lib/serverLog";
+import { isAllowedPushEndpoint } from "@/lib/pushEndpoint";
 
 const plog = (label: string, fields: Record<string, unknown>) => structuredLog("push", label, fields);
 
@@ -243,15 +244,18 @@ async function sendWebPushToUser(
 ): Promise<void> {
   if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) { plog("web:not_configured", {}); return; }
 
-  const subscriptions = await prisma.pushSubscription.findMany({
+  const stored = await prisma.pushSubscription.findMany({
     where: { userId },
   });
-  plog("web:subs", { userId, count: subscriptions.length });
-  if (subscriptions.length === 0) return;
+  // Abos aus der Zeit vor der Endpunkt-Prüfung (`subscribe`): eine Adresse, die kein Push-Dienst
+  // vergibt, wird weder angefragt (SSRF) noch behalten.
+  const subscriptions = stored.filter((s) => isAllowedPushEndpoint(s.endpoint));
+  plog("web:subs", { userId, count: subscriptions.length, rejected: stored.length - subscriptions.length });
+  if (stored.length === 0) return;
 
   // Wie bei APNs: `unread` nur mitsenden, wenn es einen Wert gibt (siehe sw.js).
   const payload = JSON.stringify({ title, body, url, ...(badge !== undefined ? { unread: badge } : {}) });
-  const stale: string[] = [];
+  const stale: string[] = stored.filter((s) => !subscriptions.includes(s)).map((s) => s.id);
 
   await Promise.allSettled(
     subscriptions.map(async (sub) => {

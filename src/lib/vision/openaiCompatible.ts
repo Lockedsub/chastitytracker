@@ -1,6 +1,6 @@
 import type { VisionConfig } from "./config";
 import type { VisionRequest, VisionResponse } from "./types";
-import { isAllowedVisionUrl } from "./urlGuard";
+import { pinnedFetch } from "./pinnedFetch";
 
 /**
  * Vision über einen OpenAI-kompatiblen `chat/completions`-Endpunkt: OpenAI, Google Gemini,
@@ -35,8 +35,7 @@ function headers(config: VisionConfig): Record<string, string> {
  */
 async function visionFetch(config: VisionConfig, url: string, init: RequestInit): Promise<Response> {
   if (config.source !== "app") return fetch(url, init);
-  if (!(await isAllowedVisionUrl(url))) throw new Error("vision target not allowed");
-  return fetch(url, { ...init, redirect: "error" });
+  return pinnedFetch(url, init); // prüft das Ziel UND verbindet an die geprüfte Adresse (DNS-Rebinding)
 }
 
 /** Health-Probe fürs eigene Backend: winzige echte Mini-Inferenz („ping", 1 Token). Bestätigt, dass

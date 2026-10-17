@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireApi } from "@/lib/authGuards";
 import { prisma } from "@/lib/prisma";
+import { isAllowedPushEndpoint } from "@/lib/pushEndpoint";
 
 export async function POST(req: NextRequest) {
   const session = await requireApi();
   if (session instanceof NextResponse) return session;
 
   const { endpoint, keys } = await req.json();
-  if (!endpoint || !keys?.p256dh || !keys?.auth) {
+  if (!isAllowedPushEndpoint(endpoint) || typeof keys?.p256dh !== "string" || typeof keys?.auth !== "string" || !keys.p256dh || !keys.auth) {
     return NextResponse.json({ error: "Invalid subscription" }, { status: 400 });
   }
 
