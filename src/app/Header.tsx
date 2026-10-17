@@ -3,6 +3,7 @@ import Link from "next/link";
 import AvatarMenu from "@/app/components/AvatarMenu";
 import FeedbackButton from "@/app/components/FeedbackButton";
 import HeaderMessages from "@/app/components/HeaderMessages";
+import JournalHeaderLink from "@/app/components/JournalHeaderLink";
 import SkipLink from "@/app/components/SkipLink";
 import { headerActionsCls, headerBarCls, headerBrandCls, headerHostCls, headerNameCls, headerRowCls } from "@/app/components/inputStyles";
 import { ownTrackerHidden } from "@/lib/ownTracker";
@@ -37,7 +38,13 @@ export default async function Header() {
               eigenen Tracker hat, hat auch keinen eigenen Posteingang. Das App-Badge zählt hier
               trotzdem den Keyholder-Stand mit — die Regel dafür steht in `HeaderMessages`. */}
           {user?.id && !hideOwnTracker && <HeaderMessages actor={user} scope="own" />}
-          {user && <FeedbackButton mode={feedbackMode()} />}
+          {/* Unter 360 px weicht das Feedback dem Tagebuch-Zeichen: mit vier Symbolen schob sich sonst
+              der App-Name unter die Glocke. Erreichbar bleibt es als Zeile in den Einstellungen. */}
+          {user && <span className="hidden min-[360px]:contents"><FeedbackButton mode={feedbackMode()} /></span>}
+          {/* Das Tagebuch gehört dem eigenen Tracker — dieselbe Bedingung wie der eigene Posteingang.
+              Am persönlichen Ende der Zeile, vor dem Avatar, nicht direkt neben der Glocke: dort
+              läse es sich wie ein Kanal zur Keyholderin. */}
+          {user?.id && !hideOwnTracker && <JournalHeaderLink />}
           {user && (
             <AvatarMenu
               username={user.name ?? ""}

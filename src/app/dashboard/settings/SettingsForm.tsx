@@ -23,6 +23,7 @@ import { useApiError } from "@/app/hooks/useApiError";
 import { useNotifyLevel } from "@/app/hooks/useNotifyLevel";
 import { usePushDevice } from "@/app/hooks/usePushDevice";
 import PasswordChangeConfirm from "@/app/components/PasswordChangeConfirm";
+import JournalSettings from "./JournalSettings";
 import WeightSettings from "./WeightSettings";
 import LockmeboxConnect from "@/app/components/LockmeboxConnect";
 import BoxRemoveButton from "./BoxRemoveButton";
@@ -31,13 +32,14 @@ import PushAllowRow from "./PushAllowRow";
 import type { SettingsFormProps } from "./getSettingsProps";
 import { formColCls } from "@/app/components/inputStyles";
 
-export default function SettingsForm({ username, email, locale, timezone, startPage, showStartPage, controlledSubs, isAdmin, hideOwnTracker, notifyMail, notifyPush, notifyTelegram, telegramConfigured, telegramLinked, mailReachable, pushReachable, mailConfigured, version, buildDate, feedbackMode, weight, box, instanceSections }: SettingsFormProps & {
+export default function SettingsForm({ username, email, locale, timezone, startPage, showStartPage, controlledSubs, isAdmin, hideOwnTracker, notifyMail, notifyPush, notifyTelegram, telegramConfigured, telegramLinked, mailReachable, pushReachable, mailConfigured, version, buildDate, feedbackMode, weight, journal, box, instanceSections }: SettingsFormProps & {
   /** Abschnitte, die der INSTANZ gehören statt der Person — heute die Foto-Prüfung. Nur die
    *  Admin-Seite reicht sie herein; im Träger-Bereich bleibt die Maske rein persönlich. Innerhalb
    *  des `<main>`, damit sie in derselben Spalte und Landmarke stehen wie der Rest. */
   instanceSections?: React.ReactNode;
 }) {
   const t = useTranslations("settings");
+  const tj = useTranslations("journal");
   const tBox = useTranslations("lockmebox");
   const tBoxStatus = useTranslations("boxStatus");
   const tc = useTranslations("common");
@@ -499,6 +501,17 @@ export default function SettingsForm({ username, email, locale, timezone, startP
               onToggle={() => toggle("weight")}
             >
               <WeightSettings {...weight} />
+            </ExpandRow>
+          )}
+
+          {/* Tagebuch — nur mit eigenem Tracker (getSettingsProps setzt es sonst auf null) */}
+          {journal && (
+            <ExpandRow
+              label={tj("settingsSection")}
+              open={expanded === "journal"}
+              onToggle={() => toggle("journal")}
+            >
+              <JournalSettings {...journal} />
             </ExpandRow>
           )}
 

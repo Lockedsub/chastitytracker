@@ -13,7 +13,7 @@ import { goalPct, sharePct } from "@/lib/percent";
 import {
   formatDate, formatDateTime, formatDurationMs, formatTotalHours, formatTotalMs,
   buildKontrolleItems, isSubVisibleKontrolle, getMidnightToday,
-  longestOrgasmFreeGap, summarizeSessions, wearingHoursFromPairs, WEAR_PAIR,
+  longestOrgasmFreeGap, summarizeSessions, tzDayKey, wearingHoursFromPairs, WEAR_PAIR,
 } from "@/lib/utils";
 import {
   buildCalendarMonths, buildMonthStats, buildWeekdayLabels, buildYearHeatmaps, isActive,
@@ -39,6 +39,10 @@ import { blockInsetCls } from "./inputStyles";
 import StatsCard from "./StatsCard";
 import StatsKontrollenList, { type StatsKontrolleRow } from "./StatsKontrollenList";
 import WeightStatsCard from "./WeightStatsCard";
+import JournalMoodCard, { type MoodChartPoint } from "./JournalMoodCard";
+import { auth } from "@/lib/auth";
+import { canReadJournal } from "@/lib/keyholder";
+import { journalMoodSeries } from "@/lib/journalService";
 import { getWeightStatsProps } from "@/lib/weightStatsProps";
 import { ShieldAlert } from "lucide-react";
 
@@ -457,6 +461,26 @@ export const STATS_BLOCK_TABLE: Record<StatsBlockId, StackBlock<StatsCtx>> = {
   weight: block({
     load: (ctx) => getWeightStatsProps(ctx.userId),
     render: (props) => props && <WeightStatsCard {...props} />,
+  }),
+
+  // Stimmung aus dem Tagebuch. Die Keyholder-Sicht verlangt die ZUGEORDNETE Keyholderin
+  // (`canReadJournal`); ein Admin ohne Zuordnung bekommt den Block nicht, auch nicht leer. Der
+  // Handelnde kommt aus der Sitzung, weil `StatsCtx` nur den Träger kennt — `auth()` liest dabei nur
+  // das Token. Ohne einen einzigen Wert erscheint der Block gar nicht.
+  mood: block({
+    load: async ({ userId, isKeyholderView, now, tz }) => {
+      if (isKeyholderView) {
+        const session = await auth();
+        if (!session?.user?.id || !(await canReadJournal(session.user.id, userId))) return null;
+      }
+      const series = await journalMoodSeries(userId, isKeyholderView ? "keyholder" : "own", now);
+      return series.map((p): MoodChartPoint => ({ x: p.at.getTime(), mood: p.mood, private: p.private, day: tzDayKey(p.at, tz) }));
+    },
+    render: (points, { t, isKeyholderView }) => points && points.length > 0 && (
+      <Section title={t("moodTitle")}>
+        <JournalMoodCard points={points} showPrivateNote={!isKeyholderView} />
+      </Section>
+    ),
   }),
 
   // Monatsübersicht — KG-Ziele, deshalb nur die KG-Vorgaben.

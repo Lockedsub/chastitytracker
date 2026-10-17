@@ -128,6 +128,8 @@ export const STATE_IGNORED_TABLES: Readonly<Record<string, string>> = {
   OAuthCode: "Konto",
   OAuthToken: "Konto",
   OAuthRefreshToken: "Konto",
+  JournalEntry: "privates Tagebuch — ein Zähler verriete, DASS geschrieben wurde, auch bei Einträgen „nur für mich\"",
+  JournalSettings: "Tagebuch-Einstellungen des Subs — gehören so wenig in die Keyholder-Sicht wie die Einträge",
 };
 
 /** Markiert in einer Migration den Abschnitt, den {@link buildStateTriggerSql} erzeugt hat. */

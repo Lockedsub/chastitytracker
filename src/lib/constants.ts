@@ -675,6 +675,31 @@ export function toNotifyLevel(v: unknown): NotifyLevel {
 }
 
 /**
+ * Wer einen Tagebuch-Eintrag sehen darf (Issue #114) — die Wahl trifft allein der Sub.
+ *
+ * `PRIVATE` — „nur für mich": bei der Keyholderin erscheint nichts, auch nicht als Anzahl oder Lücke.
+ * `MOOD_ONLY` — sie sieht Zeitpunkt, Dauern und Stimmung, aber weder Text noch Leitfrage.
+ * `FULL` — sie sieht den ganzen Eintrag. Vorgabe für neue Einträge (`JournalSettings.defaultVisibility`).
+ */
+export const JOURNAL_VISIBILITIES = ["PRIVATE", "MOOD_ONLY", "FULL"] as const;
+export type JournalVisibility = (typeof JOURNAL_VISIBILITIES)[number];
+
+export function isJournalVisibility(v: unknown): v is JournalVisibility {
+  return typeof v === "string" && (JOURNAL_VISIBILITIES as readonly string[]).includes(v);
+}
+
+/** Die Stimmung eines Tagebuch-Eintrags: ganze Zahl, 1 = schlecht … 5 = gut. */
+export const JOURNAL_MOOD_MIN = 1;
+export const JOURNAL_MOOD_MAX = 5;
+
+/** Obergrenze des Tagebuch-Textes in Zeichen — ein langer Eintrag, kein Dokumentenspeicher. */
+export const JOURNAL_TEXT_MAX = 20_000;
+
+/** Längste gespeicherte Leitfrage. Die Fragen stehen in `messages/*.json`; die Grenze ist nur der
+ *  Riegel gegen einen Client, der etwas anderes schickt als eine dieser Fragen. */
+export const JOURNAL_PROMPT_MAX = 300;
+
+/**
  * Wie dringend eine Meldung ist — die Tabelle dazu steht in `messageCategories.ts`
  * (`messagePriority`), damit sie neben den Meldungstexten liegt und importfrei bleibt.
  *

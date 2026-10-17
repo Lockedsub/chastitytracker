@@ -143,6 +143,9 @@ const STATS_BLOCKS = [
   { id: "deviceUsage", labelKey: "blockStatsDeviceUsage" },
   { id: "inspections", labelKey: "blockStatsInspections" },
   { id: "weight", labelKey: "blockStatsWeight" },
+  // Der Stimmungsverlauf aus dem Tagebuch (#114). In der Keyholder-Sicht nur aus freigegebenen
+  // Einträgen und nur für die ZUGEORDNETE Keyholderin — die Admin-Rolle allein sieht ihn leer.
+  { id: "mood", labelKey: "blockStatsMood" },
   { id: "monthStats", labelKey: "blockStatsMonths" },
   { id: "unlawfulOpenings", labelKey: "blockStatsUnlawful" },
 ] as const;

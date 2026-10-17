@@ -59,6 +59,8 @@ export const SHARED_SERVICE_CODES = [
   // (`correctEntry`) statt nur die Route.
   "INVALID_ORDER",
   "INTERNAL_ERROR",
+  // Der Body ist kein lesbares JSON — ein Fehler des Aufrufers, kein Serverfehler.
+  "INVALID_REQUEST_BODY",
   "UNKNOWN_ACTION",
   "USER_NOT_LOCKED",
   "USER_ALREADY_LOCKED",
@@ -396,6 +398,16 @@ export const ENTRY_CORRECTION_CODES = [
   "WEAR_DEVICE_KG",
 ] as const;
 
+/** Das Tagebuch (`journal.ts`). Zukunft und unlesbares Datum laufen über die geteilten
+ *  `TIME_IN_FUTURE`/`INVALID_DATETIME` — derselbe Satz wie bei jedem anderen Zeitpunkt. */
+export const JOURNAL_CODES = [
+  "JOURNAL_TEXT_REQUIRED",
+  "JOURNAL_TEXT_TOO_LONG",
+  "JOURNAL_INVALID_MOOD",
+  "JOURNAL_INVALID_VISIBILITY",
+  "JOURNAL_INVALID_SETTING",
+] as const;
+
 /** Every code the service layer can return — the set the i18n parity test iterates. */
 export const SERVICE_ERROR_CODES = [
   ...new Set<string>([
@@ -419,6 +431,7 @@ export const SERVICE_ERROR_CODES = [
     ...WEIGHT_CODES,
     ...HEALTH_HOLD_CODES,
     ...ENTRY_CORRECTION_CODES,
+    ...JOURNAL_CODES,
   ]),
 ] as readonly string[];
 
@@ -446,7 +459,8 @@ export type ServiceErrorCode =
   | (typeof SETTINGS_CODES)[number]
   | (typeof WEIGHT_CODES)[number]
   | (typeof HEALTH_HOLD_CODES)[number]
-  | (typeof ENTRY_CORRECTION_CODES)[number];
+  | (typeof ENTRY_CORRECTION_CODES)[number]
+  | (typeof JOURNAL_CODES)[number];
 
 /**
  * Die Keyholder-Fassung der beiden Verschluss-Absagen — die Übersetzung, die der Absatz oben

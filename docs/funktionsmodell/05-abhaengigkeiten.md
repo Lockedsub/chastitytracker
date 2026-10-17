@@ -14,7 +14,7 @@ Zwei Arten von Kanten, und der Unterschied ist wichtig:
 - ***feste Regel*** — dahinter steht **kein** Schalter. Diese Kanten sind die, die im Betrieb
   überraschen: man sucht die Einstellung, die das verursacht hat, und es gibt keine.
 
-Insgesamt 158 Kanten über 18 Mechaniken, davon 20 fest verdrahtet.
+Insgesamt 158 Kanten über 19 Mechaniken, davon 20 fest verdrahtet.
 
 ## Einträge
 

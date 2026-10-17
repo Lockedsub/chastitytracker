@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { assertKeyholderOrAdmin } from "@/lib/authGuards";
 import { getLatestKgEntry, latestKgTimesByUser } from "@/lib/queries";
 import { subLockPeriodCached } from "@/lib/dashboardData";
-import { getControlledSubs } from "@/lib/keyholder";
+import { canReadJournal, getControlledSubs } from "@/lib/keyholder";
 import UserContextBar from "./UserContextBar";
 import UserSubNav from "./UserSubNav";
 import { blockStackCls, wideColCls } from "@/app/components/inputStyles";
@@ -25,7 +25,7 @@ export default async function AdminUserLayout({
     : getControlledSubs(actorId);
 
   // Parallelize all queries — select only needed fields for user-switcher
-  const [user, allUsers, latestLockEntry, activeLockPeriod] = await Promise.all([
+  const [user, allUsers, latestLockEntry, activeLockPeriod, journalReader] = await Promise.all([
     prisma.user.findUnique({ where: { id }, select: { id: true, username: true } }),
     usersForSwitcher,
     getLatestKgEntry(id),
@@ -33,6 +33,8 @@ export default async function AdminUserLayout({
     // `subLockPeriodCached`, damit die drei Aktions-Unterseiten, die dieselbe Sperrzeit lesen,
     // die Abfrage per React-`cache()` mit dem Layout teilen statt sie doppelt zu fahren.
     subLockPeriodCached(id),
+    // Der Tagebuch-Reiter erscheint nur der ZUGEORDNETEN Keyholderin — dieselbe Regel wie seine Seite.
+    canReadJournal(actorId, id),
   ]);
 
   const userIds = allUsers.map(u => u.id);
@@ -72,7 +74,7 @@ export default async function AdminUserLayout({
         users={userLockStatuses}
         isGlobalAdmin={isGlobalAdmin}
       />
-      <UserSubNav userId={id} />
+      <UserSubNav userId={id} showJournal={journalReader} />
       {/* Kopfzeile und Reiter oben spannen die ganze HÜLLE (`adminShellColCls`, 1024) — sie rahmen
           die Seite und tragen die neun Reiter in einer Zeile. Der INHALT hier wird dagegen auf das
           Lesemass (`wideColCls`, 768) zurückgekappt: eine Detailzeile mit Name links und Chevron

@@ -19,6 +19,16 @@ export async function isKeyholderOf(actorId: string, subId: string): Promise<boo
   return rel !== null;
 }
 
+/**
+ * Darf `actorId` das geteilte Tagebuch von `subId` lesen (Issue #114)? DIE eine Regel dafür — API-
+ * und Seiten-Guard, Reiter, Stimmungs-Block und MCP fragen alle hier.
+ *
+ * Nur die ZUGEORDNETE Keyholderin, bewusst OHNE Admin-Bypass: was ein Sub mit seiner Keyholderin
+ * teilt, teilt er mit IHR, nicht mit dem Betreiber der Instanz. Pro Request memoisiert, weil Layout,
+ * Seite und Statistik-Block dieselbe Frage im selben Render stellen.
+ */
+export const canReadJournal = cache((actorId: string, subId: string): Promise<boolean> => isKeyholderOf(actorId, subId));
+
 /** May `actorId` (with `role`) view/edit/delete an entry owned by `ownerId`?
  *  Allowed for the owner, a global admin, or a keyholder of the owner (scoped admin).
  *  `elevated` = acting as a controller (admin/keyholder, NOT the owner) — callers use it to waive the

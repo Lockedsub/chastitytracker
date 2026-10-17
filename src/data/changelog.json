@@ -1,5 +1,18 @@
 [
   {
+    "version": "6.4.3",
+    "date": "2026-10-17",
+    "changes": [
+      {
+        "type": "feat",
+        "text": {
+          "de": "Neu: ein Tagebuch für Subs, erreichbar über das Buch-Symbol oben. Jeder Eintrag lässt sich mit der Keyholderin teilen, nur als Stimmung zeigen oder ganz für sich behalten.",
+          "en": "New: a journal for subs, reached via the book icon at the top. Each entry can be shared with the keyholder, show only the mood, or be kept to yourself."
+        }
+      }
+    ]
+  },
+  {
     "version": "6.4.2",
     "date": "2026-10-15",
     "changes": [

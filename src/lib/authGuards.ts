@@ -1,9 +1,9 @@
 import { auth } from "@/lib/auth";
 import type { Session } from "next-auth";
 import { NextResponse } from "next/server";
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { deviceCategoriesEnabled } from "@/lib/constants";
-import { getControllableSubsCached, isKeyholderOf } from "@/lib/keyholder";
+import { canReadJournal, getControllableSubsCached, isKeyholderOf } from "@/lib/keyholder";
 import { errorResponse } from "@/lib/serviceResult";
 import { prisma } from "@/lib/prisma";
 
@@ -83,6 +83,33 @@ export function sessionActor(session: ApiSession): string {
 export async function requireKeyholderOrAdminApi(targetUserId: string): Promise<NextResponse | null> {
   const actor = await requireKeyholderOrAdminActor(targetUserId);
   return actor instanceof NextResponse ? actor : null;
+}
+
+/**
+ * Darf der Handelnde das Tagebuch von `subId` lesen (Issue #114)? NUR, wenn er dem Sub als Keyholder
+ * ZUGEORDNET ist (`isKeyholderOf`).
+ *
+ * **Bewusst OHNE Admin-Bypass — die einzige Keyholder-Prüfung dieser Art.** Jeder andere Keyholder-Pfad
+ * lässt den globalen Admin durch, weil er der Betreiber der Instanz ist und über alles Auskunft geben
+ * können soll. Für das Tagebuch gilt das nicht: was ein Sub mit seiner Keyholderin teilt, teilt er mit
+ * IHR, nicht mit dem Betreiber. Wer hier „vereinheitlicht", gibt jedem Admin jeder Portal-Instanz die
+ * freigegebenen Einträge aller Subs zu lesen. Ist der Admin zugleich zugeordnet, liest er als Keyholder.
+ *
+ * Gleiche Form wie {@link requireKeyholderOrAdminApi}: null = darf, sonst die Absage.
+ */
+export async function requireJournalReaderApi(subId: string): Promise<NextResponse | null> {
+  const session = await requireApi();
+  if (session instanceof NextResponse) return session;
+  return (await canReadJournal(session.user.id, subId)) ? null : errorResponse(403, "FORBIDDEN");
+}
+
+/** Seiten-Gegenstück zu {@link requireJournalReaderApi}: für alle ausser der zugeordneten
+ *  Keyholderin gibt es die Seite nicht (404, wie eine unbekannte). */
+export async function assertJournalReader(subId: string): Promise<{ userId: string }> {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+  if (!(await canReadJournal(session.user.id, subId))) notFound();
+  return { userId: session.user.id };
 }
 
 /** Der Handelnde UND die Träger, die er kontrollieren darf — die Rechte-Grenze als DATUM, nicht als

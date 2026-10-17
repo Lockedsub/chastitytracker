@@ -201,6 +201,8 @@ model User {
   /// Opt-in wie das Gewichtstracking: nichts ändert sich beim Ausrollen, und ohne Box gibt es
   /// nichts zu bestätigen — die Oberfläche zeigt den Schalter deshalb nur, wo eine Box gemeldet hat.
   lockRequiresBolt               Boolean                  @default(false)
+  journalEntries                 JournalEntry[]
+  journalSettings                JournalSettings?
   entries                        Entry[]
   notificationPrefs              NotificationPreference[]
   vorgaben                       TrainingVorgabe[]
@@ -1879,4 +1881,61 @@ model StateVersion {
   changedAt DateTime
 
   @@id([userId, area])
+}
+
+/// Ein Tagebuch-Eintrag des Subs (Issue #114): wie er Aufgaben, Ziele und die Keuschhaltung ERLEBT —
+/// das Protokoll (`Entry`) sagt, was passiert ist, das Tagebuch, wie es sich angefühlt hat.
+///
+/// **Die Sichtbarkeit gehört allein dem Sub.** Die Keyholderin liest nur, was er freigibt, und kann
+/// nichts anlegen, ändern oder verlangen. Ein `PRIVATE`-Eintrag darf bei ihr auch INDIREKT nicht
+/// erkennbar sein — kein Zähler, keine Lücke, kein Stimmungswert. Deshalb gibt es genau einen
+/// Lesepfad für die Keyholder-Seite (`listKeyholderJournal` in `journalService.ts`), der private Zeilen
+/// gar nicht erst lädt. Lesen darf nur, wer dem Sub ZUGEORDNET ist (`isKeyholderOf`); die Admin-Rolle
+/// allein genügt hier bewusst nicht.
+///
+/// **Bewusst NICHT im Zustands-Register** (`STATE_IGNORED_TABLES`): ein Trigger würde `check_updates`
+/// bei jedem privaten Eintrag hochzählen und damit verraten, DASS geschrieben wurde.
+///
+/// Die Dauern zum Zeitpunkt `entryAt` (verschlossen, orgasmusfrei) stehen nicht hier: sie werden bei
+/// jeder Anzeige aus dem Protokoll berechnet, damit sie auch nach einer Korrektur stimmen.
+model JournalEntry {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// Wann das Erlebte war. Vorgabe jetzt, rückdatierbar, nie in der Zukunft.
+  entryAt    DateTime
+  /// Pflicht und nicht leer — ein einzelner Punkt genügt.
+  text       String
+  /// 1 = schlecht … 5 = gut; null = keine Stimmung angegeben.
+  mood       Int?
+  /// KOPIE des Fragetexts, der beim Schreiben über dem Feld stand — keine id: die Liste der
+  /// Leitfragen darf sich ändern, ohne alte Einträge umzudeuten. null = ohne Frage geschrieben.
+  /// Beim Bearbeiten unveränderlich.
+  prompt     String?
+  /// `JOURNAL_VISIBILITIES`: PRIVATE | MOOD_ONLY | FULL. Startwert aus `JournalSettings.defaultVisibility`.
+  visibility String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([userId, entryAt])
+}
+
+/// Die Tagebuch-Einstellungen des Subs (Issue #114) — eine Zeile je Sub, und nur, wenn er etwas
+/// umgestellt hat; fehlt sie, gelten die Vorgaben der Spalten (`journalSettingsOf` in
+/// `journalService.ts`).
+///
+/// **Eigene Tabelle statt Spalten an `User`**, damit das Tagebuch das Konto nicht anfasst: die
+/// Migration legt nur an, statt die `User`-Tabelle umzubauen, und die Werte gehören allein dem Sub —
+/// keine Keyholder-Seite, keine Admin-Route und kein `select` auf `User` reicht sie versehentlich
+/// mit durch. Auch sie stehen nicht im Zustands-Register (`STATE_IGNORED_TABLES`).
+model JournalSettings {
+  userId            String   @id
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// `JOURNAL_VISIBILITIES`: mit welcher Sichtbarkeit ein NEUER Eintrag entsteht. Vorgabe `FULL`:
+  /// Offenheit gegenüber der Keyholderin ist der Normalfall, „nur für mich" eine bewusste Wahl je
+  /// Eintrag. Eine Änderung wirkt nur auf neue Einträge.
+  defaultVisibility String   @default("FULL")
+  /// Leitfrage über dem Textfeld anzeigen. Aus = keine Frage, gespeichert wird dann `prompt = null`.
+  promptsEnabled    Boolean  @default(true)
+  updatedAt         DateTime @updatedAt
 }

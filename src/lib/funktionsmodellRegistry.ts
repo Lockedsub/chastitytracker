@@ -26,7 +26,8 @@ export type FmWriter = "sub" | "admin" | "mcp" | "portal" | "system";
 export type FmTarget =
   | "Sperrzeit" | "Reinigung" | "Kontrollen" | "Auto-Kontrollen" | "Box" | "Strafbuch"
   | "Aufgaben" | "Trainingsziele" | "Orgasmus" | "Geräte" | "Einträge" | "Sessions/Statistik"
-  | "Benachrichtigungen" | "Nachrichten" | "MCP" | "Oberfläche" | "Zugang" | "Bildersafe" | "Gewicht";
+  | "Benachrichtigungen" | "Nachrichten" | "MCP" | "Oberfläche" | "Zugang" | "Bildersafe" | "Gewicht"
+  | "Tagebuch";
 
 /**
  * Wie lange ein Wert gilt. Die Unterscheidung ist load-bearing: `User.cleaningAllowed` ist ein
@@ -142,6 +143,7 @@ export const FM_DOMAINS: FmDomain[] = [
   { id: "kontext", title: "Keyholder-Wissen & Kontext", doc: "80-kontext.md", mechanic: "MCP" },
   { id: "konto", title: "Konto, Zugang & Darstellung", doc: "85-zugang.md", mechanic: "Zugang" },
   { id: "gewicht", title: "Gewicht", mechanic: "Gewicht" },
+  { id: "tagebuch", title: "Tagebuch", mechanic: "Tagebuch" },
   { id: "betrieb", title: "Betrieb & Stichtage" },
 ];
 
@@ -462,6 +464,18 @@ export const FM_REGISTRY: FmEntry[] = [
     effect: "Sein „Verschlossen\" ist dann erst der AUFRUF an die Box; verschlossen ist er, wenn sie den Riegel meldet. Bis dahin läuft nichts an — keine Sperrzeit, keine erfüllte Anforderung, keine Tragezeit. Das Abschalten vollzieht einen wartenden Aufruf sofort.",
     writers: ["admin", "mcp"], affects: ["Box", "Sperrzeit", "Sessions/Statistik", "Strafbuch"],
     anchor: "lockCommit.ts:lockAwaitsBolt",
+  }),
+
+  // ── Tagebuch ─────────────────────────────────────────────────────────────────────────
+  s({
+    model: "JournalSettings", field: "defaultVisibility", domain: "tagebuch", scope: "standing",
+    effect: "Mit welcher Sichtbarkeit ein NEUER Tagebuch-Eintrag entsteht (nur für mich / Stimmung zeigen / mit Keyholder teilen). Vorgabe: teilen. Die Keyholderin sieht die Einstellung nicht und kann sie nicht ändern.",
+    writers: ["sub"], affects: ["Tagebuch"], anchor: "journalService.ts:createJournalEntry",
+  }),
+  s({
+    model: "JournalSettings", field: "promptsEnabled", domain: "tagebuch", scope: "standing",
+    effect: "Zeigt beim Schreiben eine Leitfrage über dem Textfeld. Aus = keine Frage, und es wird auch keine gespeichert, selbst wenn der Client eine schickt.",
+    writers: ["sub"], affects: ["Tagebuch"], anchor: "journal.ts:storedPrompt",
   }),
 
   // ── User: Gewicht ──────────────────────────────────────────────────────────────────────────

@@ -1,4 +1,4 @@
-import { ClipboardList, Play, Square, ClipboardCheck, Droplets, Scale, KeyRound, ShowerHead, Eye } from "lucide-react";
+import { ClipboardList, Play, Square, ClipboardCheck, Droplets, Scale, KeyRound, ShowerHead, Eye, NotebookPen } from "lucide-react";
 import { LockClosedIcon, LockOpenIcon } from "@/app/components/lockIcons";
 
 /**
@@ -31,7 +31,8 @@ export type ActionSignKey =
   | "BILDERSAFE_SEAL"
   | "BILDERSAFE_SHOW"
   | "REINIGUNG"
-  | "TASK";
+  | "TASK"
+  | "JOURNAL";
 
 /** Die Farben stehen als CSS-Variable und nicht als Tailwind-Klasse, weil die Hülle sie als
  *  `style`-Wert setzt: das Zeichen färbt sich, ohne dass die Hülle die Palette kennen muss. */
@@ -55,6 +56,9 @@ const SIGNS: Record<ActionSignKey, { Icon: typeof LockClosedIcon; color: string 
   // „Session vorbei" — dasselbe Glyph für „Unterbrechung, es geht weiter" und für das Ende.
   REINIGUNG: { Icon: ShowerHead, color: "var(--foreground)" },
   TASK: { Icon: ClipboardList, color: "var(--foreground)" },
+  // Neutral wie das Gewicht: ein Tagebuch-Eintrag ist keine Handlung im Verschluss und keine
+  // Aufforderung — er trägt keine Bedeutungsfarbe. Dasselbe Zeichen steht in der Kopfzeile.
+  JOURNAL: { Icon: NotebookPen, color: "var(--foreground)" },
 };
 
 /**

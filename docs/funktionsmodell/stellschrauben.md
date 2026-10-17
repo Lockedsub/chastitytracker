@@ -3,7 +3,7 @@
 <!-- GENERIERT — nicht von Hand ändern. Quelle: prisma/schema.prisma +
      src/lib/funktionsmodellRegistry.ts · neu erzeugen: `npm run funktionsmodell` -->
 
-Jedes Feld, das Verhalten steuert: 152 Stellschrauben über 41 Modelle.
+Jedes Feld, das Verhalten steuert: 154 Stellschrauben über 41 Modelle.
 Typ und Default stammen aus dem Schema, die Bedeutung aus der Registry — beides wird bei jedem
 Testlauf gegeneinander geprüft, ein neues Feld ohne Eintrag lässt `npm test` fehlschlagen.
 
@@ -261,6 +261,13 @@ Steckbrief: [85-zugang.md](85-zugang.md)
 | `User.targetWeightKeyholderKg` | Float? | — | dauerhaft | Zielgewicht der Keyholderin. Es GILT, solange sie eines führt — auch wenn es strenger ist als seines; seines bleibt daneben sichtbar. Zurückgenommen gilt wieder seines. | Keyholder (UI) | Gewicht, Nachrichten | `weight.ts:effectiveTarget` |
 | `User.targetWeightKeyholderSetAt` | DateTime? | — | dauerhaft | Wann sie ihr Ziel gesetzt hat — derselbe Bezugspunkt des Fortschritts wie auf seiner Seite. | System | Gewicht | `weightService.ts:targetStartWeight` |
 | `User.weighingWindows` | String? | — | dauerhaft | Tägliche Zeitfenster fürs Wiegen (Wanduhrzeit des Trägers). Leer = keine Fensterpflicht. Ein Wert ausserhalb wird markiert, nicht geahndet — er misst nur eine andere Tageszeit mit. | Keyholder (UI) | Gewicht | `weightWindows.ts:inWeighingWindow` |
+
+## Tagebuch
+
+| Feld | Typ | Default | Gilt | Wirkung | Schreibt | Wirkt auf | Anker |
+|---|---|---|---|---|---|---|---|
+| `JournalSettings.defaultVisibility` | String | `"FULL"` | dauerhaft | Mit welcher Sichtbarkeit ein NEUER Tagebuch-Eintrag entsteht (nur für mich / Stimmung zeigen / mit Keyholder teilen). Vorgabe: teilen. Die Keyholderin sieht die Einstellung nicht und kann sie nicht ändern. | Sub | Tagebuch | `journalService.ts:createJournalEntry` |
+| `JournalSettings.promptsEnabled` | Boolean | `true` | dauerhaft | Zeigt beim Schreiben eine Leitfrage über dem Textfeld. Aus = keine Frage, und es wird auch keine gespeichert, selbst wenn der Client eine schickt. | Sub | Tagebuch | `journal.ts:storedPrompt` |
 
 ## Betrieb & Stichtage
 

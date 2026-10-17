@@ -1,11 +1,11 @@
-import { buildKgWearPairs, wearHoursOfPairs, longestOrgasmFreeGap, median, msToHours, round1, summarizeDurations } from "@/lib/utils";
+import { buildKgWearPairs, wearHoursOfPairs, longestOrgasmFreeGap, median, msToHours, orgasmTimes, round1, summarizeDurations } from "@/lib/utils";
 import { type ByPeriod, type GoalChangedInPeriod, type VorgabeTargets } from "@/lib/goalFulfillment";
 import { resolveGoalRow } from "@/lib/goalSegments";
 import { getActiveVorgabe, getKgVorgabeSegments } from "@/lib/queries";
 import { buildCategoryWearGoals } from "@/lib/categoryGoals";
 import { buildSessions, buildWearSessions, deviceDisplayName, deviceGroupKey, isLiveOpenSession, isUnassignedDevice, segmentsByDevice, type DeviceRef, type Session, type Segment } from "@/lib/sessionModel";
 import { pct } from "@/lib/mcp/format";
-import { makeIso, buildEnvelope, loadTrackingContext, loadCategoryNames, type Envelope, type TrackingContext, type TrackingEntry } from "@/lib/mcp/common";
+import { makeIso, buildEnvelope, loadTrackingContext, loadCategoryNames, type Envelope, type TrackingContext } from "@/lib/mcp/common";
 import { prisma } from "@/lib/prisma";
 
 /** Vorberechnete Statistiken & Rekorde aus SEGMENTEN (nicht Labels) — §5/§6/§7. Rein lesend.
@@ -229,10 +229,6 @@ export interface RecordsResult extends Envelope {
   /** Das GERADE laufende Segment (letztes Segment einer offenen Session), falls vorhanden. */
   currentUnbrokenSegmentHours: number | null;
   currentUnbrokenVsBestPct: number | null;
-}
-
-function orgasmTimes(entries: TrackingEntry[]): Date[] {
-  return entries.filter((e) => e.type === "ORGASMUS").map((e) => e.startTime).sort((a, b) => a.getTime() - b.getTime());
 }
 
 /** Längste Lücke zwischen Orgasmen inkl. der aktuell laufenden Strecke (now − letzter Orgasmus).

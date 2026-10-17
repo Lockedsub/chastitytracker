@@ -9,6 +9,8 @@ import { boxCouplingEnabled, isValidStartPage, lockmeboxEnabled, toNotifyLevel, 
 import { toBoxKind, type BoxKind } from "@/lib/boxStatus";
 import type { WeightSettingsProps } from "./WeightSettings";
 import type { UnitSystem } from "@/lib/weight";
+import { journalSettingsOf } from "@/lib/journalService";
+import type { JournalSettingsProps } from "./JournalSettings";
 import pkg from "@/../package.json";
 import { feedbackMode, type FeedbackMode } from "@/lib/feedback";
 
@@ -55,6 +57,8 @@ export interface SettingsFormProps {
   /** Gewichtstracking — `null`, wenn die Keyholderin es für diesen Sub nicht freigeschaltet hat.
    *  Der Abschnitt erscheint dann gar nicht. */
   weight: WeightSettingsProps | null;
+  /** Tagebuch-Einstellungen — `null` ohne eigenen Tracker: dann gibt es kein Tagebuch. */
+  journal: JournalSettingsProps | null;
   /** Die Schlüsselbox: `null` = der Abschnitt erscheint nicht (keine Box-Kopplung, oder weder eine
    *  Box noch die LockMeBox zum Koppeln). Sonst die EINE Box des Trägers (`boxPairing.ts`) — dann
    *  bietet er „Box entfernen" an —, oder `paired: null`: dann das Koppeln einer LockMeBox. Ob DIESES
@@ -78,6 +82,7 @@ export async function getSettingsProps(): Promise<SettingsFormProps> {
   let startPage = "auto";
   let hideOwnTracker = false;
   let weight: WeightSettingsProps | null = null;
+  let journal: JournalSettingsProps | null = null;
   // Vorgabe wie in der Spalte: alles zustellen, bis der Nutzer es leiser stellt.
   let notifyMail: NotifyLevel = "all";
   let notifyPush: NotifyLevel = "all";
@@ -87,7 +92,7 @@ export async function getSettingsProps(): Promise<SettingsFormProps> {
   let pushReachable = false;
 
   if (userId) {
-    const [dbUser, reminderPref, pushTarget] = await Promise.all([
+    const [dbUser, reminderPref, pushTarget, journalSettings] = await Promise.all([
       prisma.user.findUnique({
         where: { id: userId },
         select: {
@@ -99,6 +104,8 @@ export async function getSettingsProps(): Promise<SettingsFormProps> {
       }),
       getRecipientChannels(userId, "WEIGHT_REMINDER"),
       hasPushTarget(userId),
+      // Parallel statt danach; ohne eigenen Tracker wird es unten verworfen.
+      journalSettingsOf(userId),
     ]);
     pushReachable = pushTarget;
     if (dbUser) {
@@ -114,6 +121,7 @@ export async function getSettingsProps(): Promise<SettingsFormProps> {
       timezone = dbUser.timezone;
       startPage = dbUser.startPage;
       hideOwnTracker = dbUser.hideOwnTracker;
+      if (!hideOwnTracker) journal = journalSettings;
       telegramLinked = !!dbUser.telegramChatId;
       if (dbUser.weightTrackingEnabled) {
         weight = {
@@ -164,6 +172,7 @@ export async function getSettingsProps(): Promise<SettingsFormProps> {
     buildDate: process.env.BUILD_DATE ?? undefined,
     feedbackMode: feedbackMode(),
     weight,
+    journal,
     box: boxCouplingEnabled() && userId ? await boxSettings(userId) : null,
   };
 }

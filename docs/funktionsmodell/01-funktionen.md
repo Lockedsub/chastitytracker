@@ -6,7 +6,7 @@
 Was der Tracker kann — flach aufgelistet, nach Mechanik gruppiert. Für den Betrieb, nicht für
 Endnutzer: die Spalte **Endpunkt** nennt die API-Route bzw. das MCP-Werkzeug dahinter.
 
-115 Funktionen über 18 Mechaniken, davon 13 ohne jede Bedienung — sie laufen von selbst.
+118 Funktionen über 19 Mechaniken, davon 13 ohne jede Bedienung — sie laufen von selbst.
 
 **Wer** ist der Auslöser, **Wo** die Oberfläche. Eine Funktion mit zwei Oberflächen ist EINE
 Funktion: „Kontrolle anfordern" gibt es in der App und über den MCP, und beide Wege enden im
@@ -254,6 +254,14 @@ Steckbrief: [85-zugang.md](85-zugang.md)
 | **Gewichtstracking einrichten** | Freischaltung, Wiege-Fenster (Zeit, Dauer, Wochentage, Erinnerung) und ihr Zielgewicht. <br>*Ihr Zielgewicht gilt, seines bleibt sichtbar. Das Abschalten nimmt die Meldepflicht mit — sonst zählte die Aus-Zeit als lauter versäumte Meldungen.* | Keyholder (UI), Keyholder (MCP) | App (Keyholder), MCP | `/api/admin/users/[id]` `set_weight_tracking` |
 | **Wiegung löschen** | Entfernt eine einzelne Messung samt Foto und Notiz. <br>*Nur der Keyholder — der Träger korrigiert eigene Zeilen nicht selbst, wie bei den Einträgen. Ein bereits geöffnetes Orgasmus-Fenster bleibt bestehen: es ist danach eine eigene Zeile mit eigenem Rückzugsweg, und eine Freigabe rückwirkend einzukassieren wäre die härtere Überraschung.* | Keyholder (UI) | App (Keyholder) | `/api/weight/[id]` |
 | **Freigabe an das Gewicht knüpfen** | Eine Vorgabe, die den nächsten Orgasmus freigibt, sobald das MITTEL der letzten Tage eine Schwelle erreicht. Erfüllt sie sich, entsteht beim nächsten Wiegen ein Orgasmus-Fenster (Gelegenheit). <br>*Geprüft wird das Mittel, nicht der Tageswert — ein einzelnes Wiegen schwankt um ein bis zwei Kilo. Ausgewertet wird nur die ERSTE Messung eines Tages; wer nachwiegt, könnte sonst so lange wiegen, bis es passt. Die Vorgabe ist verbraucht, sobald sie ausgelöst hat; sie erzeugt NIE ein Vergehen — die Konsequenz ist Warten.* | Keyholder (UI), Keyholder (MCP) | App (Keyholder), MCP | `/api/admin/weight-release` `set_weight_release` |
+
+## Tagebuch
+
+| Funktion | Was sie tut | Wer | Wo | Endpunkt |
+|---|---|---|---|---|
+| **Tagebuch schreiben** | Eigene Einträge anlegen, ändern und endgültig löschen: Text, optional Stimmung (1–5) und Leitfrage, rückdatierbar, je Eintrag eine Sichtbarkeit. <br>*Nur der Besitzer — auch die Keyholderin und der Admin bekommen für eine fremde id ein 404, wie für eine unbekannte. Es gibt keine Erinnerung, keine Meldung und keine Folge, wenn nichts geschrieben wird; ein Eintrag zählt nicht im Zustands-Signal `check_updates`, damit Privates nicht als Änderung sichtbar wird.* | Sub | App (Träger) | `/api/journal` `/api/journal/[id]` |
+| **Tagebuch einstellen** | Standard-Sichtbarkeit neuer Einträge und Leitfragen an/aus. <br>*Eigene Tabelle, nicht am Konto: die Keyholderin sieht die Einstellungen nicht und kann sie nicht setzen.* | Sub | App (Träger) | `/api/settings/journal` |
+| **Geteilte Tagebuch-Einträge lesen** | Die vom Sub freigegebenen Einträge samt Stimmung; bei „Stimmung zeigen" ohne Text und Leitfrage. <br>*Strenger als jede andere Keyholder-Sicht: nur wer dem Sub ZUGEORDNET ist, nicht schon die Admin-Rolle — auch für die KI (OAuth-Zugang des zugeordneten Kontos; der statische Token liest nichts). Private Einträge werden gar nicht geladen — kein Zähler, keine Lücke.* | Keyholder (UI), Keyholder (MCP) | App (Keyholder), MCP | `/api/admin/users/[id]/journal` `get_shared_journal` |
 
 ## Läuft von selbst
 

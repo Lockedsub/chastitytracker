@@ -1022,6 +1022,13 @@ export function summarizeSessions<T extends { durationMs: number }>(completed: T
   };
 }
 
+/** Die Zeitpunkte aller Orgasmus-Einträge, AUFSTEIGEND — die Eingabe von {@link longestOrgasmFreeGap}
+ *  (MCP `records`/`denial_trend`) und der orgasmusfreien Dauer eines Tagebuch-Eintrags (`journal.ts`).
+ *  Der Rekorde-Block der Statistik-Seite kommt über `orgasmEntriesCached` an dieselbe Liste. */
+export function orgasmTimes(entries: readonly { type: string; startTime: Date }[]): Date[] {
+  return entries.filter((e) => e.type === "ORGASMUS").map((e) => e.startTime).sort((a, b) => a.getTime() - b.getTime());
+}
+
 /**
  * Die längste orgasmusfreie Strecke: die grösste Lücke zwischen zwei aufeinanderfolgenden Orgasmen
  * ODER die gerade laufende Strecke (`now` − letzter Orgasmus), je nachdem welche länger ist. `times`

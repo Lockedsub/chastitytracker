@@ -176,6 +176,11 @@ Sperre `cleaningAllowed` hat. Freie Wechsel erlauben ⇒ `cleaningAllowed` setze
   ALLE Einstellungen des Features: die Freischaltung, die Wiege-Fenster (Startzeit, Dauer,
   Wochentage als ISO-Liste 1–7, Erinnerung) und DEIN Zielgewicht — es gilt, solange du eines führst,
   seines bleibt daneben sichtbar (`subTarget`). Der dryRun warnt, wenn deine Zahl unter BMI 18,5 führt.
+- `get_shared_journal` liest, was der Träger aus seinem Tagebuch mit dir TEILT — dasselbe, was der
+  Mensch im Reiter „Geteilte Einträge“ sieht. Private Einträge gibt es für dich nicht, auch nicht als
+  Anzahl; bei `shared: "mood_only"` fehlen Text und Leitfrage. Nur lesen, und nur mit einem Zugang,
+  der dem Träger als Keyholder ZUGEORDNET ist. Das Tagebuch ist freiwillig: fehlende Einträge sind
+  kein Vergehen und kein Anlass, Schreiben oder Teilen zu verlangen.
 - Welche Vergehensarten überhaupt zählen, legst du mit `set_offense_rules` um (Bestand:
   `get_context.offenseRules`). Mehrere Arten gehören in EINEN Aufruf — zusammen sind sie eine
   Entscheidung, und die Regel-Historie bekommt einen Zeitpunkt statt mehrerer. Eine Änderung wirkt

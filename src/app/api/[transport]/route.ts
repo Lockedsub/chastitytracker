@@ -39,6 +39,7 @@ import { timeline } from "@/lib/mcp/timeline";
 import { getActionLog } from "@/lib/mcp/actionlog";
 import { checkUpdates } from "@/lib/mcp/stateToken";
 import { weightHistory, logWeightDef } from "@/lib/mcp/weight";
+import { sharedJournal } from "@/lib/mcp/journal";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -1938,6 +1939,28 @@ function registerTools(server: McpServer) {
         },
       },
       (args) => runTool("weight_history", (u) => weightHistory(u, { days: args.days ?? null })),
+    );
+
+    server.registerTool(
+      "get_shared_journal",
+      {
+        title: "Read the journal entries the sub shares",
+        description:
+          "Die Tagebuch-Einträge, die der Träger mit seiner Keyholderin TEILT — genau das, was der Mensch " +
+          "im Reiter „Geteilte Einträge“ sieht. Private Einträge existieren für dich nicht, auch nicht als " +
+          "Anzahl; bei `shared: \"mood_only\"` sind Text und Leitfrage leer. Je Eintrag die Dauern zu seinem " +
+          "Zeitpunkt (`lockedHours`, `orgasmFreeHours`). Nur lesen: du kannst nichts anlegen, ändern oder " +
+          "ein Teilen verlangen, und das Tagebuch ist freiwillig — fehlende Einträge sind kein Vergehen und " +
+          "kein Anlass, nachzufragen. Braucht einen OAuth-Zugang, der dem Träger als Keyholder ZUGEORDNET " +
+          "ist; die Admin-Rolle allein genügt nicht.",
+        inputSchema: {
+          month: z.string().regex(/^\d{4}-\d{2}$/).optional().describe("Kalendermonat YYYY-MM in seiner Zeitzone; weglassen = die neuesten Einträge."),
+          cursor: z.string().optional().describe("id des letzten Eintrags der vorigen Antwort, wenn `hasMore` true war."),
+        },
+      },
+      (args, extra) =>
+        runTool("get_shared_journal", (u) =>
+          sharedJournal(u, (extra as ToolExtra).authInfo?.extra?.userId, { month: args.month, cursor: args.cursor })),
     );
 
     server.registerTool(

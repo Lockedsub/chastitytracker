@@ -46,6 +46,10 @@ interface Props {
   domain: { min: number; max: number };
   /** Beschriftung der Werteachse, z.B. „kg". */
   unit: string;
+  /** Feste Achsenmarken für eine GESCHLOSSENE Skala (Stimmung 1–5). Ohne sie rechnet das Diagramm
+   *  drei Marken aus dem Wertebereich samt Luft — für eine Messreihe richtig, für eine Skala aber
+   *  „0,7 / 3,0 / 5,3", Werte, die es auf ihr gar nicht gibt. */
+  ticks?: number[];
   /** Zugängliche Beschreibung des ganzen Bildes. */
   ariaLabel: string;
 }
@@ -56,7 +60,7 @@ const PAD = { top: 8, right: 6, bottom: 16, left: 30 };
 /** Ab dieser Spanne der Achse genügen ganze Zahlen; darunter bekommt sie eine Kommastelle. */
 const TICK_WHOLE_SPAN = 6;
 
-export default function MeasurementChart({ points, trend, markers = [], domain, unit, ariaLabel }: Props) {
+export default function MeasurementChart({ points, trend, markers = [], domain, unit, ariaLabel, ticks: fixedTicks }: Props) {
   const clipId = useId();
   const locale = useLocale();
   if (points.length === 0) return null;
@@ -80,10 +84,11 @@ export default function MeasurementChart({ points, trend, markers = [], domain, 
     : null;
 
   // Drei Beschriftungen reichen: unten, Mitte, oben. Mehr Zahlen machen die Achse zur Tabelle.
-  const ticks = [lo, (lo + hi) / 2, hi];
+  const ticks = fixedTicks ?? [lo, (lo + hi) / 2, hi];
   // Ganze Zahlen nur, wo die Achse breit genug ist: bei einer Spanne von unter einem Kilo hiessen
   // sonst alle drei Marken „85" und die Achse sagte nichts mehr (84,5 und 85,4 sähen gleich aus).
-  const fractionDigits = hi - lo >= TICK_WHOLE_SPAN ? 0 : 1;
+  // Feste Marken einer Skala sind ganze Zahlen und stehen auch so da.
+  const fractionDigits = fixedTicks?.every(Number.isInteger) || hi - lo >= TICK_WHOLE_SPAN ? 0 : 1;
   const tickFormat = new Intl.NumberFormat(locale.startsWith("en") ? "en-US" : "de", {
     maximumFractionDigits: fractionDigits,
     minimumFractionDigits: fractionDigits,

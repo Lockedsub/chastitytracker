@@ -754,6 +754,26 @@ export const FM_CAPABILITIES: FmCapability[] = [
     note: "Geprüft wird das Mittel, nicht der Tageswert — ein einzelnes Wiegen schwankt um ein bis zwei Kilo. Ausgewertet wird nur die ERSTE Messung eines Tages; wer nachwiegt, könnte sonst so lange wiegen, bis es passt. Die Vorgabe ist verbraucht, sobald sie ausgelöst hat; sie erzeugt NIE ein Vergehen — die Konsequenz ist Warten.",
   }),
   c({
+    id: "journal-write", mechanic: "Tagebuch", title: "Tagebuch schreiben",
+    what: "Eigene Einträge anlegen, ändern und endgültig löschen: Text, optional Stimmung (1–5) und Leitfrage, rückdatierbar, je Eintrag eine Sichtbarkeit.",
+    actors: ["sub"], surfaces: ["sub-ui"], routes: ["/api/journal", "/api/journal/[id]"],
+    note: "Nur der Besitzer — auch die Keyholderin und der Admin bekommen für eine fremde id ein 404, wie für eine unbekannte. Es gibt keine Erinnerung, keine Meldung und keine Folge, wenn nichts geschrieben wird; ein Eintrag zählt nicht im Zustands-Signal `check_updates`, damit Privates nicht als Änderung sichtbar wird.",
+  }),
+  c({
+    id: "journal-settings", mechanic: "Tagebuch", title: "Tagebuch einstellen",
+    what: "Standard-Sichtbarkeit neuer Einträge und Leitfragen an/aus.",
+    actors: ["sub"], surfaces: ["sub-ui"],
+    routes: ["/api/settings/journal"],
+    note: "Eigene Tabelle, nicht am Konto: die Keyholderin sieht die Einstellungen nicht und kann sie nicht setzen.",
+  }),
+  c({
+    id: "journal-keyholder-read", mechanic: "Tagebuch", title: "Geteilte Tagebuch-Einträge lesen",
+    what: "Die vom Sub freigegebenen Einträge samt Stimmung; bei „Stimmung zeigen\" ohne Text und Leitfrage.",
+    actors: ["admin", "mcp"], surfaces: ["admin-ui", "mcp"],
+    routes: ["/api/admin/users/[id]/journal"], tools: ["get_shared_journal"],
+    note: "Strenger als jede andere Keyholder-Sicht: nur wer dem Sub ZUGEORDNET ist, nicht schon die Admin-Rolle — auch für die KI (OAuth-Zugang des zugeordneten Kontos; der statische Token liest nichts). Private Einträge werden gar nicht geladen — kein Zähler, keine Lücke.",
+  }),
+  c({
     id: "user-manage", mechanic: "Zugang", title: "Konten verwalten",
     what: "Anlegen, bearbeiten, Rolle setzen, Passwort setzen und löschen.",
     actors: ["admin"], surfaces: ["admin-ui"], routes: ["/api/admin/users", "/api/admin/users/[id]"],
