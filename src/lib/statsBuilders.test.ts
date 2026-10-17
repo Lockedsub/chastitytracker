@@ -54,18 +54,27 @@ describe("buildDailyData", () => {
     expect(m.get(key(2026, 3, 29))?.hours).toBeCloseTo(23, 6);
   });
 
-  it("BEKANNTER BUG, hier nur festgehalten: am Herbst-Umstellungstag geht eine Stunde verloren", () => {
-    // Der 25.10.2026 hat lokal 25 Stunden. Das Paar deckt ihn vollständig ab, gezählt werden aber
-    // nur 24 h. Zwei Ursachen greifen ineinander:
-    //   1. `midnightInTZ` misst am Mittags-Anker und trifft an Umstellungstagen die echte lokale
-    //      Mitternacht nicht (eigener Fix-Task).
-    //   2. Die Schleife läuft in starren 86_400_000-ms-Schritten, die auf einem 25-Stunden-Tag
-    //      nicht mehr auf lokalen Mitternachtsgrenzen liegen.
-    // Vor der Extraktion nach statsBuilders.ts verhielt sich der Code identisch (differenziell
-    // geprüft) — deshalb hier eingefroren statt im Refactor stillschweigend geändert.
+  it("am Herbst-Umstellungstag zählt ein volles Tages-Paar 25 Stunden", () => {
+    // Der 25.10.2026 hat lokal 25 Stunden. Früher lief die Schleife in starren 24-h-Schritten
+    // und zählte 24 h (der Test hielt das als „BEKANNTER BUG" mit falschem Sollwert fest).
     const pairs = [{ start: D("2026-10-24T22:00:00Z"), end: D("2026-10-25T23:00:00Z") }];
     const m = buildDailyData(pairs, new Set(), TZ);
-    expect(m.get(key(2026, 10, 25))?.hours).toBeCloseTo(24, 6); // korrekt wären 25
+    expect(m.get(key(2026, 10, 25))?.hours).toBeCloseTo(25, 6);
+    expect(m.size).toBe(1);
+  });
+
+  it("Zone fern von Zürich (Auckland, Herbst-Wende 05.04.2026, 25 h): volles Tages-Paar zählt 25 h", () => {
+    const pairs = [{ start: D("2026-04-04T11:00:00Z"), end: D("2026-04-05T12:00:00Z") }];
+    const m = buildDailyData(pairs, new Set(), "Pacific/Auckland");
+    expect(m.get(key(2026, 4, 5))?.hours).toBeCloseTo(25, 6);
+    expect(m.size).toBe(1);
+  });
+
+  it("Zone westlich (Los Angeles, Frühjahrs-Wende 08.03.2026, 23 h): volles Tages-Paar zählt 23 h", () => {
+    const pairs = [{ start: D("2026-03-08T08:00:00Z"), end: D("2026-03-09T07:00:00Z") }];
+    const m = buildDailyData(pairs, new Set(), "America/Los_Angeles");
+    expect(m.get(key(2026, 3, 8))?.hours).toBeCloseTo(23, 6);
+    expect(m.size).toBe(1);
   });
 
   it("markiert Orgasmus-Tage auch ohne Trage-Zeit", () => {

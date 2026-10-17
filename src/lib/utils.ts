@@ -456,7 +456,16 @@ export function midnightInTZ(d: Date, tz: string): Date {
 export function midnightOfLocalDate(year: number, month: number, day: number, tz: string): Date {
   const guessUTC = Date.UTC(year, month, day);
   // Anker ist der Ziel-Instant selbst (ein Pass) — Begründung bei `tzOffsetMsAt`.
-  return new Date(guessUTC - tzOffsetMsAt(guessUTC, tz));
+  const first = guessUTC - tzOffsetMsAt(guessUTC, tz);
+  // Liegt die Zeitumstellung zwischen 00:00 UTC und der lokalen Mitternacht (Zonen östlich von UTC,
+  // z.B. Auckland am 05.04.), misst der Anker die falsche Seite der Wende und die Mitternacht
+  // läge um eine Stunde daneben. Dann nachmessen — aber nur übernehmen, wenn das Ergebnis die
+  // Mitternacht wirklich trifft (sonst, wie in Santiago/Beirut, bei der nicht existierenden
+  // Mitternacht, bleibt es beim ersten Pass).
+  const offsetAtFirst = tzOffsetMsAt(first, tz);
+  if (guessUTC - first === offsetAtFirst) return new Date(first);
+  const second = guessUTC - offsetAtFirst;
+  return new Date(tzOffsetMsAt(second, tz) === offsetAtFirst ? second : first);
 }
 
 /** Today at 00:00:00 in `tz` */

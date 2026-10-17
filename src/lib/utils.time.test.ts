@@ -230,3 +230,18 @@ describe("Summen — zusammengezählte Zeit nennt nie Tage", () => {
     expect(formatTotalMs(-1)).toBe("–");
   });
 });
+
+describe("midnightOfLocalDate an Zeitumstellungstagen östlich von UTC", () => {
+  // Auckland: Wende 05.04.2026 03:00 NZDT → 02:00 NZST, also liegt 00:00 UTC schon NACH der Wende.
+  // Der Ein-Pass-Anker maß dort +12 statt +13 und lag eine Stunde neben der Mitternacht.
+  it("Auckland, 05.04.2026: Mitternacht ist 04.04. 11:00 UTC (NZDT, +13)", async () => {
+    const { midnightOfLocalDate } = await import("./utils");
+    expect(midnightOfLocalDate(2026, 3, 5, "Pacific/Auckland").toISOString()).toBe("2026-04-04T11:00:00.000Z");
+    expect(midnightOfLocalDate(2026, 3, 6, "Pacific/Auckland").toISOString()).toBe("2026-04-05T12:00:00.000Z");
+  });
+  it("Zürich bleibt unverändert", async () => {
+    const { midnightOfLocalDate } = await import("./utils");
+    expect(midnightOfLocalDate(2026, 9, 25, "Europe/Zurich").toISOString()).toBe("2026-10-24T22:00:00.000Z");
+    expect(midnightOfLocalDate(2026, 2, 29, "Europe/Zurich").toISOString()).toBe("2026-03-28T23:00:00.000Z");
+  });
+});
