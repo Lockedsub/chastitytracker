@@ -69,3 +69,48 @@ describe("historicalSessionNeedsBuckets", () => {
     expect(historicalSessionNeedsBuckets(start, new Date("2026-07-15T00:00:00Z"))).toBe(true);
   });
 });
+
+/**
+ * Bucket-Grenzen sind Kalendertage, keine 24-h-Blöcke: an einer Zeitumstellung hat der Tag 23/25 h,
+ * und `+ n * 86_400_000` auf einer Mitternacht landete eine Stunde neben der nächsten Mitternacht.
+ * Ausserdem liefen die Beschriftungen in der Zone des Betrachters (APP_TZ) statt der der Sub.
+ */
+describe("groupEventsIntoBuckets — Zeitumstellung und Beschriftung in der Zone der Sub", () => {
+  it("Zürich, Herbst-Wende 25.10.2026: 00:30 Ortszeit am 25.10. gehört zu Gestern (der Tag hat 25 h)", () => {
+    const now = new Date("2026-10-26T11:00:00Z"); // Mo 26.10. 12:00 Ortszeit
+    // 24.10. 22:30 UTC = 25.10. 00:30 CEST — nach lokaler Mitternacht, aber VOR (heute-24h) = 23:00 UTC
+    const buckets = groupEventsIntoBuckets([ev("2026-10-24T22:30:00Z")], now, "de-CH", "active", "Europe/Zurich");
+    expect(buckets.map((b) => b.kind)).toEqual(["yesterday"]);
+  });
+
+  it("Zürich: Montag 00:30 Ortszeit der Vorwoche (Sommerzeit) liegt in 'Letzte Woche'", () => {
+    const now = new Date("2026-10-27T11:00:00Z"); // Di 27.10.
+    // 18.10. 22:30 UTC = Mo 19.10. 00:30 CEST; lastWeekStart ist 19.10. 00:00 CEST = 18.10. 22:00 UTC
+    const buckets = groupEventsIntoBuckets([ev("2026-10-18T22:30:00Z")], now, "de-CH", "active", "Europe/Zurich");
+    expect(buckets.map((b) => b.kind)).toEqual(["lastWeek"]);
+    expect(buckets[0].dateRangeLabel).toBe("19.10.–25.10.");
+  });
+
+  it("Auckland: die Wochen-Beschriftung nennt Montag bis Sonntag der Sub, nicht den Vortag in Zürcher Zeit", () => {
+    const now = new Date("2026-07-15T00:00:00Z"); // Mi 15.07. 12:00 NZ
+    const buckets = groupEventsIntoBuckets([ev("2026-07-13T05:00:00Z")], now, "de-CH", "active", "Pacific/Auckland");
+    expect(buckets.map((b) => b.kind)).toEqual(["thisWeek"]);
+    expect(buckets[0].dateRangeLabel).toBe("13.07.–19.07.");
+  });
+
+  it("Auckland: Monats-Beschriftung nennt den Monat der Sub (01.06. 01:00 NZ ist Juni, in Zürich noch Mai)", () => {
+    const now = new Date("2026-07-15T00:00:00Z");
+    const buckets = groupEventsIntoBuckets([ev("2026-05-31T13:00:00Z")], now, "de-CH", "active", "Pacific/Auckland");
+    expect(buckets[0].kind).toBe("month");
+    expect(buckets[0].absoluteLabel).toBe("Juni 2026");
+  });
+
+  it("Auckland, Herbst-Wende 05.04.2026 (25 h): Wochen-Bucket derselben Woche endet auf der nächsten Mitternacht", () => {
+    const now = new Date("2026-04-20T00:00:00Z"); // Mo 20.04. 12:00 NZ
+    // Ereignis Mo 06.04. 00:30 NZST = 05.04. 12:30 UTC, gleicher Monat → Wochen-Bucket ab Mo 06.04.
+    const buckets = groupEventsIntoBuckets([ev("2026-04-05T12:30:00Z")], now, "de-CH", "active", "Pacific/Auckland");
+    expect(buckets[0].kind).toBe("week");
+    expect(buckets[0].absoluteLabel).toBe("06.04.");
+    expect(buckets[0].rangeEnd.toISOString()).toBe("2026-04-12T12:00:00.000Z"); // Mo 13.04. 00:00 NZST
+  });
+});
