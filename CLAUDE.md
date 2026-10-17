@@ -328,6 +328,19 @@ TELEGRAM_WEBHOOK_SECRET=<random>   # optional, aber Pflicht sobald der Webhook l
 # vom Betreiber, steht NICHT im Repo. Ohne ihn keine Kopplung, keine Route `/api/box/ble`, kein
 # Einstellungs-Eintrag.
 BLE_BRIDGE_KEY=<hex>               # optional
+# MCP-Bildauslieferung (`get_image`): Bindung an den Sub. `MCP_IMAGE_KEY` muss die `User.id` des
+# `MCP_USERNAME` sein; fehlt er, passt er nicht oder ist die DB nicht erreichbar, liefert der MCP keine
+# Fotos aus (fail-closed, der Grund steht als Logzeile). Die id ist eine Bindung, kein Geheimnis.
+MCP_IMAGE_KEY=<user-id>            # optional
+MCP_IMAGE_MAX_PX=1400              # optional: Kantenlänge, auf die ein Foto für den MCP verkleinert wird (Vorgabe 1400, Minimum 256)
+# Bildverkleinerung und Referenzbilder der Vision-Anfragen (kürzer = schneller und billiger, mehr = genauer).
+VISION_MAX_IMAGE_PX=1024           # optional: Kantenlänge für Code-/Siegel-Prüfung (Vorgabe 1024, Minimum 256)
+VISION_DEVICE_MAX_IMAGE_PX=768     # optional: Kantenlänge für die Geräte-Erkennung (Vorgabe 768, Minimum 256)
+VISION_MAX_REFS_PER_DEVICE=2       # optional: Referenzbilder je Gerät im Prompt (Vorgabe 2, Minimum 1)
+VISION_MAX_TOTAL_REFS=6            # optional: Obergrenze über alle Geräte (Vorgabe 6, Minimum 1; wird überzogen, wenn es mehr Geräte gibt, weil jedes sein Grundbild braucht)
+# Schwelle der lokalen Schärfeprüfung des Bildersafe-Fotos (Laplace-Varianz, ohne KI). Darunter gilt das Foto
+# als unleserlich; im Zweifel (Datei fehlt, Fehler) wird nie blockiert.
+BILDERSAFE_SHARPNESS_MIN=20        # optional (Vorgabe 20)
 ```
 
 

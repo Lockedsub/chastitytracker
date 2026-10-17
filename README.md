@@ -223,6 +223,15 @@ WEBAUTHN_RP_ORIGIN=https://yourdomain.com
 ENABLE_MCP=true                    # master switch; without it the /api/[transport] endpoint returns 404
 MCP_USERNAME=<username>            # the single user whose data the MCP server exposes
 MCP_TOKEN=<static-bearer-token>    # optional static bearer token (alternative to the OAuth 2.0 flow)
+MCP_IMAGE_KEY=<user-id>            # optional: must equal the User.id of MCP_USERNAME, otherwise the MCP serves no photos (fail-closed)
+MCP_IMAGE_MAX_PX=1400              # optional: longest edge photos are downscaled to for the MCP (default 1400, min 256)
+
+# Vision tuning (optional; fewer/smaller images = faster, more/larger = more accurate)
+VISION_MAX_IMAGE_PX=1024           # longest edge for code/seal checks (default 1024, min 256)
+VISION_DEVICE_MAX_IMAGE_PX=768     # longest edge for device detection (default 768, min 256)
+VISION_MAX_REFS_PER_DEVICE=2       # reference photos per device in the prompt (default 2, min 1)
+VISION_MAX_TOTAL_REFS=6            # cap across all devices (default 6, min 1; exceeded if there are more devices, each needs its base photo)
+BILDERSAFE_SHARPNESS_MIN=20        # local sharpness threshold (Laplacian variance) for the key-box code photo (default 20)
 
 # Feature flags
 ENABLE_DEVICE_CATEGORIES=false     # multi-category wear tracking (default on; false = KG only)
