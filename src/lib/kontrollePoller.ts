@@ -378,9 +378,15 @@ async function processDueVerschlussAnforderungen(now: Date): Promise<void> {
  * `checkOrgasmWindowEnd` gegen `wirksamAb` gar nicht erst anlegen; hier fängt es den Fall ab, dass
  * der Poller lange stand (Container-Neustart) und das Fenster inzwischen verstrichen ist.
  *
- * Fehler → `benachrichtigtAt` bleibt null (Retry nächster Tick).
+ * Die Zeile wird ZUERST mit Zustandsbedingung beansprucht (`updateMany` auf `withdrawnAt: null,
+ * benachrichtigtAt: null`, wie `dispatchDueTasks`) und nur bei `count: 1` zugestellt: zieht die
+ * Keyholderin sie zwischen Auswahl und Versand zurück, geht keine Mail raus, und der Stempel weckt
+ * sie nicht wieder auf.
+ *
+ * Fehler beim Versand → der Anspruch wird zurückgenommen, `benachrichtigtAt` bleibt null (Retry
+ * nächster Tick).
  */
-async function processDueOrgasmusAnforderungen(now: Date): Promise<void> {
+export async function processDueOrgasmusAnforderungen(now: Date): Promise<void> {
   const due = await prisma.orgasmusAnforderung.findMany({
     where: { ...dueForDispatchWhere(now), fulfilledAt: null },
     include: { user: { select: { email: true, username: true, orgasmusArtenConfig: true, locale: true } } },
@@ -390,7 +396,7 @@ async function processDueOrgasmusAnforderungen(now: Date): Promise<void> {
   for (const oa of due) {
     try {
       if (checkOrgasmWindowEnd(oa.endsAt, now)) {
-        await prisma.orgasmusAnforderung.update({ where: { id: oa.id }, data: { withdrawnAt: new Date() } });
+        await prisma.orgasmusAnforderung.updateMany({ where: { id: oa.id, withdrawnAt: null, benachrichtigtAt: null }, data: { withdrawnAt: new Date() } });
         continue;
       }
       // Das FENSTER wandert um die Verspätung mit — wie die ganze Geometrie einer Aufgabe
@@ -403,25 +409,37 @@ async function processDueOrgasmusAnforderungen(now: Date): Promise<void> {
       const lateMs = Math.max(0, sentAt.getTime() - (oa.wirksamAb?.getTime() ?? sentAt.getTime()));
       const beginsAtDate = new Date(oa.beginsAt.getTime() + lateMs);
       const endsAtDate = new Date(oa.endsAt.getTime() + lateMs);
-      await sendOrgasmusAnforderungNotifications({
-        userId: oa.userId,
-        user: oa.user,
-        art: oa.art as "ANWEISUNG" | "GELEGENHEIT",
-        message: oa.message,
-        beginsAtDate,
-        endsAtDate,
-        requiredType: oa.requiredType,
-        openingAllowed: oa.openingAllowed,
-        directiveId: oa.id,
-        // Wie bei Kontrolle und Verschluss: genannt wird, wer die Anweisung angeordnet hat, nicht der Bote.
-        actor: oa.createdBy,
-      });
-      // Verschobenes Fenster UND Stempel in EINEM Schreibvorgang: die Mail nennt bereits die neuen
-      // Zeiten, eine Zeile mit alten Werten wäre ab hier eine Lüge gegenüber dem Träger.
-      await prisma.orgasmusAnforderung.update({
-        where: { id: oa.id },
+      // Verschobenes Fenster UND Stempel in EINEM Schreibvorgang, VOR dem Versand: die Mail nennt
+      // bereits die neuen Zeiten, eine Zeile mit alten Werten wäre ab hier eine Lüge gegenüber dem
+      // Träger. Wer den Anspruch nicht bekommt (zurückgezogen, oder ein anderer Tick war schneller),
+      // benachrichtigt nicht.
+      const claim = await prisma.orgasmusAnforderung.updateMany({
+        where: { id: oa.id, withdrawnAt: null, benachrichtigtAt: null, fulfilledAt: null },
         data: { beginsAt: beginsAtDate, endsAt: endsAtDate, benachrichtigtAt: sentAt },
       });
+      if (claim.count === 0) continue;
+      try {
+        await sendOrgasmusAnforderungNotifications({
+          userId: oa.userId,
+          user: oa.user,
+          art: oa.art as "ANWEISUNG" | "GELEGENHEIT",
+          message: oa.message,
+          beginsAtDate,
+          endsAtDate,
+          requiredType: oa.requiredType,
+          openingAllowed: oa.openingAllowed,
+          directiveId: oa.id,
+          // Wie bei Kontrolle und Verschluss: genannt wird, wer die Anweisung angeordnet hat, nicht der Bote.
+          actor: oa.createdBy,
+        });
+      } catch (sendError) {
+        // Versand gescheitert: Anspruch zurücknehmen (alte Zeiten, kein Stempel), nächster Tick versucht es erneut.
+        await prisma.orgasmusAnforderung.updateMany({
+          where: { id: oa.id, withdrawnAt: null, benachrichtigtAt: sentAt },
+          data: { beginsAt: oa.beginsAt, endsAt: oa.endsAt, benachrichtigtAt: null },
+        });
+        throw sendError;
+      }
     } catch (e) {
       console.error(`[kontrollePoller] Orgasmus-Auslösung fehlgeschlagen (${oa.id}):`, (e as Error).message);
     }
