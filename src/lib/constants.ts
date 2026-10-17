@@ -875,6 +875,8 @@ export const parseRotation = (v: unknown): Rotation => ((VALID_ROTATIONS as read
 const ALLOWED_IMAGE_URL = /^\/api\/uploads\/[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
 export function isValidImageUrl(url: string | null | undefined): boolean {
   if (!url) return true; // null/undefined = no image, which is valid
+  // Nur Strings: `regex.test()` wandelt vorher um — `["/api/uploads/a.jpg"]` hiesse sonst gültig.
+  if (typeof url !== "string") return false;
   return ALLOWED_IMAGE_URL.test(url);
 }
 
@@ -886,7 +888,7 @@ export function isValidImageUrl(url: string | null | undefined): boolean {
  * log entries without a photo. User-route requires a photo for PRUEFUNG.
  */
 export function validateEntryPayload(
-  body: { type?: string; startTime?: string; imageUrl?: string; boxImageUrl?: string; oeffnenGrund?: string; orgasmusArt?: string; note?: string; keyInBox?: unknown },
+  body: { type?: string; startTime?: string; imageUrl?: string; boxImageUrl?: string; codeImageUrl?: string; oeffnenGrund?: string; orgasmusArt?: string; note?: string; keyInBox?: unknown },
   opts: { requirePhotoForPruefung?: boolean; allowFuture?: boolean } = {},
   // Per-User Reason-Validierung (aus reasonsService). Fehlt sie, gelten die eingebauten Konstanten
   // (Default-Verhalten für null-Config / Aufrufer ohne User-Kontext) — unverändert. `orgasmAllowed`
@@ -894,7 +896,7 @@ export function validateEntryPayload(
   reasonCtx?: { orgasmAllowed?: (value: string) => boolean; openingCodes?: Set<string> },
 ): EntryValidationCode | null {
   const { requirePhotoForPruefung = true, allowFuture = false } = opts;
-  const { type, startTime, imageUrl, boxImageUrl, oeffnenGrund, orgasmusArt, note, keyInBox } = body;
+  const { type, startTime, imageUrl, boxImageUrl, codeImageUrl, oeffnenGrund, orgasmusArt, note, keyInBox } = body;
 
   // Schlüssel-Deklaration: nur ein echter Boolean oder gar nichts. Ein Client, der `"false"` schickt,
   // darf weder als "ja" durchrutschen (String ist truthy) noch als String in der Spalte landen.
@@ -905,6 +907,8 @@ export function validateEntryPayload(
   // Box-Foto (Schlüssel im Sichtfenster): derselbe Pfad-Guard wie das Haupt-Foto. Es wird
   // server-seitig an die Vision gereicht — eine fremde URL wäre hier direkt ein SSRF-Hebel.
   if (!isValidImageUrl(boxImageUrl)) return "INVALID_IMAGE_URL";
+  // Code-Foto des Bildersafes (POST /api/entries): geht ebenfalls an die Vision und wird später gelöscht.
+  if (!isValidImageUrl(codeImageUrl)) return "INVALID_IMAGE_URL";
   if (!startTime) return "START_TIME_REQUIRED";
   if (!allowFuture && new Date(startTime) > new Date()) return "TIME_IN_FUTURE";
   if (!type || !VALID_TYPES.includes(type as (typeof VALID_TYPES)[number])) {
