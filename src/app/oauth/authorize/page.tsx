@@ -1,10 +1,12 @@
 import { redirect } from "next/navigation";
+import { getTranslations } from "next-intl/server";
 import { titleCls } from "@/app/components/inputStyles";
 import { auth } from "@/lib/auth";
 import { ShieldCheck } from "lucide-react";
 import Card from "@/app/components/Card";
 import Button from "@/app/components/Button";
 import { getClient, clientAllowsRedirect } from "@/lib/oauth";
+import { APP_NAME } from "@/lib/constants";
 
 interface Props {
   searchParams: Promise<{
@@ -20,19 +22,20 @@ interface Props {
 export default async function OAuthAuthorizePage({ searchParams }: Props) {
   const session = await auth();
   const params = await searchParams;
+  const t = await getTranslations("oauth");
 
   const { client_id, redirect_uri, scope, state, code_challenge, client_name } = params;
 
   // Missing params — show generic error
   if (!client_id || !redirect_uri || !code_challenge) {
-    return <OAuthError message="Ungültige Anfrage: fehlende Parameter." />;
+    return <OAuthError message={t("invalidRequest")} />;
   }
 
   // Validate client and redirect_uri server-side — never trust URL params alone.
   // This prevents open redirects and phishing via crafted client_name params.
   const client = await getClient(client_id);
   if (!client || !clientAllowsRedirect(client, redirect_uri)) {
-    return <OAuthError message="Ungültige Anfrage: unbekannter Client oder redirect_uri nicht registriert." />;
+    return <OAuthError message={t("invalidClient")} />;
   }
 
   // Not logged in → redirect to login, then back here
@@ -48,6 +51,15 @@ export default async function OAuthAuthorizePage({ searchParams }: Props) {
   // checkMcpKeyholder lässt Schreib-Tools nur für Admins zu. Der Consent muss das ehrlich zeigen.
   const isAdmin = (session?.user as { role?: string } | undefined)?.role === "admin";
 
+  // Wohin der Browser nach der Entscheidung geht — aus der REGISTRIERTEN redirect_uri (oben gegen den
+  // Client geprüft), nicht aus dem Namen, den der Client sich gibt. Wer hier einen fremden Host liest,
+  // soll „Erlauben" nicht klicken. Eigene Schemata (App-Rückruf) zeigen `schema://host`.
+  const target = new URL(redirect_uri);
+  const redirectHost = target.protocol === "https:" || target.protocol === "http:" ? target.host : `${target.protocol}//${target.host}`;
+  const denyUrl = new URL(redirect_uri);
+  denyUrl.searchParams.set("error", "access_denied");
+  if (state) denyUrl.searchParams.set("state", state);
+
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
@@ -58,39 +70,40 @@ export default async function OAuthAuthorizePage({ searchParams }: Props) {
             </div>
 
             <div className="text-center">
-              <h1 className={`${titleCls} mb-1`}>Zugriff erlauben?</h1>
+              <h1 className={`${titleCls} mb-1`}>{t("title")}</h1>
               <p className="text-sm text-foreground-muted">
-                <strong>{appName}</strong> möchte auf deinen ChastityTracker zugreifen.
+                {t.rich("intro", { client: appName, app: APP_NAME, strong: (chunks) => <strong>{chunks}</strong> })}
+              </p>
+              <p className="text-sm text-foreground-muted mt-2">
+                {t.rich("redirectTo", { host: redirectHost, code: (chunks) => <code className="font-mono font-medium text-foreground break-all">{chunks}</code> })}
               </p>
             </div>
 
-            <div className="w-full rounded-xl border border-border bg-surface-subtle p-4">
+            <div className="w-full rounded-xl border border-border bg-surface-raised p-4">
               <p className="text-xs font-medium text-foreground-muted uppercase tracking-wide mb-2">
-                Berechtigungen
+                {t("permissions")}
               </p>
               <ul className="space-y-1">
                 {scopeList.includes("read") && (
                   <li className="text-sm flex items-start gap-2">
                     <span className="text-lock mt-0.5">✓</span>
-                    <span>Lesezugriff auf Tracker-Daten (Einschlüsse, Statistiken, Strafbuch)</span>
+                    <span>{t("permRead")}</span>
                   </li>
                 )}
                 {isAdmin && (
                   <li className="text-sm flex items-start gap-2">
                     <span className="text-lock mt-0.5">✓</span>
-                    <span>Keyholder-Aktionen in deinem Namen (Sperren/Entsperren, Kontrollen, Trainingsziele, Reinigung, Notizen)</span>
+                    <span>{t("permKeyholder")}</span>
                   </li>
                 )}
               </ul>
               <p className="text-xs text-foreground-faint mt-3">
-                {isAdmin
-                  ? "Als Admin verbunden — die KI kann als Keyholderin handeln (Schreibzugriff)."
-                  : "Kein Schreibzugriff — keine Änderungen an deinen Daten möglich."}
+                {isAdmin ? t("noteAdmin") : t("noteReadOnly")}
               </p>
             </div>
 
             <p className="text-xs text-foreground-faint text-center">
-              Eingeloggt als <strong>{session?.user?.name}</strong>
+              {t.rich("loggedInAs", { name: session?.user?.name ?? "", strong: (chunks) => <strong>{chunks}</strong> })}
             </p>
 
             <form action="/api/oauth/authorize" method="POST" className="w-full flex flex-col gap-3">
@@ -101,14 +114,14 @@ export default async function OAuthAuthorizePage({ searchParams }: Props) {
               <input type="hidden" name="code_challenge" value={code_challenge} />
 
               <Button type="submit" variant="semantic" semantic="lock" fullWidth>
-                Erlauben
+                {t("allow")}
               </Button>
 
               <a
-                href={(() => { const u = new URL(redirect_uri); u.searchParams.set("error", "access_denied"); if (state) u.searchParams.set("state", state); return u.toString(); })()}
+                href={denyUrl.toString()}
                 className="text-sm text-center text-foreground-muted hover:text-foreground transition"
               >
-                Ablehnen
+                {t("deny")}
               </a>
             </form>
           </div>

@@ -2533,5 +2533,20 @@
       "Was möchtest du morgen anders machen?"
     ],
     "done": "Fertig"
+  },
+  "oauth": {
+    "invalidRequest": "Ungültige Anfrage: fehlende Parameter.",
+    "invalidClient": "Ungültige Anfrage: unbekannter Client oder redirect_uri nicht registriert.",
+    "title": "Zugriff erlauben?",
+    "intro": "<strong>{client}</strong> möchte auf deinen {app} zugreifen.",
+    "permissions": "Berechtigungen",
+    "permRead": "Lesezugriff auf Tracker-Daten (Einschlüsse, Statistiken, Strafbuch)",
+    "permKeyholder": "Keyholder-Aktionen in deinem Namen (Sperren/Entsperren, Kontrollen, Trainingsziele, Reinigung, Notizen)",
+    "noteAdmin": "Als Admin verbunden — die KI kann als Keyholderin handeln (Schreibzugriff).",
+    "noteReadOnly": "Kein Schreibzugriff — keine Änderungen an deinen Daten möglich.",
+    "redirectTo": "Nach deiner Entscheidung wirst du weitergeleitet an <code>{host}</code>",
+    "loggedInAs": "Eingeloggt als <strong>{name}</strong>",
+    "allow": "Erlauben",
+    "deny": "Ablehnen"
   }
 }
