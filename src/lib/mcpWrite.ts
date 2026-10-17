@@ -1429,11 +1429,13 @@ export async function mcpSetWeightRelease(username: string, args: SetWeightRelea
   // Der STAND vor dem Schreiben, für beide Zweige: der Dry-Run zeigt ihn, der Commit hängt ihn an
   // die Antwort. Eine KI, die gerade eine Schwelle gesetzt hat, soll im selben Zug sehen, wie weit
   // sie von ihr entfernt ist.
-  const status = await weightReleaseStatus(userId);
+  const [status, user] = await Promise.all([
+    weightReleaseStatus(userId),
+    args.dryRun ? prisma.user.findUnique({ where: { id: userId }, select: { weightTrackingEnabled: true, heightCm: true } }) : null,
+  ]);
 
   if (args.dryRun) {
     // Dieselbe Prüfung wie `setWeightRelease` — nicht abgeschrieben (Muster `checkOrgasmusAnforderung`).
-    const user = await prisma.user.findUnique({ where: { id: userId }, select: { weightTrackingEnabled: true, heightCm: true } });
     const checked = checkWeightRelease({
       userId, thresholdKg: args.thresholdKg, direction: args.direction, averageDays: args.averageDays,
       minMeasurements: args.minMeasurements, stepKg: args.stepKg, notBeforeAt: args.notBeforeAt, windowHours: args.windowHours,

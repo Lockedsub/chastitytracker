@@ -46,8 +46,6 @@ export type Vorgabe = {
   notiz: string | null;
 };
 
-const DAY_MS = 86_400_000;
-
 /**
  * ZAHLEN-Rechner für den Kalender: reine Datums-Arithmetik ohne jeden Ortsbezug. `m`/`d` dürfen
  * überlaufen, wie bei `Date.UTC` (Monat 12 = Januar des Folgejahres, Tag 0 = letzter Tag des
@@ -267,7 +265,7 @@ export function buildCalendarMonths(opts: {
       if (firstDayOfRow != null) {
         const dow = mondayIndexOfLocalDate(year, month, firstDayOfRow);
         const wkStart = midnightOfLocalDate(year, month, firstDayOfRow - dow, tz);
-        // Kalendertag-Arithmetik statt `+ 7 * DAY_MS`: in der Umstellungswoche hat die Woche 167
+        // Kalendertag-Arithmetik statt `+ 7 * 86_400_000`: in der Umstellungswoche hat die Woche 167
         // oder 169 Stunden, und die Millisekunden-Addition verfehlt die Mitternacht.
         const wkEnd = midnightOfLocalDate(year, month, firstDayOfRow - dow + 7, tz);
         weekGoal = goalIn("week", wkStart, wkEnd);
