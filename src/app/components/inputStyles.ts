@@ -338,8 +338,8 @@ export function filledActionCls(colorToken: keyof typeof filledActionBg): string
  * Die Kante links an etwas, das eine Frist gerissen hat.
  *
  * Sie stand wörtlich an drei Stellen (`OffenseCard`, beide Alarm-Banner) — dieselbe Geste an
- * derselben Farbe, dreimal abgeschrieben. Zwei Pixel und nicht vier: die vierte Breite gehört
- * `PairRow`, wo sie eine KARTE markiert und nicht eine Zeile.
+ * derselben Farbe, dreimal abgeschrieben. Zwei Pixel und nicht vier: vier Pixel markieren eine KARTE,
+ * keine Zeile.
  */
 export const warnEdgeCls = "border-l-2 border-warn pl-3";
 

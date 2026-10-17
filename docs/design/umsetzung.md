@@ -292,7 +292,7 @@ ist ein scharfeckiger Farbklotz.
   erledigt — die beiden letzten nehmen `Section`.)
 - **Weitere Kasten-Nachbauten auf Block-Ebene**, erhoben nach der Umstellung und noch offen:
   `dashboard/TaskList.tsx`, `admin/users/[id]/strafbuch/StrafbuchClient.tsx` (drei Hüllen),
-  `admin/CreateDemoUserButton.tsx`, `admin/tasks/TaskProofPicker.tsx` und
+  `admin/tasks/TaskProofPicker.tsx` und
   `TaskRequirementPicker.tsx` (zwei weitere Checklisten-Ringe), `dashboard/changelog/UpstreamSection.tsx`.
 - **Stapel, die noch nicht auf `blockStackCls` stehen:** `dashboard/settings/SettingsForm.tsx`,
   `dashboard/categories/CategoriesClient.tsx`, `admin/page.tsx`, `admin/kontrollen/page.tsx` samt

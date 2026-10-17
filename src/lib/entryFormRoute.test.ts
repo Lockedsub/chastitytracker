@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { expectImportFree } from "@/test/importFree";
 import { isEntryFormRoute, inspectionHref, taskFormHref, openInspections, pendingInspection, type PendingInspectionLike } from "./entryFormRoute";
 
-// Client-Komponenten (`BottomNav`, `MoreMenu`, `NewEntrySheet`) UND server-only Code
+// Client-Komponenten (`BottomNav`, `NewEntrySheet`) UND server-only Code
 // (`kontrolleService` → Mail/Push) importieren dieses Modul — Begründung in `expectImportFree`.
 describe("entryFormRoute.ts bleibt importfrei", () => {
   it("enthält keine import-/require-Anweisung", () => {

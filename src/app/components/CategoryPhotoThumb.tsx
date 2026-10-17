@@ -44,7 +44,7 @@ export function CategoryIconTile({
  * gleich. Bewusst NICHT über `ImageViewer`: dessen Vollbild-Plakette ist für grosse Bilder gemacht
  * und würde ein 32-px-Thumbnail zur Hälfte verdecken.
  *
- * Der Ladefehler-Zustand liegt hier, je Instanz, als schlichtes Boolean — wie in `PairRow` und
+ * Der Ladefehler-Zustand liegt hier, je Instanz, als schlichtes Boolean — wie in
  * `SessionEventRow`. Die aufrufenden Listen brauchten dafür vorher je ein Set von ids; das war eine
  * eigene Zustandsform für ein Problem, das jede Kachel für sich hat.
  */

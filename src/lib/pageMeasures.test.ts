@@ -58,7 +58,6 @@ describe("Seiten-Masse kommen aus einer Quelle", () => {
    */
   const COLUMN_ALLOWED = new Set([
     // Öffentliche Seiten stehen bewusst ausserhalb der App-Spalte.
-    "src/app/Footer.tsx",
     "src/app/info/[lang]/page.tsx",
     // Die Bauteil-Schau zeigt Bauteile nebeneinander; sie ist keine Seite der App.
     "src/app/admin/dev/components/page.tsx",
