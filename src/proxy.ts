@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { ownTrackerHidden } from "@/lib/ownTracker";
 import { touchAppMeta } from "@/lib/appMeta";
 import { logTimestamp } from "@/lib/logFormat";
+import { isPublicPath } from "@/lib/publicRoutes";
 
 // ── Rate limiter für Login-Endpunkt ──────────────────────────────────────────
 const loginBucket = new Map<string, { count: number; resetAt: number }>();
@@ -54,14 +55,8 @@ export default auth(async (req) => {
   const isLoggedIn = !!req.auth && !!user?.id;
   const role = user?.role;
 
-  // /api/mcp authenticates itself via bearer token (withMcpAuth) — exempt from the NextAuth session gate.
-  // OAuth endpoints are public: clients call them directly; the consent page redirects to /login itself.
-  // /api/mcp, /api/sse, /api/message: mcp-handler transport paths — all authenticated via withMcpAuth (bearer token), not session.
-  const isAuthRoute = pathname.startsWith("/api/auth") || pathname === "/login" || pathname === "/api/version" || pathname === "/api/heartbeat" || pathname === "/api/upstream-changelog" || pathname === "/api/portal-login"
-    || pathname === "/api/mcp" || pathname === "/api/sse" || pathname === "/api/message"
-    || pathname.startsWith("/api/integration/") // Heimdall-Box: Shared-Secret (requireBoxSync), keine Session
-    || pathname === "/api/telegram/webhook" // Telegram ruft an; über `secret_token`-Header gesichert, keine Session
-    || pathname.startsWith("/api/oauth/") || pathname.startsWith("/.well-known/") || pathname.startsWith("/oauth/");
+  // Die Ausnahmen vom Session-Gate (mit Grund und Art des eigenen Schutzes) stehen in lib/publicRoutes.ts.
+  const isAuthRoute = isPublicPath(pathname);
   const isAdminRoute = pathname.startsWith("/admin") || pathname.startsWith("/api/admin");
   const isProtected =
     pathname.startsWith("/dashboard") ||
