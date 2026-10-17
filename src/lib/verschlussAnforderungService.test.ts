@@ -24,7 +24,11 @@ vi.mock("@/lib/prisma", () => ({
     $transaction: vi.fn(async (fn: (t: typeof tx) => unknown) => fn(tx)),
   },
 }));
-vi.mock("@/lib/notify", () => ({ notifyUser: vi.fn() }));
+vi.mock("@/lib/notify", async (importOriginal) => ({
+  // Der Versand-Rumpf (`deliverToChannels`) läuft ECHT: geprüft wird, was an die Kanal-Blätter geht.
+  ...(await importOriginal<typeof import("@/lib/notify")>()),
+  notifyUser: vi.fn(),
+}));
 vi.mock("@/lib/heimdallNotify", () => ({ notifyHeimdallForUserId: vi.fn() }));
 vi.mock("@/lib/queries", async (importOriginal) => {
   // isScheduledDirective ist reine Zeit-Arithmetik ohne DB — sie kommt echt aus dem Modul, damit der
@@ -36,7 +40,7 @@ vi.mock("@/lib/mail", () => ({
   sendMailSafe: vi.fn(), escHtml: (s: string) => s, noticeBoxHtml: () => "", optionalNoticeBoxHtml: () => "", dashboardEmailHtml: () => "",
 }));
 vi.mock("@/lib/emailI18n", () => ({ emailT: async () => (k: string) => k, emailGreeting: () => "" }));
-vi.mock("@/lib/push", () => ({ firePush: vi.fn() }));
+vi.mock("@/lib/push", () => ({ sendPushToUser: vi.fn() }));
 
 import {
   createVerschlussAnforderung, withdrawVerschlussAnforderung, withdrawVerschlussAnforderungById,
@@ -49,7 +53,7 @@ import { prisma } from "@/lib/prisma";
 import { notifyUser } from "@/lib/notify";
 import { notifyHeimdallForUserId } from "@/lib/heimdallNotify";
 import { getIsLocked } from "@/lib/queries";
-import { firePush } from "@/lib/push";
+import { sendPushToUser } from "@/lib/push";
 import { sendMailSafe } from "@/lib/mail";
 
 const findUniqueMock = prisma.verschlussAnforderung.findUnique as unknown as ReturnType<typeof vi.fn>;
@@ -567,7 +571,7 @@ describe("updateLockRequest", () => {
     expect(res.data.notified).toBe(true);
     // Nicht die „geändert"-Notiz, sondern die volle Anforderungs-Zustellung (Mail + Push).
     expect(notifyMock).not.toHaveBeenCalled();
-    expect(firePush).toHaveBeenCalledTimes(1);
+    expect(sendPushToUser).toHaveBeenCalledTimes(1);
     expect(updateMock.mock.calls[0][0].data.benachrichtigtAt).toEqual(JETZT);
   });
 
@@ -583,7 +587,7 @@ describe("updateLockRequest", () => {
     expect(res.data.notified).toBe(false);
     expect(res.data.deliveredToPoller).toBe(true);
     expect(notifyMock).not.toHaveBeenCalled();
-    expect(firePush).not.toHaveBeenCalled();
+    expect(sendPushToUser).not.toHaveBeenCalled();
     // benachrichtigtAt bleibt null → der Poller findet die Zeile weiterhin fällig.
     expect(updateMock.mock.calls[0][0].data.benachrichtigtAt).toBeUndefined();
   });
@@ -598,7 +602,7 @@ describe("updateLockRequest", () => {
     if (res.ok) throw new Error("erwartet: Fehler");
     expect(res.error).toBe("USER_ALREADY_LOCKED");
     expect(updateMock).not.toHaveBeenCalled();
-    expect(firePush).not.toHaveBeenCalled();
+    expect(sendPushToUser).not.toHaveBeenCalled();
   });
 
   it("Mindestdauer und absolutes Sperr-Ende verdrängen einander, statt still zu koexistieren", async () => {

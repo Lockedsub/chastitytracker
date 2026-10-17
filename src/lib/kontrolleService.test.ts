@@ -6,17 +6,24 @@ vi.mock("@/lib/prisma", () => ({
   prisma: {
     kontrollAnforderung: { findFirst: vi.fn() },
     entry: { findUnique: vi.fn(), update: vi.fn() },
+    user: { findUnique: vi.fn() },
   },
 }));
-vi.mock("@/lib/notify", () => ({ notifyUser: vi.fn() }));
+vi.mock("@/lib/telegram", () => ({ sendTelegram: vi.fn(), telegramChatReachable: vi.fn() }));
+vi.mock("@/lib/notify", async (importOriginal) => ({
+  // Der Versand-Rumpf (`deliverToChannels`) läuft ECHT: geprüft wird, was an die Kanal-Blätter geht.
+  ...(await importOriginal<typeof import("@/lib/notify")>()),
+  notifyUser: vi.fn(),
+}));
 vi.mock("@/lib/appMeta", () => ({ markLastAction: vi.fn(), touchAppMeta: vi.fn() }));
-vi.mock("@/lib/push", () => ({ firePush: vi.fn(), hasPushTarget: vi.fn() }));
+vi.mock("@/lib/push", () => ({ sendPushToUser: vi.fn(), hasPushTarget: vi.fn() }));
 
 import { hasActiveKontrolle, inspectionIntro, buildInspectionPush, buildInspectionCodePush, resolveInspectionEntry, resendOwnInspectionCode } from "./kontrolleService";
 import { emailT } from "@/lib/emailI18n";
 import { prisma } from "@/lib/prisma";
 import { notifyUser } from "@/lib/notify";
-import { firePush, hasPushTarget } from "@/lib/push";
+import { sendPushToUser, hasPushTarget } from "@/lib/push";
+import { sendTelegram } from "@/lib/telegram";
 
 /** Die Zone, in der die Erwartungswerte dieser Datei ausgedrückt sind. Als Konstante, damit der
  *  eine Test, der bewusst eine ANDERE Zone prüft, im Fliesstext sofort auffällt. */
@@ -26,8 +33,16 @@ const findFirstMock = prisma.kontrollAnforderung.findFirst as unknown as ReturnT
 const entryFindMock = prisma.entry.findUnique as unknown as ReturnType<typeof vi.fn>;
 const entryUpdateMock = prisma.entry.update as unknown as ReturnType<typeof vi.fn>;
 const notifyMock = notifyUser as unknown as ReturnType<typeof vi.fn>;
-const firePushMock = firePush as unknown as ReturnType<typeof vi.fn>;
+const pushMock = sendPushToUser as unknown as ReturnType<typeof vi.fn>;
 const pushTargetMock = hasPushTarget as unknown as ReturnType<typeof vi.fn>;
+const userFindMock = prisma.user.findUnique as unknown as ReturnType<typeof vi.fn>;
+const telegramMock = sendTelegram as unknown as ReturnType<typeof vi.fn>;
+
+/** Die Zeile des Empfängers, wie `NOTIFY_RECIPIENT_SELECT` sie lädt. */
+const RECIPIENT = {
+  id: "u1", username: "sub", email: "sub@example.org", locale: "de", telegramChatId: "chat-1",
+  notifyMail: "all", notifyPush: "all", notifyTelegram: "all",
+};
 
 beforeEach(() => {
   findFirstMock.mockReset();
@@ -253,6 +268,7 @@ describe("resendOwnInspectionCode — der selbst gewählte Code", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     pushTargetMock.mockResolvedValue(true);
+    userFindMock.mockResolvedValue(RECIPIENT);
   });
 
   /** Ohne Ziel-Untertitel: eine Selbstkontrolle steht für sich. Im Text steht nur die Uhrzeit — sie
@@ -260,7 +276,7 @@ describe("resendOwnInspectionCode — der selbst gewählte Code", () => {
   it("schickt Code und Uhrzeit als Meldung an den Absender selbst", async () => {
     const res = await resendOwnInspectionCode("u1", "70499", TZ);
     expect(res.ok).toBe(true);
-    expect(firePushMock).toHaveBeenCalledWith("u1", "70499", expect.stringMatching(/^\d{2}:\d{2}$/), expect.any(String));
+    expect(pushMock).toHaveBeenCalledWith("u1", "70499", expect.stringMatching(/^\d{2}:\d{2}$/), expect.any(String), undefined);
   });
 
   /**
@@ -273,12 +289,32 @@ describe("resendOwnInspectionCode — der selbst gewählte Code", () => {
    */
   it("der Link trägt das Ziel der Trage-Kontrolle", async () => {
     await resendOwnInspectionCode("u1", "70499", TZ, "cat-plug");
-    expect(firePushMock.mock.calls[0][3]).toContain("cat=cat-plug");
+    expect(pushMock.mock.calls[0][3]).toContain("cat=cat-plug");
   });
 
   it("ohne Ziel bleibt es beim KG — kein Parameter", async () => {
     await resendOwnInspectionCode("u1", "70499", TZ);
-    expect(firePushMock.mock.calls[0][3]).not.toContain("cat=");
+    expect(pushMock.mock.calls[0][3]).not.toContain("cat=");
+  });
+
+  /** Die Push ist der Zweck des Knopfes; Telegram folgt seiner Stufe wie jede Meldung. */
+  it("Telegram bekommt denselben Text, wenn die Stufe es zulässt", async () => {
+    await resendOwnInspectionCode("u1", "70499", TZ);
+    const [, title, body] = pushMock.mock.calls[0];
+    expect(telegramMock).toHaveBeenCalledWith("chat-1", `${title}\n\n${body}`);
+  });
+
+  it("Telegram aus: die Push geht trotzdem, Telegram bleibt stumm", async () => {
+    userFindMock.mockResolvedValue({ ...RECIPIENT, notifyTelegram: "off" });
+    await resendOwnInspectionCode("u1", "70499", TZ);
+    expect(pushMock).toHaveBeenCalledOnce();
+    expect(telegramMock).not.toHaveBeenCalled();
+  });
+
+  it("ohne verknüpften Chat entfällt Telegram", async () => {
+    userFindMock.mockResolvedValue({ ...RECIPIENT, telegramChatId: null });
+    await resendOwnInspectionCode("u1", "70499", TZ);
+    expect(telegramMock).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -290,7 +326,7 @@ describe("resendOwnInspectionCode — der selbst gewählte Code", () => {
   ])("weist einen unbrauchbaren Code ab (%s)", async (_name, code) => {
     const res = await resendOwnInspectionCode("u1", code, TZ);
     expect(res).toMatchObject({ ok: false, status: 400, error: "INSPECTION_CODE_INVALID" });
-    expect(firePushMock).not.toHaveBeenCalled();
+    expect(pushMock).not.toHaveBeenCalled();
   });
 
   /** Ohne angemeldetes Gerät ginge die Meldung ins Leere, und der Knopf meldete trotzdem Erfolg —
@@ -299,7 +335,7 @@ describe("resendOwnInspectionCode — der selbst gewählte Code", () => {
     pushTargetMock.mockResolvedValue(false);
     const res = await resendOwnInspectionCode("u1", "70499", TZ);
     expect(res).toMatchObject({ ok: false, error: "PUSH_NOT_ENABLED" });
-    expect(firePushMock).not.toHaveBeenCalled();
+    expect(pushMock).not.toHaveBeenCalled();
   });
 });
 

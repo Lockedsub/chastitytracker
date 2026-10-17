@@ -1,14 +1,12 @@
 import { prisma } from "@/lib/prisma";
 import { LOCK_ENDED_REASON, APP_NAME } from "@/lib/constants";
-import { sendMailSafe, escHtml, optionalNoticeBoxHtml, dashboardEmailHtml } from "@/lib/mail";
-import { notifyUser, type NotifyContent, type NotifyInbox } from "@/lib/notify";
+import { escHtml, optionalNoticeBoxHtml, dashboardEmailHtml } from "@/lib/mail";
+import { notifyUser, deliverToChannels, NOTIFY_RECIPIENT_SELECT, type NotifyContent, type NotifyInbox, type NotifyRecipient } from "@/lib/notify";
 import { actorColumn, recordInboxDelivery, type MessageActor } from "@/lib/messageService";
 import { notifyHeimdallForUserId } from "@/lib/heimdallNotify";
 import { emailT, emailGreeting } from "@/lib/emailI18n";
 import { validateDeviceOwnership, getIsLocked, isScheduledDirective } from "@/lib/queries";
 import { formatDateTime, formatDurationHours } from "@/lib/utils";
-import { firePush } from "@/lib/push";
-import { fireTelegram } from "@/lib/telegram";
 import { parseTriggerAt, computeDelayedTrigger, isHiddenFromSub } from "@/lib/delayedTrigger";
 import { serviceErrors, mapServiceError, serviceFail, type ServiceResult } from "@/lib/serviceResult";
 import { isHealthHoldActive } from "@/lib/healthHold";
@@ -273,7 +271,7 @@ export async function createVerschlussAnforderung(
 
   // Sofort benachrichtigen; bei geplanter Auslösung übernimmt der Poller bei Fälligkeit.
   if (!wirksamAb) {
-    await sendVerschlussAnforderungNotifications({ userId, user, art, message, endsAtDate, lockSpec: anforderung, requestId: anforderung.id, actor });
+    await sendVerschlussAnforderungNotifications({ user, art, message, endsAtDate, lockSpec: anforderung, requestId: anforderung.id, actor });
   }
 
   // Instant-Push: Heimdall re-pullt die Config (neue/geänderte Sperre) für eine LIVE Box sofort.
@@ -281,12 +279,12 @@ export async function createVerschlussAnforderung(
   return { ok: true, data: { id: anforderung.id, scheduledFor: wirksamAb?.toISOString() ?? null } };
 }
 
-/** Wraps email body HTML in the standard frame + "Zum Dashboard →" button. */
-/** Sends the e-mail (ANFORDERUNG/SPERRZEIT) + push to the user. Fire-and-forget for push.
+/** Sends the directive to the user on every channel their levels allow (`deliverToChannels`).
  *  Reused by the immediate path in createVerschlussAnforderung and by the delayed-trigger poller. */
 export async function sendVerschlussAnforderungNotifications(opts: {
-  userId: string;
-  user: { email: string | null; username: string; locale: string };
+  /** Die GELADENE Zeile des Empfängers: sie geht an `recordInboxDelivery` und `deliverToChannels`
+   *  weiter, damit nichts sie ein zweites und drittes Mal nachschlägt. */
+  user: NotifyRecipient;
   art: "ANFORDERUNG" | "SPERRZEIT";
   message?: string | null;
   endsAtDate: Date | null;
@@ -308,7 +306,7 @@ export async function sendVerschlussAnforderungNotifications(opts: {
    */
   actor: MessageActor;
 }) {
-  const { userId, user, art, message, endsAtDate, lockSpec, requestId, actor } = opts;
+  const { user, art, message, endsAtDate, lockSpec, requestId, actor } = opts;
 
   // Die Anforderungs-Nachricht des Keyholders wird NICHT mitkopiert: der Posteingang zeigt auf die
   // Direktive und liest sie beim Anzeigen frisch von dort. Eine spätere Korrektur über
@@ -316,12 +314,12 @@ export async function sendVerschlussAnforderungNotifications(opts: {
   // Wie bei der Kontrolle: Mail/Push/Telegram folgen dem Kanal-Schalter des Empfängers, die
   // Posteingangs-Zeile entsteht immer.
   const { badge, channels } = await recordInboxDelivery({
-    subjectUserId: userId,
+    subjectUserId: user.id,
     bodyKey: art === "SPERRZEIT" ? "lockPeriodSetBody" : "lockRequestBody",
     actor,
     ref: { type: "lockRequest", id: requestId },
     once: true,
-  });
+  }, user);
   const t = await emailT(user.locale);
   const messageHtml = optionalNoticeBoxHtml(t("lockNoticeLabel"), message);
   const greeting = emailGreeting(t, user.username);
@@ -330,20 +328,18 @@ export async function sendVerschlussAnforderungNotifications(opts: {
   const lockEndHtml = (end: Date | null) => end
     ? `<p><strong>${t("lockedUntilLabel")}</strong> ${formatDateTime(end)}</p>`
     : `<p><strong>${t("lockDurationLabel")}</strong> ${t("lockIndefinite")}</p>`;
-  if (art === "SPERRZEIT" && user.email && channels.mail) {
-    const bisHtml = lockEndHtml(endsAtDate);
-    await sendMailSafe(
-      user.email,
-      `${APP_NAME} – ${t("lockPeriodSetSubject")}`,
-      dashboardEmailHtml(t("lockPeriodSetSubject"),
-        `${greeting}
+  /** Die Mail dieser Art — gebaut wird sie von `deliverToChannels` erst, wenn sie hinausgeht. */
+  const buildMail = () => {
+    if (art === "SPERRZEIT") {
+      return {
+        subject: t("lockPeriodSetSubject"),
+        html: dashboardEmailHtml(t("lockPeriodSetSubject"),
+          `${greeting}
         <p>${escHtml(t("lockPeriodSetBody"))}</p>
         ${messageHtml}
-        ${bisHtml}`, t("dashboardButton")),
-    );
-  }
-
-  if (art === "ANFORDERUNG" && user.email && channels.mail) {
+        ${lockEndHtml(endsAtDate)}`, t("dashboardButton")),
+      };
+    }
     const deadlineHtml = endsAtDate
       ? `<p><strong>${t("lockUntilLabel")}</strong> ${formatDateTime(endsAtDate)}</p>`
       : "";
@@ -351,20 +347,18 @@ export async function sendVerschlussAnforderungNotifications(opts: {
       ? `<p><strong>${t("lockMinWearLabel")}</strong> ${escHtml(formatDurationHours(lockSpec.minDurationHours, user.locale))}</p>`
       : "";
     const sperrBisHtml = lockSpec?.lockEndsAt || lockSpec?.lockIndefinite ? lockEndHtml(lockSpec.lockEndsAt) : "";
-    await sendMailSafe(
-      user.email,
-      `${APP_NAME} – ${t("lockRequestSubject")}`,
-      dashboardEmailHtml(t("lockRequestSubject"),
+    return {
+      subject: t("lockRequestSubject"),
+      html: dashboardEmailHtml(t("lockRequestSubject"),
         `${greeting}
         <p>${escHtml(t("lockRequestBody"))}</p>
         ${messageHtml}
         ${deadlineHtml}
         ${minDurationHtml}
         ${sperrBisHtml}`, t("dashboardButton")),
-    );
-  }
+    };
+  };
 
-  // Push (fire-and-forget)
   const pushTitle = art === "ANFORDERUNG" ? t("lockPushRequestTitle") : t("lockPushPeriodTitle");
   const pushParts: string[] = [];
   if (art === "ANFORDERUNG") {
@@ -377,8 +371,7 @@ export async function sendVerschlussAnforderungNotifications(opts: {
   }
   if (message?.trim()) pushParts.push(message.trim());
   const pushBody = pushParts.join(" · ");
-  if (channels.push) firePush(userId, pushTitle, pushBody, "/dashboard", badge);
-  if (channels.telegram) fireTelegram(userId, pushTitle, pushBody);
+  await deliverToChannels(user, channels, { mail: buildMail, title: pushTitle, body: pushBody, url: "/dashboard", badge });
 }
 
 /**
@@ -514,7 +507,7 @@ export async function updateLockRequest(
 ): Promise<ServiceResult<{ id: string; userId: string; notified: boolean; deliveredToPoller: boolean }>> {
   const va = await prisma.verschlussAnforderung.findUnique({
     where: { id },
-    include: { user: { select: { id: true, email: true, username: true, locale: true } } },
+    include: { user: { select: NOTIFY_RECIPIENT_SELECT } },
   });
   if (!va || va.art !== "ANFORDERUNG") return serviceFail(404, "LOCK_REQUEST_NOT_FOUND");
   if (va.fulfilledAt || va.withdrawnAt) return serviceFail(400, "LOCK_REQUEST_NOT_EDITABLE");
@@ -553,7 +546,7 @@ export async function updateLockRequest(
 
   if (deliverNow) {
     await sendVerschlussAnforderungNotifications({
-      userId: va.userId, user: va.user, art: "ANFORDERUNG",
+      user: va.user, art: "ANFORDERUNG",
       message: next.message, endsAtDate: next.endsAt, lockSpec: next,
       requestId: va.id,
       // Die Anforderung selbst nennt ihren ANORDNENDEN, nicht den, der sie vorgezogen hat — genau

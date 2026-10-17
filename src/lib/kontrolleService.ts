@@ -1,15 +1,14 @@
 import { prisma } from "@/lib/prisma";
 import { generateKontrollCode, APP_TZ } from "@/lib/utils";
-import { sendMailSafe, escHtml, appBaseUrl, optionalNoticeBoxHtml, dashboardEmailHtml } from "@/lib/mail";
+import { escHtml, appBaseUrl, optionalNoticeBoxHtml, dashboardEmailHtml } from "@/lib/mail";
 import { formatDateTime, formatDate, formatTime } from "@/lib/utils";
-import { firePush, hasPushTarget } from "@/lib/push";
-import { fireTelegram } from "@/lib/telegram";
+import { hasPushTarget } from "@/lib/push";
 import { markLastAction } from "@/lib/appMeta";
-import { notifyUser, type NotifyContent } from "@/lib/notify";
+import { notifyUser, deliverToChannels, NOTIFY_RECIPIENT_SELECT, type NotifyContent, type NotifyRecipient } from "@/lib/notify";
 import { actorColumn, recordInboxDelivery, type MessageActor, type MessageRef } from "@/lib/messageService";
-import { deliveryChannelsForUser } from "@/lib/deliveryChannels";
+import { deliveryChannels } from "@/lib/deliveryChannels";
 import { emailT, emailGreeting, type EmailTranslator } from "@/lib/emailI18n";
-import { toLocale, inspectionHelpUrl, EMAIL_BUTTON_COLORS, INSPECTION_DEADLINE_DEFAULT_H, isValidInspectionCode, APP_NAME } from "@/lib/constants";
+import { toLocale, inspectionHelpUrl, EMAIL_BUTTON_COLORS, INSPECTION_DEADLINE_DEFAULT_H, isValidInspectionCode } from "@/lib/constants";
 import { computeDelayedTrigger, isHiddenFromSub } from "@/lib/delayedTrigger";
 import { serviceErrors, mapServiceError, serviceFail, type ServiceResult } from "@/lib/serviceResult";
 import { isHealthHoldActive } from "@/lib/healthHold";
@@ -509,11 +508,10 @@ export function inspectionIntro(t: EmailTranslator, msLeft: number): string {
   return t("inspectionRequestedIntroHoursMinutes", { hours, minutes });
 }
 
-/** Der Mail-Körper der Kontroll-Anforderung. Eigene Funktion, weil sie der einzige Teil ist, der
- *  eine Adresse braucht — so bleibt der Versand-Ablauf daneben auf einer Ebene lesbar (Posteingang →
- *  Mail, falls Adresse → Push) statt vierzig eingerückte Zeilen dazwischen zu haben. */
-async function sendInspectionMail(o: {
-  to: string;
+/** Betreff und Körper der Kontroll-Anforderungs-Mail. Eigene Funktion, weil sie der längste Teil des
+ *  Versands ist — so bleibt der Ablauf daneben auf einer Ebene lesbar (Posteingang → Kanäle) statt
+ *  vierzig eingerückte Zeilen dazwischen zu haben. Gebaut wird sie erst, wenn die Mail hinausgeht. */
+function buildInspectionMail(o: {
   t: EmailTranslator;
   locale: string;
   username: string;
@@ -525,8 +523,8 @@ async function sendInspectionMail(o: {
   deadlineStr: string;
   formPath: string;
   targetLabel: string | null;
-}): Promise<void> {
-  const { to, t, locale, username, code, sealCode, sealRequired, kommentar, deadline, deadlineStr, formPath, targetLabel } = o;
+}): { subject: string; html: string } {
+  const { t, locale, username, code, sealCode, sealRequired, kommentar, deadline, deadlineStr, formPath, targetLabel } = o;
   const intro = inspectionIntro(t, deadline.getTime() - Date.now());
   const kommentarHtml = optionalNoticeBoxHtml(t("inspectionAdminLabel"), kommentar);
 
@@ -545,10 +543,9 @@ async function sendInspectionMail(o: {
     ? `<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:14px 18px;margin:16px 0"><p style="margin:0;font-size:14px;color:#1e3a8a"><strong>${t("inspectionSealHintLabel")}</strong> ${t("inspectionSealHintText")}</p></div>`
     : "";
 
-  await sendMailSafe(
-    to,
-    `${APP_NAME} – ${t("inspectionRequestedSubject")}`,
-    dashboardEmailHtml(
+  return {
+    subject: t("inspectionRequestedSubject"),
+    html: dashboardEmailHtml(
       t("inspectionRequestedSubject"),
       `${emailGreeting(t, username)}
       <p>${escHtml(intro)}</p>
@@ -567,7 +564,7 @@ async function sendInspectionMail(o: {
           `<p style="color:#64748b;font-size:13px;margin-top:20px;border-top:1px solid #f1f5f9;padding-top:16px">${escHtml(t("inspectionHelpText"))} <a href="${helpUrl}" style="color:${EMAIL_BUTTON_COLORS.default}">${escHtml(t("inspectionHelpLink"))}</a></p>`,
       },
     ),
-  );
+  };
 }
 
 /**
@@ -619,10 +616,11 @@ export function buildInspectionPush(opts: {
  * `code: null` → Mail und Push nennen keinen Code; verlangt bleibt das Foto (und, falls ein Siegel
  * aktiv ist, dessen Nummer).
  * Ohne hinterlegte Adresse entfällt nur die Mail — Posteingang und Push laufen unabhängig davon.
- * Push is fire-and-forget.
+ * Versand über `deliverToChannels` (alle Kanäle parallel, begrenzt abgewartet).
  */
 export async function sendKontrolleNotification(opts: {
-  user: { id: string; email: string | null; username: string; locale: string };
+  /** Die GELADENE Zeile des Empfängers — geht weiter an `recordInboxDelivery` und `deliverToChannels`. */
+  user: NotifyRecipient;
   /** null = diese Kontrolle verlangt keinen Code (Gerät mit `requireInspectionCode: false`). Mail und
    *  Push nennen dann keinen, und der Link führt ohne vorbelegtes Feld aufs Formular. */
   code: string | null;
@@ -654,7 +652,7 @@ export async function sendKontrolleNotification(opts: {
     actor,
     ref: { type: "control", id: controlId },
     once: true,
-  });
+  }, user);
 
   const sealRequired = requiredSealCode(code, sealCode) !== null;
 
@@ -671,13 +669,32 @@ export async function sendKontrolleNotification(opts: {
   // Auto-Buchung als Öffnen) lief auf einer Anforderung, die ihn nie erreicht hatte. Über den
   // manuellen Pfad kann das nicht entstehen (`requestKontrolle` weist ohne Adresse ab), wohl aber
   // über die automatischen Kontrollen: die plant `autoKontrolleService` ohne solche Prüfung.
-  if (user.email && channels.mail) {
-    await sendInspectionMail({ to: user.email, t, locale, username: user.username, code, sealCode, sealRequired, kommentar, deadline, deadlineStr, formPath, targetLabel });
-  }
-
   const push = buildInspectionPush({ t, code, targetLabel, deadline, deadlineStr, sealRequired, kommentar });
-  if (channels.push) firePush(user.id, push.title, push.body, formPath, badge);
-  if (channels.telegram) fireTelegram(user.id, push.title, push.body);
+  await deliverToChannels(user, channels, {
+    mail: () => buildInspectionMail({ t, locale, username: user.username, code, sealCode, sealRequired, kommentar, deadline, deadlineStr, formPath, targetLabel }),
+    title: push.title,
+    body: push.body,
+    url: formPath,
+    badge,
+  });
+}
+
+/**
+ * Die Wiederholung eines Codes als Push — und, wenn die Stufe des Empfängers es zulässt, als Telegram.
+ *
+ * Die Push geht IMMER (der Sub hat sie eben angefordert; ohne Push-Ziel weist die Prüfung davor ab).
+ * Telegram folgt dagegen seiner Stufe: ein stummgestellter Kanal bleibt stumm, auch für eine
+ * Wiederholung. Und zwar als `important`, NICHT als `deadline`, obwohl es um eine Frist geht: der
+ * Frist-Rückfall greift, sobald die gewählten Kanäle nichts tragen — hier trägt aber garantiert die
+ * Push. Mit `deadline` bekäme ausgerechnet der Nutzer mit „Telegram aus" beides, und der Aufruf
+ * kostete zusätzlich die Erreichbarkeits-Probe (ein Bot-API-Aufruf mitten im Knopfdruck) für eine
+ * Antwort, die am Ergebnis nichts mehr ändern kann.
+ */
+async function deliverCodeResend(userId: string, push: { title: string; body: string }, url: string): Promise<void> {
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: NOTIFY_RECIPIENT_SELECT });
+  if (!user) return;
+  const { telegram } = await deliveryChannels(user, "important");
+  await deliverToChannels(user, { mail: false, push: true, telegram }, { title: push.title, body: push.body, url });
 }
 
 /**
@@ -767,17 +784,7 @@ export async function resendInspectionCode(
   });
   // Ziel des Antippens ist dasselbe Formular wie bei der Ankündigung — der Sub steht zwar meist
   // schon darauf, aber eine Meldung, die nirgendwohin führt, ist auf der Uhr eine Sackgasse.
-  firePush(userId, push.title, push.body, inspectionHref(ka.code, { kommentar: ka.kommentar, categoryId: ka.categoryId }));
-  // Die Push ist der Zweck des Knopfes und geht immer (der Sub hat sie eben angefordert; ohne
-  // Push-Ziel weist die Prüfung oben ab). Telegram folgt dagegen seiner Stufe: ein stummgestellter
-  // Kanal bleibt stumm, auch für eine Wiederholung.
-  //
-  // Und zwar als `important`, NICHT als `deadline`, obwohl es um eine Frist geht: der Frist-Rückfall
-  // greift, sobald die gewählten Kanäle nichts tragen — hier trägt aber garantiert die Push, die
-  // eine Zeile höher schon hinausgeht. Mit `deadline` bekäme ausgerechnet der Nutzer mit „Telegram
-  // aus" beides, und der Aufruf kostete zusätzlich die Erreichbarkeits-Probe (ein Bot-API-Aufruf
-  // mitten im Knopfdruck) für eine Antwort, die am Ergebnis nichts mehr ändern kann.
-  if ((await deliveryChannelsForUser(userId, "important")).telegram) fireTelegram(userId, push.title, push.body);
+  await deliverCodeResend(userId, push, inspectionHref(ka.code, { kommentar: ka.kommentar, categoryId: ka.categoryId }));
   return { ok: true, data: null };
 }
 
@@ -823,8 +830,6 @@ export async function resendOwnInspectionCode(
   // Uhrzeit. Das Ziel gehört trotzdem in den LINK: es steuert, wohin das Antippen führt, nicht was
   // im Bild landet.
   const push = buildInspectionCodePush({ code, targetLabel: null, tz });
-  firePush(userId, push.title, push.body, inspectionHref(code, { categoryId }));
-  // Wie oben: Push auf Wunsch, Telegram nach Stufe — und aus demselben Grund `important`.
-  if ((await deliveryChannelsForUser(userId, "important")).telegram) fireTelegram(userId, push.title, push.body);
+  await deliverCodeResend(userId, push, inspectionHref(code, { categoryId }));
   return { ok: true, data: null };
 }

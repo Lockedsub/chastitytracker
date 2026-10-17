@@ -38,7 +38,11 @@ vi.mock("@/lib/queries", () => ({
   releaseLockPeriodsOnOpen: vi.fn(),
 }));
 vi.mock("@/lib/oeffnenService", () => ({ createOeffnenEntryTx: vi.fn() }));
-vi.mock("@/lib/notify", () => ({ notifyUser: vi.fn(), notifyControllers: vi.fn() }));
+vi.mock("@/lib/notify", async (importOriginal) => ({
+  // Der Versand-Rumpf (`deliverToChannels`) läuft ECHT: geprüft wird, was an die Kanal-Blätter geht.
+  ...(await importOriginal<typeof import("@/lib/notify")>()),
+  notifyUser: vi.fn(), notifyControllers: vi.fn(),
+}));
 vi.mock("@/lib/keyholder", () => ({ getControllersOfUser: vi.fn(async () => []), getControllerAudience: vi.fn(async () => ({ controllers: [], username: "sub" })) }));
 // Nur der Schreib-Weg wird ersetzt; der Rest des Moduls (Absender-Abbildung, Spalten-Helfer) bleibt
 // echt — er ist reine Ableitung, keine Nebenwirkung. Spread statt Aufzählung, siehe offenseAnnounce.test.ts.
@@ -49,7 +53,7 @@ vi.mock("@/lib/messageService", async (importOriginal) => ({
 vi.mock("@/lib/mail", () => ({
   sendMailSafe: vi.fn(), escHtml: (s: string) => s, appBaseUrl: () => "https://x", noticeBoxHtml: () => "", optionalNoticeBoxHtml: () => "", dashboardEmailHtml: () => "",
 }));
-vi.mock("@/lib/push", () => ({ firePush: vi.fn() }));
+vi.mock("@/lib/push", () => ({ sendPushToUser: vi.fn() }));
 vi.mock("@/lib/appMeta", () => ({ markLastAction: vi.fn() }));
 vi.mock("@/lib/emailI18n", () => ({ emailT: vi.fn(async () => (k: string) => k), emailGreeting: () => "" }));
 vi.mock("next-intl/server", () => ({ getTranslations: vi.fn(async () => (k: string) => k) }));

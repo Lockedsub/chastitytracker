@@ -50,7 +50,7 @@ vi.mock("@/lib/mail", () => ({
   sendMailSafe: vi.fn(), escHtml: (s: string) => s, appBaseUrl: () => "https://x",
   noticeBoxHtml: () => "", optionalNoticeBoxHtml: () => "", dashboardEmailHtml: () => "",
 }));
-vi.mock("@/lib/push", () => ({ firePush: vi.fn() }));
+vi.mock("@/lib/push", () => ({ firePush: vi.fn(), sendPushToUser: vi.fn() }));
 vi.mock("@/lib/emailI18n", async () => (await import("@/test/notifyLeafMocks")).emailI18nLeaf());
 vi.mock("next-intl/server", () => ({ getTranslations: vi.fn(async () => (k: string) => k) }));
 vi.mock("@/lib/heimdallNotify", () => ({ notifyHeimdallForUserId: vi.fn(), notifyHeimdall: vi.fn() }));
@@ -118,7 +118,10 @@ const recorded = (): { bodyKey: string | null; senderKind: string; senderName: s
 /** Die zuletzt geschriebene Nachricht — jeder Test löst genau eine an den Träger aus. */
 const lastToSub = () => recorded().at(-1);
 
-const USER = { id: "u1", email: "sub@example.org", username: "sub", locale: "de", role: "user", orgasmusArtenConfig: null };
+const USER = {
+  id: "u1", email: "sub@example.org", username: "sub", locale: "de", role: "user", orgasmusArtenConfig: null,
+  telegramChatId: null, notifyMail: "all", notifyPush: "all", notifyTelegram: "all",
+};
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -184,7 +187,7 @@ describe("Kontrolle", () => {
 
 describe("Verschluss-Direktiven", () => {
   const NOTIFY = {
-    userId: "u1", user: USER, art: "SPERRZEIT" as const,
+    user: USER, art: "SPERRZEIT" as const,
     endsAtDate: new Date("2026-08-13T12:00:00Z"), lockSpec: null, requestId: "va1",
   };
 

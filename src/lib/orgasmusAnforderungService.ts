@@ -1,15 +1,12 @@
 import { prisma } from "@/lib/prisma";
-import { sendMailSafe, escHtml, optionalNoticeBoxHtml, dashboardEmailHtml } from "@/lib/mail";
+import { escHtml, optionalNoticeBoxHtml, dashboardEmailHtml } from "@/lib/mail";
 import { formatDateTime } from "@/lib/utils";
-import { firePush } from "@/lib/push";
-import { fireTelegram } from "@/lib/telegram";
 import { ORGASMUS_ANFORDERUNG_ARTEN, toLocale, EMAIL_BUTTON_COLORS, APP_NAME } from "@/lib/constants";
 import { orgasmusValueAllowed, resolveOrgasmusArtDisplay, effectiveOrgasmusArten } from "@/lib/reasonsService";
-import { notifyUser, type NotifyContent } from "@/lib/notify";
+import { notifyUser, deliverToChannels, type NotifyContent, type NotifyRecipient } from "@/lib/notify";
 import { computeDelayedTrigger, isHiddenFromSub, parseTriggerAt } from "@/lib/delayedTrigger";
 import { recordInboxDelivery, type MessageActor } from "@/lib/messageService";
-import { emailT, emailGreeting } from "@/lib/emailI18n";
-import { getTranslations } from "next-intl/server";
+import { emailT, emailGreeting, localeT } from "@/lib/emailI18n";
 import { serviceFail, type ServiceResult } from "@/lib/serviceResult";
 import { isHealthHoldActive } from "@/lib/healthHold";
 
@@ -161,7 +158,7 @@ export async function createOrgasmusAnforderung(
   // das, was die Terminierung verbergen soll (`isHiddenFromSub`).
   if (!wirksamAb) {
     await sendOrgasmusAnforderungNotifications({
-      userId, user, art, message, beginsAtDate, endsAtDate, requiredType, openingAllowed: Boolean(openingAllowed),
+      user, art, message, beginsAtDate, endsAtDate, requiredType, openingAllowed: Boolean(openingAllowed),
       directiveId: anforderung.id, actor,
     });
   } else if (replacedVisible) {
@@ -251,13 +248,13 @@ export async function withdrawOrgasmusAnforderungById(id: string, userId: string
   return { ok: true, data: { count: res.count } };
 }
 
-/** Sends the directive e-mail + push to the user. Push is fire-and-forget.
+/** Sends the directive to the user on every channel their levels allow (`deliverToChannels`).
  *
  *  Exportiert für den Poller (`kontrollePoller.ts`), der die terminierten Anweisungen zustellt —
  *  dieselbe Meldung, nur später und mit dem Anordnenden aus `createdBy` statt aus der Sitzung. */
 export async function sendOrgasmusAnforderungNotifications(opts: {
-  userId: string;
-  user: { email: string | null; username: string; orgasmusArtenConfig: string | null; locale: string };
+  /** Die GELADENE Zeile des Empfängers — geht weiter an `recordInboxDelivery` und `deliverToChannels`. */
+  user: NotifyRecipient & { orgasmusArtenConfig: string | null };
   art: "ANWEISUNG" | "GELEGENHEIT";
   message?: string | null;
   beginsAtDate: Date;
@@ -269,18 +266,18 @@ export async function sendOrgasmusAnforderungNotifications(opts: {
   /** WER die Anweisung gestellt hat — der Absender ihrer Meldung. */
   actor: MessageActor;
 }) {
-  const { userId, user, art, message, beginsAtDate, endsAtDate, requiredType, openingAllowed, directiveId, actor } = opts;
+  const { user, art, message, beginsAtDate, endsAtDate, requiredType, openingAllowed, directiveId, actor } = opts;
   const istAnweisung = art === "ANWEISUNG";
 
   // Nachricht des Keyholders bleibt an der Direktive; der Posteingang verlinkt sie nur.
   // Mail/Push/Telegram folgen dem Kanal-Schalter des Empfängers, die Zeile entsteht immer.
   const { badge, channels } = await recordInboxDelivery({
-    subjectUserId: userId,
+    subjectUserId: user.id,
     bodyKey: istAnweisung ? "orgasmAnweisungIntro" : "orgasmGelegenheitIntro",
     actor,
     ref: { type: "orgasmDirective", id: directiveId },
     once: true,
-  });
+  }, user);
   const locale = toLocale(user.locale);
   const t = await emailT(locale);
   const betreff = istAnweisung ? t("orgasmAnweisungSubject") : t("orgasmGelegenheitSubject");
@@ -289,19 +286,18 @@ export async function sendOrgasmusAnforderungNotifications(opts: {
 
   // Reason-Code → Anzeige-Label gegen die Config des Ziel-Subs auflösen (sonst zeigt eine Custom-Art
   // den rohen `c_…`-Code in Mail/Push). In der Sprache des Empfängers, wie der restliche Text.
-  const tOrgasm = await getTranslations({ locale, namespace: "orgasmForm" });
+  const tOrgasm = localeT(locale, "orgasmForm");
   const artLabel = requiredType
     ? resolveOrgasmusArtDisplay(requiredType, effectiveOrgasmusArten(user.orgasmusArtenConfig), tOrgasm) ?? requiredType
     : null;
 
-  if (user.email && channels.mail) {
+  const buildMail = () => {
     const messageHtml = optionalNoticeBoxHtml(t("orgasmNoticeLabel"), message);
     const artHtml = artLabel ? `<p><strong>${t("orgasmArtLabel")}</strong> ${escHtml(artLabel)}</p>` : "";
     const oeffnenHtml = openingAllowed ? `<p><strong>${t("orgasmOpenAllowedLabel")}</strong> ${t("orgasmOpenAllowedText")}</p>` : "";
-    await sendMailSafe(
-      user.email,
-      `${APP_NAME} – ${betreff}`,
-      dashboardEmailHtml(
+    return {
+      subject: betreff,
+      html: dashboardEmailHtml(
         escHtml(betreff),
         `${emailGreeting(t, user.username)}
           <p>${escHtml(einleitung)}</p>
@@ -312,13 +308,12 @@ export async function sendOrgasmusAnforderungNotifications(opts: {
         t("dashboardButton"),
         { buttonColor: EMAIL_BUTTON_COLORS.orgasm },
       ),
-    );
-  }
+    };
+  };
 
   const pushParts: string[] = [`${t("orgasmWindowLabel")} ${windowStr}`];
   if (artLabel) pushParts.push(artLabel);
   if (message?.trim()) pushParts.push(message.trim());
   const pushBody = pushParts.join(" · ");
-  if (channels.push) firePush(userId, betreff, pushBody, "/dashboard", badge);
-  if (channels.telegram) fireTelegram(userId, betreff, pushBody);
+  await deliverToChannels(user, channels, { mail: buildMail, title: betreff, body: pushBody, url: "/dashboard", badge });
 }

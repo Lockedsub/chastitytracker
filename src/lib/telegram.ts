@@ -58,8 +58,8 @@ async function callBot(
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ chat_id: chatId, ...payload }),
-    // `notifyLoadedUser` awaitet den Versand — ohne Timeout hinge eine lahme Telegram-API die
-    // Antwort des auslösenden Requests fest (Push ist daneben fire-and-forget). 10s wie bei APNs.
+    // `deliverToChannels` awaitet den Versand — ohne Timeout hinge eine lahme Telegram-API die
+    // Antwort des auslösenden Requests fest. 10s wie bei APNs.
     signal: AbortSignal.timeout(timeoutMs),
   });
   if (res.ok) return { ok: true };
@@ -133,25 +133,6 @@ export async function telegramChatReachable(chatId: string): Promise<boolean> {
     probeCache.set(chatId, { reachable: false, until: Date.now() + PROBE_FAIL_TTL_MS });
     return false;
   }
-}
-
-/**
- * Telegram-Kurzmeldung an einen Nutzer über seine User-id — lädt die verknüpfte `telegramChatId` und
- * sendet fire-and-forget, exakt wie {@link import("@/lib/push").firePush}. Nimmt `title` und `body`
- * getrennt (dieselbe Signatur wie `firePush`) und fügt sie als `Titel\n\nText` zusammen; ohne
- * verknüpften Chat passiert nichts. Für die reichhaltigen Direktiv-Meldungen (Verschluss/Orgasmus/
- * Kontrolle), die ihre Kanäle selbst über `recordInboxDelivery` bekommen und `firePush` direkt rufen,
- * statt über `notifyUser` — dort ist Telegram schon eingebaut.
- */
-export function fireTelegram(userId: string, title: string, body: string): void {
-  void (async () => {
-    try {
-      const u = await prisma.user.findUnique({ where: { id: userId }, select: { telegramChatId: true } });
-      if (u?.telegramChatId) await sendTelegram(u.telegramChatId, `${title}\n\n${body}`);
-    } catch (e) {
-      structuredLog("telegram", "fire_error", { userId, error: (e as Error).message });
-    }
-  })();
 }
 
 // ── Verknüpfung: kurzlebiger, einmaliger Token (Muster wie PasswordResetToken) ────────────────────

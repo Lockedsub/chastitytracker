@@ -3,6 +3,7 @@ import { pruneExpiredMessages } from "@/lib/messageService";
 import { pruneWeightPhotos } from "@/lib/weightService";
 import { sendDueWeighingReminders } from "@/lib/weightReminder";
 import { LOCK_ENDED_REASON } from "@/lib/constants";
+import { NOTIFY_RECIPIENT_SELECT } from "@/lib/notify";
 import { sendKontrolleNotification, deriveSealCode, hasActiveKontrolle, inspectionCodeRequired } from "@/lib/kontrolleService";
 import { getIsLocked, getActiveLockPeriod } from "@/lib/queries";
 import { resolveInspectionTarget, inspectionTargetLabel, isKgTarget } from "@/lib/inspectionTarget";
@@ -68,7 +69,7 @@ async function processDue(): Promise<void> {
 
     const due = await prisma.kontrollAnforderung.findMany({
       where: { ...dueForDispatchWhere(now), entryId: null },
-      include: { user: { select: { id: true, email: true, username: true, locale: true, autoKontrolleNurBeiSperre: true } } },
+      include: { user: { select: { ...NOTIFY_RECIPIENT_SELECT, autoKontrolleNurBeiSperre: true } } },
       // Chronologisch: werden mehrere Kontrollen desselben Users im selben Tick fällig, überlebt die
       // früheste (wird zuerst zugestellt), die späteren verwirft der Überschneidungs-Schutz unten.
       orderBy: { wirksamAb: "asc" },
@@ -301,7 +302,7 @@ async function processInspectionEscalation(now: Date): Promise<void> {
 async function processDueVerschlussAnforderungen(now: Date): Promise<void> {
   const due = await prisma.verschlussAnforderung.findMany({
     where: { ...dueForDispatchWhere(now), fulfilledAt: null },
-    include: { user: { select: { id: true, email: true, username: true, locale: true } } },
+    include: { user: { select: NOTIFY_RECIPIENT_SELECT } },
     take: 50,
   });
 
@@ -334,7 +335,6 @@ async function processDueVerschlussAnforderungen(now: Date): Promise<void> {
         // Anforderung nie erfahren — ohne diese Meldung liefe er in eine Sperre, von der er nichts
         // weiss, und die nächste Öffnung wäre ein unverschuldetes Vergehen.
         await sendVerschlussAnforderungNotifications({
-          userId: va.userId,
           user: va.user,
           art: "SPERRZEIT",
           message: carriedOver.message,
@@ -350,7 +350,6 @@ async function processDueVerschlussAnforderungen(now: Date): Promise<void> {
       }
 
       await sendVerschlussAnforderungNotifications({
-        userId: va.userId,
         user: va.user,
         art,
         message: va.message,
@@ -388,7 +387,7 @@ async function processDueVerschlussAnforderungen(now: Date): Promise<void> {
 export async function processDueOrgasmusAnforderungen(now: Date): Promise<void> {
   const due = await prisma.orgasmusAnforderung.findMany({
     where: { ...dueForDispatchWhere(now), fulfilledAt: null },
-    include: { user: { select: { email: true, username: true, orgasmusArtenConfig: true, locale: true } } },
+    include: { user: { select: { ...NOTIFY_RECIPIENT_SELECT, orgasmusArtenConfig: true } } },
     take: 50,
   });
 
@@ -415,7 +414,6 @@ export async function processDueOrgasmusAnforderungen(now: Date): Promise<void> 
       });
       if (stillOpen === 0) continue;
       await sendOrgasmusAnforderungNotifications({
-        userId: oa.userId,
         user: oa.user,
         art: oa.art as "ANWEISUNG" | "GELEGENHEIT",
         message: oa.message,

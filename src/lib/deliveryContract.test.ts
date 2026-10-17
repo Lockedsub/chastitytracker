@@ -6,8 +6,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
  * Die Versand-Enden der Meldungen (`notifyUser`, die Direktiven Verschluss/Orgasmus/Kontrolle) bauten
  * dasselbe Ende fünfmal mit verschiedenem Warteverhalten. Dieser Test hält fest, was bei ALLEN gleich
  * bleiben muss, wie auch immer das Ende gebaut ist: je Kanal die Adressaten, Betreff, Titel, Text,
- * Ziel und Badge. Er prüft deshalb an den BLÄTTERN (Mail, Push, Telegram), nicht an der Aufrufform —
- * `firePush`/`sendPushToUser` und `sendTelegram`/`fireTelegram` zählen gleich.
+ * Ziel und Badge. Er prüft deshalb an den BLÄTTERN (Mail, Push, Telegram), nicht an der Aufrufform.
  *
  * Echtes SMTP, Push und Telegram sind hier nicht erreichbar; geprüft wird, was an sie GEHT.
  */
@@ -22,8 +21,8 @@ vi.mock("@/lib/mail", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/mail")>()),
   sendMailSafe: vi.fn(),
 }));
-vi.mock("@/lib/push", () => ({ firePush: vi.fn(), sendPushToUser: vi.fn(), hasPushTarget: vi.fn() }));
-vi.mock("@/lib/telegram", () => ({ sendTelegram: vi.fn(), fireTelegram: vi.fn() }));
+vi.mock("@/lib/push", () => ({ sendPushToUser: vi.fn(), hasPushTarget: vi.fn() }));
+vi.mock("@/lib/telegram", () => ({ sendTelegram: vi.fn() }));
 vi.mock("@/lib/emailI18n", async () => (await import("@/test/notifyLeafMocks")).emailI18nLeaf());
 vi.mock("next-intl/server", async () => (await import("@/test/notifyLeafMocks")).intlServerLeaf());
 vi.mock("@/lib/serverLog", () => ({ structuredLog: vi.fn() }));
@@ -48,13 +47,13 @@ import { sendKontrolleNotification } from "./kontrolleService";
 import { sendVerschlussAnforderungNotifications } from "./verschlussAnforderungService";
 import { sendOrgasmusAnforderungNotifications } from "./orgasmusAnforderungService";
 import { prisma } from "@/lib/prisma";
+import { recordInboxDelivery } from "@/lib/messageService";
 import * as mailModule from "@/lib/mail";
 import * as pushModule from "@/lib/push";
 import * as telegramModule from "@/lib/telegram";
 import { APP_NAME } from "@/lib/constants";
 
 type Spy = ReturnType<typeof vi.fn>;
-const spy = (mod: unknown, name: string): Spy | undefined => (mod as Record<string, Spy | undefined>)[name];
 
 const CHAT = "chat-1";
 const USER: {
@@ -67,20 +66,13 @@ const USER: {
 
 /** Alles, was an die Mail ging: [Adresse, Betreff, HTML]. */
 const mails = () => (mailModule.sendMailSafe as unknown as Spy).mock.calls;
-/** Alles, was an die Push ging — egal ob fire-and-forget oder awaited: [Nutzer, Titel, Text, Ziel, Badge]. */
-const pushes = () => [spy(pushModule, "firePush"), spy(pushModule, "sendPushToUser")]
-  .flatMap((s) => s?.mock.calls ?? []);
+/** Alles, was an die Push ging: [Nutzer, Titel, Text, Ziel, Badge]. */
+const pushes = () => (pushModule.sendPushToUser as unknown as Spy).mock.calls;
 /** Die Zeile, die die Datenbank für `u1` liefert. */
 let DB_USER = USER;
 const NO_CONTACT = { ...USER, email: null, telegramChatId: null };
-/** Alles, was an Telegram ging: [Chat, Text] — `fireTelegram(userId, titel, text)` löst den Chat selbst
- *  über die Zeile des Nutzers auf; ohne verknüpften Chat geht nichts hinaus. */
-const telegrams = () => [
-  ...(spy(telegramModule, "sendTelegram")?.mock.calls ?? []),
-  ...(spy(telegramModule, "fireTelegram")?.mock.calls ?? [])
-    .filter(() => DB_USER.telegramChatId)
-    .map(([, title, body]) => [DB_USER.telegramChatId, `${title}\n\n${body}`]),
-];
+/** Alles, was an Telegram ging: [Chat, Text]. */
+const telegrams = () => (telegramModule.sendTelegram as unknown as Spy).mock.calls;
 
 /** Warten, bis fire-and-forget-Enden durch sind. */
 const settle = () => new Promise((r) => setTimeout(r, 0));
@@ -139,9 +131,13 @@ describe("notifyUser", () => {
   });
 });
 
+/** Die geladene Zeile geht an `recordInboxDelivery` weiter — sie wird nicht für die Kanal-Frage und
+ *  den Telegram-Versand je ein weiteres Mal von der Platte geholt. */
+const recipientPassedOn = () => (recordInboxDelivery as unknown as Spy).mock.calls[0][1];
+
 describe("Verschluss-Direktive", () => {
   const BASE = {
-    userId: "u1", user: USER, endsAtDate: new Date("2026-08-13T12:00:00Z"), lockSpec: null, requestId: "va1", actor: "herrin",
+    user: USER, endsAtDate: new Date("2026-08-13T12:00:00Z"), lockSpec: null, requestId: "va1", actor: "herrin",
   };
 
   it.each(CHANNEL_CASES)("Sperrzeit: %s", async (_name, channels) => {
@@ -160,6 +156,12 @@ describe("Verschluss-Direktive", () => {
     expect(body).toContain("lockPushUntil");
     expect(body.endsWith("Hinweis")).toBe(true);
     expect(telegrams()[0]).toEqual([CHAT, `${title}\n\n${body}`]);
+  });
+
+  it("reicht die geladene Zeile des Empfängers durch", async () => {
+    await sendVerschlussAnforderungNotifications({ ...BASE, art: "SPERRZEIT", message: null });
+    expect(recipientPassedOn()).toBe(USER);
+    expect(prisma.user.findUnique).not.toHaveBeenCalled();
   });
 
   it("Anforderung: eigener Betreff und Push-Titel", async () => {
@@ -184,7 +186,7 @@ describe("Verschluss-Direktive", () => {
 
 describe("Orgasmus-Direktive", () => {
   const BASE = {
-    userId: "u1", user: USER, art: "ANWEISUNG" as const, message: "Hinweis",
+    user: USER, art: "ANWEISUNG" as const, message: "Hinweis",
     beginsAtDate: new Date("2026-08-13T10:00:00Z"), endsAtDate: new Date("2026-08-13T12:00:00Z"),
     requiredType: null, openingAllowed: false, directiveId: "oa1", actor: "herrin",
   };
@@ -194,6 +196,12 @@ describe("Orgasmus-Direktive", () => {
     await sendOrgasmusAnforderungNotifications(BASE);
     await settle();
     expectChannelsRespected(channels);
+  });
+
+  it("reicht die geladene Zeile des Empfängers durch", async () => {
+    await sendOrgasmusAnforderungNotifications(BASE);
+    expect(recipientPassedOn()).toBe(USER);
+    expect(prisma.user.findUnique).not.toHaveBeenCalled();
   });
 
   it("Betreff, Push-Titel/Text/Ziel/Badge und Telegram-Text", async () => {
@@ -218,6 +226,12 @@ describe("Kontrolle", () => {
     await sendKontrolleNotification(BASE);
     await settle();
     expectChannelsRespected(channels);
+  });
+
+  it("reicht die geladene Zeile des Empfängers durch", async () => {
+    await sendKontrolleNotification(BASE);
+    expect(recipientPassedOn()).toBe(USER);
+    expect(prisma.user.findUnique).not.toHaveBeenCalled();
   });
 
   it("Push-Ziel trägt den Code, Titel/Text/Badge stimmen mit Telegram überein", async () => {
