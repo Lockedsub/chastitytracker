@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireApi } from "@/lib/authGuards";
 import { isValidEmail } from "@/lib/constants";
+import { censusEnabled, censusInstanceId, imageOrigin, imageOriginLabel } from "@/lib/census";
 import { FEEDBACK_DEFAULT_UPSTREAM_URL, feedbackMode, isThrowawayEmail } from "@/lib/feedback";
 
 const VALID_TYPES = ["BUG", "IDEA", "QUESTION", "THANKS"] as const;
@@ -78,6 +79,11 @@ export async function POST(req: NextRequest) {
         appVersion,
         platform: platform ?? "web",
         clientLocale: clientLocale ?? null,
+        // Census-Verknüpfung (Issue #15): dieselbe Instanz-ID wie im Update-Check, dazu die
+        // Image-Herkunft — so lässt sich eine Rückmeldung der Nutzung ihrer Instanz zuordnen.
+        // Die Census-ID geht nur an dieses Postfach, nie in eine öffentliche URL (`censusPublicId`).
+        instanceId: censusEnabled() ? censusInstanceId() : null,
+        imageOrigin: imageOriginLabel(imageOrigin()),
       }),
       // Keep the request quick — don't block the user's UI on upstream latency.
       signal: AbortSignal.timeout(10_000),

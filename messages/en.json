@@ -888,6 +888,8 @@
     "version": "Version",
     "buildDate": "Build date",
     "buildDateLocal": "local",
+    "imageOrigin": "Image origin",
+    "censusId": "Instance ID",
     "pushDenied": "Notifications blocked – please enable them in browser settings.",
     "pushRegisterFailed": "Push registration failed – please try again.",
     "pushAllowTitle": "Allow push",

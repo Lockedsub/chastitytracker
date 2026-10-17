@@ -12,7 +12,9 @@ import type { UnitSystem } from "@/lib/weight";
 import { journalSettingsOf } from "@/lib/journalService";
 import type { JournalSettingsProps } from "./JournalSettings";
 import pkg from "@/../package.json";
-import { feedbackMode, type FeedbackMode } from "@/lib/feedback";
+import type { FeedbackSetup } from "@/lib/feedback";
+import { feedbackSetup } from "@/lib/feedbackSetup";
+import { publicIdentity } from "@/lib/census";
 
 export interface SettingsFormProps {
   username: string;
@@ -53,7 +55,10 @@ export interface SettingsFormProps {
   mailConfigured: boolean;
   version: string;
   buildDate?: string;
-  feedbackMode: FeedbackMode;
+  feedback: FeedbackSetup;
+  /** Öffentliche Instanz-Kennung und Image-Herkunft (Issue #15) — nur für Admins, zum Abschreiben in
+   *  ein GitHub-Issue. */
+  census: Awaited<ReturnType<typeof publicIdentity>> | null;
   /** Gewichtstracking — `null`, wenn die Keyholderin es für diesen Sub nicht freigeschaltet hat.
    *  Der Abschnitt erscheint dann gar nicht. */
   weight: WeightSettingsProps | null;
@@ -170,7 +175,8 @@ export async function getSettingsProps(): Promise<SettingsFormProps> {
     mailConfigured: mailConfigured(),
     version: pkg.version,
     buildDate: process.env.BUILD_DATE ?? undefined,
-    feedbackMode: feedbackMode(),
+    feedback: await feedbackSetup(),
+    census: isAdmin ? await publicIdentity() : null,
     weight,
     journal,
     box: boxCouplingEnabled() && userId ? await boxSettings(userId) : null,

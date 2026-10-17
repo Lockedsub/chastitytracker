@@ -8,7 +8,7 @@
 ![Next.js](https://img.shields.io/badge/Next.js-16-black)
 
 > [!NOTE]
-> **An alle, die den Tracker selbst hosten** 👋 — mir ist klar, dass inzwischen einige von euch das Projekt auf eigener Infrastruktur betreiben, und das freut mich wirklich. Nur: ich sehe fast nichts von euch — eine Instanz meldet beim Update-Check nur anonym, dass es sie gibt und auf welcher Version (abschaltbar, siehe [docs/update-check.md](docs/update-check.md)), sonst nichts. Darum **gebt mir Feedback** und **meldet Probleme über die [Issues](../../issues) oder per Mail an info@chastitytracker.ch** — von einem Bug, den ich nicht kenne, erfahre ich sonst nie. Nur mit eurer Rückmeldung bleibt das Projekt lebendig. Danke, dass ihr dabei seid. — *trublue*
+> **An alle, die den Tracker selbst hosten** 👋 — mir ist klar, dass inzwischen einige von euch das Projekt auf eigener Infrastruktur betreiben, und das freut mich wirklich. Nur: ich sehe fast nichts von euch — eine Instanz meldet beim Update-Check nur, dass es sie gibt, auf welcher Version sie läuft, woher ihr Image stammt und ein paar Zählwerte zur Nutzung — ohne Namen, Adressen oder Inhalte (abschaltbar, siehe [docs/update-check.md](docs/update-check.md)). Darum **gebt mir Feedback** und **meldet Probleme über die [Issues](../../issues) oder per Mail an info@chastitytracker.ch** — von einem Bug, den ich nicht kenne, erfahre ich sonst nie. Nur mit eurer Rückmeldung bleibt das Projekt lebendig. Danke, dass ihr dabei seid. — *trublue*
 >
 > ---
 >
@@ -233,7 +233,7 @@ PORTAL_SHARED_SECRET=<secret>      # JWT secret for the self-service portal's lo
 USE_ADMIN_RELATIONSHIPS=true       # enable n:m admin-user supervision
 ALLOW_ENTRY_GAP=true               # allow keyholders (and the MCP tools add_missed_break / add_missed_session) to backfill a forgotten break or locked period in the past; off by default
 DISABLE_FEEDBACK=true              # hide the in-app feedback button (disables upstream forwarding)
-DISABLE_UPDATE_CENSUS=true         # opt out of the anonymous deployment census (see docs/update-check.md)
+DISABLE_UPDATE_CENSUS=true         # opt out of the deployment and usage census (see docs/update-check.md)
 UPSTREAM_CHANGELOG_URL=<url>       # override the changelog source (a self-set value also disables the census)
 ENABLE_DEMO=true                   # optional: allow /api/admin/demo endpoint
 BUILD_DATE=<iso-date>              # optional: shown in footer; set at build time
@@ -425,7 +425,7 @@ VAPID_SUBJECT=mailto:admin@example.com
 # ENABLE_BILDERSAFE=true            # enable the sealed key-box code photo feature (default off)
 # DISABLE_FEEDBACK=true             # hide the in-app feedback button entirely
 # FEEDBACK_UPSTREAM_URL=<url>       # send in-app feedback to your own inbox instead of the project portal
-# DISABLE_UPDATE_CENSUS=true        # opt out of the anonymous deployment census (see docs/update-check.md)
+# DISABLE_UPDATE_CENSUS=true        # opt out of the deployment and usage census (see docs/update-check.md)
 # UPSTREAM_CHANGELOG_URL=<url>      # override the changelog source (a self-set value also disables the census)
 ```
 

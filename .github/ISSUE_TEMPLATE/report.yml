@@ -1,0 +1,48 @@
+name: Fehler, Idee oder Frage / Bug, idea or question
+description: Rückmeldung zum Tracker / Feedback on the tracker
+body:
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Art / Kind
+      options:
+        - Fehler / Bug
+        - Idee / Idea
+        - Frage / Question
+    validations:
+      required: true
+  - type: dropdown
+    id: deployment
+    attributes:
+      label: Wie betreibst du den Tracker? / How do you run the tracker?
+      options:
+        - Über das Portal (portal.chastitytracker.ch) / Via the portal
+        - Selbst gehostet mit dem offiziellen Image / Self-hosted, official image
+        - Selbst gehostet, eigenes Image oder Fork / Self-hosted, own image or fork
+        - Ich nutze ihn nicht selbst / I don't run it myself
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Einstellungen → App / Settings → App
+      placeholder: "6.4.4"
+  - type: input
+    id: image
+    attributes:
+      label: Image-Herkunft / Image origin
+      description: Füllt der GitHub-Link in der App selbst aus; Admins finden sie auch unter Einstellungen → App. / Filled in by the app's GitHub link; admins also find it under Settings → App.
+      placeholder: "official"
+  - type: input
+    id: instance
+    attributes:
+      label: Instanz-Kennung / Instance ID
+      description: Füllt der GitHub-Link in der App selbst aus; Admins finden sie auch unter Einstellungen → App. Anonym; verknüpft die Meldung mit der Nutzungszählung deiner Instanz (docs/update-check.md). Leer lassen, wenn du das nicht willst. / Filled in by the app's GitHub link; admins also find it under Settings → App. Anonymous; links this report to your instance's usage census. Leave empty if you prefer.
+  - type: textarea
+    id: description
+    attributes:
+      label: Beschreibung / Description
+      description: Was ist passiert, was hast du erwartet? / What happened, what did you expect?
+    validations:
+      required: true

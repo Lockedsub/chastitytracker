@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { feedbackMode, isThrowawayEmail } from "./feedback";
+import { feedbackMode, githubIssueHref, isThrowawayEmail } from "./feedback";
 
 describe("feedbackMode", () => {
   it("abgeschaltet schlägt alles", () => {
@@ -35,4 +35,19 @@ describe("isThrowawayEmail", () => {
       expect(isThrowawayEmail(email)).toBe(false);
     },
   );
+});
+
+describe("githubIssueHref", () => {
+  it("füllt das Formular mit Version, öffentlicher Kennung und Herkunft", () => {
+    const url = new URL(githubIssueHref({ version: "6.4.4", publicId: "0123456789abcdef", image: "fork:a/b" }));
+    expect(url.searchParams.get("template")).toBe("report.yml");
+    expect(url.searchParams.get("version")).toBe("6.4.4");
+    expect(url.searchParams.get("instance")).toBe("0123456789abcdef");
+    expect(url.searchParams.get("image")).toBe("fork:a/b");
+  });
+
+  it("lässt die Kennung weg, wenn es keine gibt (Census abgeschaltet)", () => {
+    const url = new URL(githubIssueHref({ version: "6.4.4", publicId: null, image: "official" }));
+    expect(url.searchParams.has("instance")).toBe(false);
+  });
 });

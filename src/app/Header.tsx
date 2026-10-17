@@ -10,7 +10,7 @@ import { ownTrackerHidden } from "@/lib/ownTracker";
 import pkg from "../../package.json";
 import { instanceHostname } from "@/lib/appMeta";
 import { APP_NAME } from "@/lib/constants";
-import { feedbackMode } from "@/lib/feedback";
+import { feedbackSetup } from "@/lib/feedbackSetup";
 
 export default async function Header() {
   const session = await auth();
@@ -40,7 +40,7 @@ export default async function Header() {
           {user?.id && !hideOwnTracker && <HeaderMessages actor={user} scope="own" />}
           {/* Unter 360 px weicht das Feedback dem Tagebuch-Zeichen: mit vier Symbolen schob sich sonst
               der App-Name unter die Glocke. Erreichbar bleibt es als Zeile in den Einstellungen. */}
-          {user && <span className="hidden min-[360px]:contents"><FeedbackButton mode={feedbackMode()} /></span>}
+          {user && <span className="hidden min-[360px]:contents"><FeedbackButton feedback={await feedbackSetup()} /></span>}
           {/* Das Tagebuch gehört dem eigenen Tracker — dieselbe Bedingung wie der eigene Posteingang.
               Am persönlichen Ende der Zeile, vor dem Avatar, nicht direkt neben der Glocke: dort
               läse es sich wie ein Kanal zur Keyholderin. */}
