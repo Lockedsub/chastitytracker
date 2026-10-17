@@ -1,5 +1,18 @@
 [
   {
+    "version": "6.5.2",
+    "date": "2026-10-17",
+    "changes": [
+      {
+        "type": "security",
+        "text": {
+          "de": "Grundbausteine der App (Webframework, Anmeldung, Bildverarbeitung, Mailversand) wurden aus Sicherheitsgründen auf aktuelle Versionen gebracht.",
+          "en": "Core building blocks of the app (web framework, sign-in, image processing, mail delivery) were updated to current versions for security reasons."
+        }
+      }
+    ]
+  },
+  {
     "version": "6.5.1",
     "date": "2026-10-17",
     "changes": [
