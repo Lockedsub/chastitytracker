@@ -21,7 +21,3 @@ export function hapticMedium() {
   if (canVibrate()) navigator.vibrate(25);
 }
 
-/** Heavy feedback — error, warning, destructive action (30-10-30ms pattern) */
-export function hapticHeavy() {
-  if (canVibrate()) navigator.vibrate([30, 10, 30]);
-}

@@ -262,21 +262,12 @@ const pairsOf = cache(async (userId: string, nowMs: number, audience: BlockAudie
   return { items, pairs: buildPairs(entries, items, cleaning.rules) };
 });
 
-/** Die Sessions aus Sicht des Trägers. */
-export const subPairsCached = (userId: string, nowMs: number) => pairsOf(userId, nowMs, "sub");
-
 /** Dieselben aus Sicht der Keyholderin — mit den Kontrollen, die nur sie sieht. */
 export const keyholderPairsCached = (userId: string, nowMs: number) => pairsOf(userId, nowMs, "keyholder");
 
 const keyProofOf = cache(async (userId: string, nowMs: number, audience: BlockAudience) =>
   loadTelemetryKeyProof(userId, (await pairsOf(userId, nowMs, audience)).pairs),
 );
-
-/** Der Schlüssel-Nachweis aus der Box-Telemetrie zu den Sessions der Träger-Sicht. */
-export const subKeyProofCached = (userId: string, nowMs: number) => keyProofOf(userId, nowMs, "sub");
-
-/** Derselbe Nachweis zur Keyholder-Sicht — sie soll dieselben Pillen sehen wie er. */
-export const keyholderKeyProofCached = (userId: string, nowMs: number) => keyProofOf(userId, nowMs, "keyholder");
 
 /**
  * Die laufende Session samt ihrer Ereignisse — oder `null`, wenn keine läuft.

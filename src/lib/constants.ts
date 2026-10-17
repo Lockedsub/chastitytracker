@@ -272,7 +272,6 @@ export const LOCK_ENDED_REASON = {
    */
   released: "released",
 } as const;
-export type LockEndedReason = typeof LOCK_ENDED_REASON[keyof typeof LOCK_ENDED_REASON];
 
 /** Maps OEFFNEN_GRUENDE values to openForm i18n keys */
 export const GRUND_I18N_KEYS: Record<typeof OEFFNEN_GRUENDE[number], string> = {
