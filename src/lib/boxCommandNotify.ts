@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { structuredLog } from "@/lib/serverLog";
 import { lockmeboxEnabled } from "@/lib/constants";
 import { notifyHeimdall } from "@/lib/heimdallNotify";
 import { deliveryChannels } from "@/lib/deliveryChannels";
@@ -24,7 +25,7 @@ import type { BoxKind } from "@/lib/boxStatus";
  */
 export function announceBoxCommand(userId: string, command: "lock" | "open"): void {
   announce(userId, command).catch((e: unknown) => {
-    console.warn(`[boxCommandNotify] Ansage fehlgeschlagen: ${(e as Error).message}`);
+    structuredLog("notify", "box_announce_failed", { userId, error: (e as Error).message });
   });
 }
 
@@ -63,7 +64,7 @@ async function pushImportant(
  */
 export function announceBoxPhotoDue(userId: string): void {
   notifyPhotoDue(userId).catch((e: unknown) => {
-    console.warn(`[boxCommandNotify] Foto-Ansage fehlgeschlagen: ${(e as Error).message}`);
+    structuredLog("notify", "box_photo_announce_failed", { userId, error: (e as Error).message });
   });
 }
 

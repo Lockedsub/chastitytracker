@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { structuredLog } from "@/lib/serverLog";
 import { ALL_CHANNELS, type NotificationChannels, type RecipientNotificationEventType } from "@/lib/constants";
 
 export type { NotificationChannels };
@@ -26,7 +27,7 @@ function channelsOf(pref: NotificationChannels | null | undefined): Notification
   };
 }
 
-/** Die eine Abfrage hinter den beiden Einzel-Lesern — samt der Zusage, nie zu werfen (siehe unten). */
+/** Die Abfrage hinter {@link getRecipientChannels} — samt der Zusage, nie zu werfen (siehe unten). */
 async function readChannels(userId: string, eventType: string): Promise<NotificationChannels> {
   try {
     const pref = await prisma.notificationPreference.findUnique({
@@ -40,7 +41,7 @@ async function readChannels(userId: string, eventType: string): Promise<Notifica
     // geändert); ein Lesefehler hier würde den Aufrufer mit einem 500 beenden, obwohl der
     // Datensatz längst geschrieben ist. Genau diese Fehlerklasse hat b5efd30 für den Mail-Versand
     // geschlossen — eine Präferenz-Abfrage darf sie nicht wieder aufmachen.
-    console.error("[notify] preference lookup failed", err);
+    structuredLog("notify", "preference_lookup_failed", { userId, eventType, error: (err as Error).message });
     return ALL_CHANNELS;
   }
 }

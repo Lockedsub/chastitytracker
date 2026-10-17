@@ -1,6 +1,7 @@
 import { cache } from "react";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { structuredLog } from "@/lib/serverLog";
 import { getControllableSubsCached } from "@/lib/keyholder";
 import { bodyKeysOfCategory, bodyKeysOutsideSystem, messagePriority, type MessageFilter, type MessageSenderKind } from "@/lib/messageCategories";
 import { dismissalMessageStillApplies, judgmentMessageStillApplies } from "@/lib/offenseTypes";
@@ -367,7 +368,7 @@ export async function recordSystemMessage(p: RecordMessageParams): Promise<strin
     });
     return created.id;
   } catch (err) {
-    console.error("[messages] record failed", err);
+    structuredLog("messages", "record_failed", { subjectUserId: p.subjectUserId, bodyKey: p.bodyKey, error: (err as Error).message });
     return null;
   }
 }
@@ -1088,7 +1089,7 @@ async function recordAndCount(p: Omit<RecordMessageParams, "audience">): Promise
   try {
     return await unreadCount(subInbox(p.subjectUserId), [messageId]);
   } catch (err) {
-    console.error("[messages] badge count failed", err);
+    structuredLog("messages", "badge_count_failed", { subjectUserId: p.subjectUserId, error: (err as Error).message });
     return undefined;
   }
 }

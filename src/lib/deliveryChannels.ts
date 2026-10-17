@@ -6,6 +6,7 @@ import {
 import { hasPushTarget } from "@/lib/push";
 import { mailReaches } from "@/lib/mail";
 import { telegramChatReachable } from "@/lib/telegram";
+import { structuredLog } from "@/lib/serverLog";
 
 /**
  * Was der Versand über einen Empfänger wissen muss, um seine Kanäle zu bestimmen — seine drei Stufen
@@ -63,7 +64,7 @@ export async function deliveryChannels(
     const telegram = !!chatId && await telegramChatReachable(chatId);
     return applyDeadlineFallback(chosen, { mail, push, telegram });
   } catch (err) {
-    console.error("[notify] deadline reach check failed", err);
+    structuredLog("notify", "deadline_reach_check_failed", { userId: recipient.id, error: (err as Error).message });
     return chosen;
   }
 }
@@ -79,7 +80,7 @@ export async function deliveryChannelsForUser(userId: string, priority: MessageP
     if (!user) return ALL_CHANNELS;
     return await deliveryChannels(user, priority);
   } catch (err) {
-    console.error("[notify] level lookup failed", err);
+    structuredLog("notify", "level_lookup_failed", { userId, error: (err as Error).message });
     return ALL_CHANNELS;
   }
 }
