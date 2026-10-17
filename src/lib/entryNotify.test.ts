@@ -23,11 +23,13 @@ vi.mock("@/lib/mail", async (importOriginal) => ({
   appBaseUrl: () => "https://kg.example",
 }));
 vi.mock("@/lib/push", () => ({ sendPushToUser: vi.fn() }));
+vi.mock("@/lib/telegram", () => ({ sendTelegram: vi.fn() }));
 vi.mock("@/lib/keyholder", () => ({ getControllersOfUser: vi.fn() }));
 
 import { notifyControllersAboutEntry, type EntryNotifyParams } from "./entryNotify";
 import { sendMailSafe } from "@/lib/mail";
 import { sendPushToUser } from "@/lib/push";
+import { sendTelegram } from "@/lib/telegram";
 import { getControllersOfUser } from "@/lib/keyholder";
 import { deliveryChannels } from "@/lib/deliveryChannels";
 
@@ -102,6 +104,33 @@ describe("notifyControllersAboutEntry", () => {
     const titles = Object.fromEntries(push.mock.calls.map((c) => [c[0], c[1]]));
     expect(titles["kh-de"]).toContain("hat sich eingeschlossen");
     expect(titles["kh-en"]).toContain("locked up");
+  });
+
+  it("Telegram: derselbe Text wie die Push, nur an Empfänger mit verknüpftem Chat", async () => {
+    prefs.mockResolvedValue({ mail: false, push: true, telegram: true });
+    controllers.mockResolvedValue([
+      { id: "kh-de", email: "de@example.com", locale: "de", telegramChatId: "chat-de" },
+      { id: "kh-en", email: "en@example.com", locale: "en", telegramChatId: null },
+    ]);
+
+    await notifyControllersAboutEntry(BASE);
+
+    const telegram = sendTelegram as unknown as ReturnType<typeof vi.fn>;
+    expect(telegram).toHaveBeenCalledOnce();
+    const [chatId, text] = telegram.mock.calls[0];
+    const dePush = push.mock.calls.find((c) => c[0] === "kh-de")!;
+    expect(chatId).toBe("chat-de");
+    expect(text).toBe(`${dePush[1]}\n\n${dePush[2]}`);
+  });
+
+  it("Mail trägt den Titel hinter dem Anwendungsnamen und geht nur an Empfänger mit Adresse", async () => {
+    controllers.mockResolvedValue([
+      { id: "kh-de", email: "de@example.com", locale: "de" },
+      { id: "kh-none", email: null, locale: "de" },
+    ]);
+    await notifyControllersAboutEntry(BASE);
+    expect(mail).toHaveBeenCalledOnce();
+    expect(subjectTo("de@example.com")).toMatch(/ – trublue hat sich eingeschlossen/);
   });
 
   it("schweigt, wenn der Empfänger diese Meldung abgeschaltet hat", async () => {

@@ -1,8 +1,8 @@
 import { prisma } from "@/lib/prisma";
-import { sendMailSafe, escHtml, appBaseUrl, dashboardEmailHtml } from "@/lib/mail";
+import { escHtml, appBaseUrl, dashboardEmailHtml } from "@/lib/mail";
 import { emailT, localeT, type EmailTranslator } from "@/lib/emailI18n";
-import { sendPushToUser } from "@/lib/push";
-import { sendTelegram } from "@/lib/telegram";
+import { deliverToChannels } from "@/lib/notify";
+import { structuredLog } from "@/lib/serverLog";
 import { getControllersOfUser } from "@/lib/keyholder";
 import { deliveryChannels } from "@/lib/deliveryChannels";
 import { effectiveOeffnenGruende, effectiveOrgasmusArten, resolveReasonLabel, resolveOrgasmusArtDisplay } from "@/lib/reasonsService";
@@ -226,34 +226,30 @@ export async function notifyControllersAboutEntry(p: EntryNotifyParams): Promise
       };
       const { title, pushBody } = renderHeadline(p, t, time, labels);
 
-      await Promise.allSettled(
-        group.filter((r) => r.channels.push).map((r) => sendPushToUser(r.id, title, pushBody, adminUrl)),
-      );
-      // Telegram: derselbe kurze Text wie der Push, an jeden Empfänger mit verknüpftem Chat.
-      await Promise.allSettled(
-        group.filter((r) => r.channels.telegram && r.telegramChatId)
-          .map((r) => sendTelegram(r.telegramChatId!, `${title}\n\n${pushBody}`)),
-      );
-      if (!group.some((r) => r.channels.mail && r.email)) continue;
-
       // Der geteilte Rahmen (`dashboardEmailHtml`), nicht eine eigene Kopie: die Farbe der
-      // Eintragsart trägt der Balken am Titel, den `heading` roh aufnimmt.
+      // Eintragsart trägt der Balken am Titel, den `heading` roh aufnimmt. Gebaut wird er höchstens
+      // einmal je Sprache, und nur, wenn überhaupt jemand in der Gruppe eine Mail bekommt.
       const accent = TYPE_EMAIL_COLORS[p.type] ?? "#1e293b";
-      const emailHtml = dashboardEmailHtml(
-        `<span style="border-left:4px solid ${accent};padding-left:12px">${escHtml(title)}</span>`,
-        `<table style="width:100%;border-collapse:collapse;font-size:14px;color:#334155">
+      let emailHtml: string | undefined;
+      const mail = () => ({
+        subject: title,
+        html: emailHtml ??= dashboardEmailHtml(
+          `<span style="border-left:4px solid ${accent};padding-left:12px">${escHtml(title)}</span>`,
+          `<table style="width:100%;border-collapse:collapse;font-size:14px;color:#334155">
             ${renderDetails(p, t, time, labels, locale).map((d) => `<tr><td style="padding:6px 0;border-bottom:1px solid #f1f5f9">${d}</td></tr>`).join("")}
           </table>`,
-        t("entryAdminButton"),
-        {
-          buttonHref: adminLink,
-          afterHtml: `<p style="color:#94a3b8;font-size:12px">${escHtml(t("inspectionLinkFallback", { link: adminLink }))}</p>`,
-        },
-      );
+          t("entryAdminButton"),
+          {
+            buttonHref: adminLink,
+            afterHtml: `<p style="color:#94a3b8;font-size:12px">${escHtml(t("inspectionLinkFallback", { link: adminLink }))}</p>`,
+          },
+        ),
+      });
 
-      for (const r of group) {
-        if (r.email && r.channels.mail) void sendMailSafe(r.email, `${APP_NAME} – ${title}`, emailHtml);
-      }
+      // Push und Telegram tragen denselben kurzen Text; die Kanäle jedes Empfängers stehen an ihm.
+      await Promise.all(group.map((r) => deliverToChannels(r, r.channels, { mail, title, body: pushBody, url: adminUrl })));
     }
-  } catch { /* ignore notification errors */ }
+  } catch (e) {
+    structuredLog("notify", "entry_notify_failed", { userId: p.userId, error: (e as Error).message });
+  }
 }
