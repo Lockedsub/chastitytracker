@@ -2,6 +2,7 @@ import webpush from "web-push";
 import { prisma } from "@/lib/prisma";
 import { structuredLog } from "@/lib/serverLog";
 import { isAllowedPushEndpoint } from "@/lib/pushEndpoint";
+import { apnsProviderToken } from "@/lib/apnsAuth";
 
 const plog = (label: string, fields: Record<string, unknown>) => structuredLog("push", label, fields);
 
@@ -36,6 +37,13 @@ const APNS_TEAM_ID     = process.env.APNS_TEAM_ID;
 const APNS_BUNDLE_ID   = process.env.APNS_BUNDLE_ID;    // e.g. ch.chastitytracker.app
 const FCM_SERVER_KEY   = process.env.FCM_SERVER_KEY;
 
+/** Der APNs-Schlüssel — aus der ENV oder asynchron von der Platte (nie `readFileSync` im Request-Pfad). */
+async function loadApnsKey(): Promise<string> {
+  if (APNS_KEY_CONTENT) return APNS_KEY_CONTENT.replace(/\\n/g, "\n"); // escaped newlines in env vars
+  const { default: fs } = await import("fs");
+  return fs.promises.readFile(APNS_KEY_PATH!, "utf8");
+}
+
 /** Send via APNs (HTTP/2). `badge` = ungelesene Nachrichten; siehe sendPushToUser. */
 async function sendApns(token: string, title: string, body: string, url?: string, badge?: number): Promise<NativeSendResult> {
   const hasKey = APNS_KEY_PATH || APNS_KEY_CONTENT;
@@ -44,22 +52,8 @@ async function sendApns(token: string, title: string, body: string, url?: string
     return { ok: false, invalid: false };
   }
   try {
-    const { createSign } = await import("crypto");
-
-    let key: string;
-    if (APNS_KEY_CONTENT) {
-      key = APNS_KEY_CONTENT.replace(/\\n/g, "\n"); // support escaped newlines in env vars
-    } else {
-      const { default: fs } = await import("fs");
-      key = fs.readFileSync(APNS_KEY_PATH!, "utf8");
-    }
-    const now = Math.floor(Date.now() / 1000);
-
-    // JWT for APNs provider auth token
-    const header = Buffer.from(JSON.stringify({ alg: "ES256", kid: APNS_KEY_ID })).toString("base64url");
-    const claims = Buffer.from(JSON.stringify({ iss: APNS_TEAM_ID, iat: now })).toString("base64url");
-    const sig = createSign("SHA256").update(`${header}.${claims}`).sign({ key, dsaEncoding: "ieee-p1363" });
-    const jwt = `${header}.${claims}.${sig.toString("base64url")}`;
+    // Der Provider-Token (und damit der Schlüssel) wird gemerkt, nicht je Push neu gebaut.
+    const jwt = await apnsProviderToken({ keyId: APNS_KEY_ID, teamId: APNS_TEAM_ID, loadKey: loadApnsKey });
 
     // Ohne `badge` bleibt das Feld WEG — ein Payload ohne badge lässt das bestehende App-Badge
     // unverändert. Eine feste 0 einzusetzen würde jede Meldung, die keine Nachricht begleitet
@@ -216,7 +210,9 @@ export async function hasPushTarget(userId: string): Promise<boolean> {
  *  fängt intern NICHT alles (die Prisma-Reads/Cleanups laufen ausserhalb try/catch), ein Reject
  *  eines unawaited Promise würde sonst als unhandledRejection den Prozess beenden. */
 export function firePush(userId: string, title: string, body: string, url?: string, badge?: number): void {
-  sendPushToUser(userId, title, body, url, badge).catch(() => { /* ignore push errors */ });
+  sendPushToUser(userId, title, body, url, badge).catch((e: unknown) => {
+    plog("fire_failed", { userId, error: (e as Error).message });
+  });
 }
 
 /**
@@ -278,7 +274,7 @@ async function sendWebPushToUser(
         if (status === 404 || status === 410) {
           stale.push(sub.id);
         } else {
-          console.error("[push] sendNotification failed for", sub.id, err);
+          plog("web:send_failed", { subscriptionId: sub.id, status: status ?? "none", error: (err as Error).message });
         }
       }
     })
