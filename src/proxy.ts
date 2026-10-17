@@ -56,7 +56,7 @@ export default auth(async (req) => {
 
   // /api/mcp authenticates itself via bearer token (withMcpAuth) — exempt from the NextAuth session gate.
   // OAuth endpoints are public: clients call them directly; the consent page redirects to /login itself.
-  // /api/mcp, /api/sse, /api/message: mcp-handler transport paths — all authenticated via withMcpAuth (bearer token), not session.
+  // /api/mcp (+ legacy /api/sse, /api/message names, answered 405 by mcp-handler 2.x): bearer token via withMcpAuth, not session.
   const isAuthRoute = pathname.startsWith("/api/auth") || pathname === "/login" || pathname === "/api/version" || pathname === "/api/heartbeat" || pathname === "/api/upstream-changelog" || pathname === "/api/portal-login"
     || pathname === "/api/mcp" || pathname === "/api/sse" || pathname === "/api/message"
     || pathname.startsWith("/api/integration/") // Heimdall-Box: Shared-Secret (requireBoxSync), keine Session
