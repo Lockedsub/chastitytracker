@@ -234,7 +234,6 @@ Nach dem Dispatch mit `gh run watch <run-id> --exit-status` oder `gh run view <r
 - `GET/POST /api/admin/vorgaben` – Trainingsvorgaben
 - `PATCH/DELETE /api/admin/vorgaben/[id]` – Vorgabe bearbeiten / löschen
 - `PATCH /api/settings/password` – Eigenes Passwort ändern
-- `POST /api/admin/demo` – DemoUser mit Beispieldaten anlegen (nur Admin)
 - `POST /api/admin/kontrolle` – Kontrolle anfordern: sendet 5-stelligen Code per E-Mail, Frist per `deadlineH` (Vorgabe 1h, Bruchteile erlaubt) (nur Admin, User muss verschlossen sein)
 - `POST /api/auth/forgot-password` – Passwort-Reset-Token per E-Mail senden
 - `POST /api/auth/reset-password` – Passwort mit Token zurücksetzen

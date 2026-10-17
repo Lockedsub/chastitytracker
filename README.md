@@ -235,7 +235,6 @@ ALLOW_ENTRY_GAP=true               # allow keyholders (and the MCP tools add_mis
 DISABLE_FEEDBACK=true              # hide the in-app feedback button (disables upstream forwarding)
 DISABLE_UPDATE_CENSUS=true         # opt out of the deployment and usage census (see docs/update-check.md)
 UPSTREAM_CHANGELOG_URL=<url>       # override the changelog source (a self-set value also disables the census)
-ENABLE_DEMO=true                   # optional: allow /api/admin/demo endpoint
 BUILD_DATE=<iso-date>              # optional: shown in footer; set at build time
 ```
 
@@ -705,7 +704,6 @@ The keyholder inbox mirrors these under `/api/admin/messages` (`GET`, `[id]`, `[
 | `POST/DELETE` | `/api/admin/users/[id]/keyholders` | Assign / remove a keyholder for a user |
 | `GET/POST` | `/api/admin/vorgaben` | List / create training goals |
 | `PATCH/DELETE` | `/api/admin/vorgaben/[id]` | Update / delete training goal |
-| `POST` | `/api/admin/demo` | Create demo user with sample data (requires `ENABLE_DEMO=true`) |
 
 ### Auth, Passkeys & Settings
 

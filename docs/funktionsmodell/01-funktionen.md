@@ -6,7 +6,7 @@
 Was der Tracker kann — flach aufgelistet, nach Mechanik gruppiert. Für den Betrieb, nicht für
 Endnutzer: die Spalte **Endpunkt** nennt die API-Route bzw. das MCP-Werkzeug dahinter.
 
-120 Funktionen über 19 Mechaniken, davon 14 ohne jede Bedienung — sie laufen von selbst.
+119 Funktionen über 19 Mechaniken, davon 14 ohne jede Bedienung — sie laufen von selbst.
 
 **Wer** ist der Auslöser, **Wo** die Oberfläche. Eine Funktion mit zwei Oberflächen ist EINE
 Funktion: „Kontrolle anfordern" gibt es in der App und über den MCP, und beide Wege enden im
@@ -32,7 +32,6 @@ Steckbrief: [15-eintraege.md](15-eintraege.md)
 | **Roh-Einträge lesen** | Die unaufbereitete Eintragsliste für die Keyholder-KI. | Keyholder (MCP) | MCP | `list_entries` |
 | **Foto hochladen und ausliefern** | Nimmt Bilder entgegen (Endungs-Whitelist, Magic-Byte-Prüfung, Grössenlimit) und liefert sie nur authentifiziert wieder aus. | Sub, Keyholder (UI) | App (Träger), App (Keyholder) | `/api/upload` `/api/uploads/[...path]` |
 | **Bild an die Keyholder-KI geben** | Liefert ein hinterlegtes Foto an den MCP, damit die KI es selbst ansehen kann. | Keyholder (MCP) | MCP | `get_image` |
-| **Demo-Daten anlegen** | Erzeugt einen Beispiel-Träger mit Beispiel-Einträgen. <br>*Nur erreichbar, wenn ausdrücklich per Umgebungsvariable freigeschaltet — sonst 404.* | Keyholder (UI) | App (Keyholder) | `/api/admin/demo` |
 
 ## Sessions/Statistik
 

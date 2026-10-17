@@ -65,7 +65,6 @@ export const FM_MCP_EXEMPT: Record<string, string> = {
   // ── Absicht: gehört nicht in die Hand einer KI ─────────────────────────────────────────────
   "user-manage": "Absicht: Passwörter, E-Mail, Benutzername, Löschen — Zugang und Identität. Eine KI mit Passwort-Hoheit könnte den Träger aussperren.",
   "keyholder-assign": "Absicht: die KI entschiede über ihre eigene Berufung mit.",
-  "demo-data": "Absicht: Werkzeug des Betreibers, nicht der Keyholderin (zusätzlich ENV-gegated).",
   "photo-analysis": "Absicht: Anbieter und API-Schlüssel der Foto-Prüfung entscheiden über Datenweg und Kosten der ganzen Instanz — eine Entscheidung des Betreibers, nicht der Keyholderin. Den Stand LIEST die KI in `get_context` (`photoAnalysis`).",
   // ── Absicht: technisch nicht KI-fähig ──────────────────────────────────────────────────────
   "upload": "Absicht: eine KI liefert keine Fotos. Die Leserichtung deckt `get_image` ab.",
@@ -845,12 +844,6 @@ export const FM_CAPABILITIES: FmCapability[] = [
     id: "app-links", mechanic: "Zugang", title: "App-Verknüpfung für iOS",
     what: "Die Datei, mit der iOS Links dieser Instanz der App zuordnet.",
     actors: ["system"], surfaces: ["extern"], routes: ["/api/apple-app-site-association"],
-  }),
-  c({
-    id: "demo-data", mechanic: "Einträge", title: "Demo-Daten anlegen",
-    what: "Erzeugt einen Beispiel-Träger mit Beispiel-Einträgen.",
-    actors: ["admin"], surfaces: ["admin-ui"], routes: ["/api/admin/demo"],
-    note: "Nur erreichbar, wenn ausdrücklich per Umgebungsvariable freigeschaltet — sonst 404.",
   }),
   c({
     id: "photo-analysis", mechanic: "Zugang", title: "Foto-Prüfung einrichten",
