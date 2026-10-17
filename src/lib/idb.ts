@@ -1,7 +1,8 @@
 // ---------------------------------------------------------------------------
 // IndexedDB helpers for offline-first PWA support
 // Database: kg-tracker v2
-// Stores: entries (cached from server), offline-queue (pending mutations),
+// Stores: entries (legacy, wird nicht mehr gelesen oder geschrieben; Entfernen bräuchte eine
+//         DB-Versionserhöhung), offline-queue (pending mutations),
 //         offline-blobs (photos captured offline, uploaded on flush)
 // ---------------------------------------------------------------------------
 
@@ -38,18 +39,6 @@ export function parseOfflineBlobToken(value: unknown): string | null {
 }
 
 // ── Types ──────────────────────────────────────────────────────────────────
-
-export interface CachedEntry {
-  id: string;
-  type: string;
-  startTime: string;
-  imageUrl: string | null;
-  note: string | null;
-  orgasmusArt: string | null;
-  kontrollCode: string | null;
-  oeffnenGrund: string | null;
-  verifikationStatus: string | null;
-}
 
 export interface QueuedMutation {
   id?: number; // auto-increment key
@@ -117,43 +106,6 @@ function openDB(): Promise<IDBDatabase> {
   });
 
   return dbPromise;
-}
-
-// ── Entries store ──────────────────────────────────────────────────────────
-
-/** Get all cached entries, sorted by startTime descending. */
-export async function getAllEntries(): Promise<CachedEntry[]> {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_ENTRIES, "readonly");
-    const store = tx.objectStore(STORE_ENTRIES);
-    const req = store.getAll();
-    req.onsuccess = () => {
-      const entries = (req.result as CachedEntry[]).sort(
-        (a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime()
-      );
-      resolve(entries);
-    };
-    req.onerror = () => reject(req.error);
-  });
-}
-
-/** Replace all cached entries with fresh data from the server. */
-export async function putEntries(entries: CachedEntry[]): Promise<void> {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_ENTRIES, "readwrite");
-    const store = tx.objectStore(STORE_ENTRIES);
-
-    // Clear existing entries and replace with fresh data
-    store.clear();
-    for (const entry of entries) {
-      store.put(entry);
-    }
-
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
 }
 
 // ── Offline queue store ────────────────────────────────────────────────────

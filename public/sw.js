@@ -170,21 +170,13 @@ self.addEventListener('fetch', (e) => {
     return;
   }
 
-  // 3. Entries API (GET /api/entries) → stale-while-revalidate
-  if (url.pathname === '/api/entries' && request.method === 'GET') {
-    const { response, networkPromise } = staleWhileRevalidate(request, CACHE_API);
-    e.waitUntil(networkPromise);
-    e.respondWith(response);
-    return;
-  }
-
-  // 4. Navigation requests → network-first with offline fallback
+  // 3. Navigation requests → network-first with offline fallback
   if (request.mode === 'navigate') {
     e.respondWith(networkFirstNavigation(request));
     return;
   }
 
-  // 5. Everything else → network-only (mutations, auth, etc.)
+  // 4. Everything else → network-only (mutations, auth, etc.)
   // Let the browser handle it normally
 });
 
@@ -214,51 +206,6 @@ async function cacheFirst(request, cacheName) {
     }
     throw err;
   }
-}
-
-/**
- * Stale-while-revalidate: serve cached immediately, update in background.
- * Returns { response: Promise<Response>, networkPromise: Promise } so the
- * caller can hand both to e.respondWith() and e.waitUntil() respectively.
- * Notifies clients via a signal-only postMessage (no body serialisation).
- */
-function staleWhileRevalidate(request, cacheName) {
-  const cacheOpenPromise = caches.open(cacheName);
-
-  const networkPromise = cacheOpenPromise
-    .then((cache) =>
-      fetch(request).then(async (response) => {
-        if (response.ok) {
-          await cache.put(request, response.clone());
-          // Signal only — client fetches fresh data itself
-          const clients = await self.clients.matchAll({ type: 'window' });
-          clients.forEach((c) => c.postMessage({ type: 'SW_ENTRIES_UPDATED' }));
-        }
-        return response;
-      })
-    )
-    .catch((err) => {
-      console.warn('[SW] background revalidation failed:', err);
-      return null;
-    });
-
-  const response = cacheOpenPromise
-    .then((cache) => cache.match(request))
-    .then(async (cached) => {
-      if (cached) return cached;
-
-      // No cache: wait for network
-      const networkResponse = await networkPromise;
-      if (networkResponse) return networkResponse;
-
-      // Both cache and network failed
-      return new Response(JSON.stringify([]), {
-        status: 503,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    });
-
-  return { response, networkPromise };
 }
 
 /**
@@ -361,37 +308,7 @@ async function drainOfflineQueue() {
 }
 
 // ---------------------------------------------------------------------------
-// Periodic Background Sync (Android Chrome only — requires site engagement)
-// Refreshes cached entries every 12 hours in the background.
-// ---------------------------------------------------------------------------
-self.addEventListener('periodicsync', (e) => {
-  if (e.tag === 'refresh-entries') {
-    e.waitUntil(refreshEntriesCache());
-  }
-});
-
-async function refreshEntriesCache() {
-  try {
-    const response = await fetch('/api/entries', { cache: 'no-store' });
-    if (response.ok) {
-      const cache = await caches.open(CACHE_API);
-      await cache.put(new Request('/api/entries'), response.clone());
-
-      // Also update IndexedDB
-      const entries = await response.json();
-      const db = await openIDB();
-      const tx = db.transaction('entries', 'readwrite');
-      const store = tx.objectStore('entries');
-      store.clear();
-      entries.forEach((entry) => store.put(entry));
-    }
-  } catch (err) {
-    console.warn('[SW] periodic entries refresh failed:', err);
-  }
-}
-
-// ---------------------------------------------------------------------------
-// IndexedDB helpers (minimal — only used by SW for background sync)
+// IndexedDB helpers (minimal — only used by SW for the offline queue / cache clearing)
 // ---------------------------------------------------------------------------
 function openIDB() {
   return new Promise((resolve, reject) => {
