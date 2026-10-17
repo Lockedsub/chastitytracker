@@ -4,7 +4,7 @@ import {
   RELEASE_WINDOW_HOURS_RANGE,
 } from "@/lib/constants";
 import { serviceErrors, mapServiceError, type ServiceResult } from "@/lib/serviceResult";
-import { dayNumber, isUnderweightTarget, weightDayKey, weightProblem } from "@/lib/weight";
+import { addWeightDays, dayNumber, isUnderweightTarget, weightDayKey, weightProblem } from "@/lib/weight";
 import { APP_TZ, clamp } from "@/lib/utils";
 import { evaluateRelease, isReleaseDirection, thresholdOn, type ReleaseEvaluation } from "@/lib/weightRelease";
 import { movingAverage, type WeightPoint } from "@/lib/weightSeries";
@@ -200,7 +200,7 @@ export async function weightReleaseStatus(userId: string, now: Date = new Date()
     ...evaluation,
     release,
     nextThresholdKg: release.stepKg > 0
-      ? thresholdOn(release, weightDayKey(new Date(now.getTime() + 86_400_000), tz), tz)
+      ? thresholdOn(release, addWeightDays(weightDayKey(now, tz), 1), tz)
       : null,
   };
 }
