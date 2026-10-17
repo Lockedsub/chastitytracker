@@ -3,14 +3,12 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 /**
  * `processDueOrgasmusAnforderungen` — der Poller-Pfad, der eine terminierte Orgasmus-Anweisung zustellt.
  *
- * Zwischen dem Lesen der fälligen Zeilen und dem Versand kann die Keyholderin die Anweisung
- * zurückziehen. Das abschliessende `update` auf die id prüfte `withdrawnAt` nicht: die Mail ging an
- * den Träger, und der Stempel schrieb die Zeile zurück in den Zustand „zugestellt" — für eine
- * Anweisung, die es nicht mehr gibt. Jetzt wird die Zeile ZUERST mit Zustandsbedingung beansprucht
- * (wie `dispatchDueTasks`), und nur wer sie bekommt, benachrichtigt.
+ * Zwei Zusagen: (1) zieht die Keyholderin zwischen Auswahl und Versand zurück, geht keine Meldung
+ * raus und der Stempel weckt die Zeile nicht auf; (2) der Zustellstempel kommt erst NACH dem
+ * Versand — ein Absturz dazwischen ist höchstens eine doppelte Meldung, nie ein stiller Verlust.
  */
 vi.mock("@/lib/prisma", () => ({
-  prisma: { orgasmusAnforderung: { findMany: vi.fn(), updateMany: vi.fn() } },
+  prisma: { orgasmusAnforderung: { findMany: vi.fn(), count: vi.fn(), update: vi.fn(), updateMany: vi.fn() } },
 }));
 vi.mock("@/lib/orgasmusAnforderungService", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/orgasmusAnforderungService")>();
@@ -21,8 +19,7 @@ import { processDueOrgasmusAnforderungen } from "./kontrollePoller";
 import { prisma } from "@/lib/prisma";
 import { sendOrgasmusAnforderungNotifications } from "@/lib/orgasmusAnforderungService";
 
-const findMany = prisma.orgasmusAnforderung.findMany as unknown as ReturnType<typeof vi.fn>;
-const updateMany = prisma.orgasmusAnforderung.updateMany as unknown as ReturnType<typeof vi.fn>;
+const db = prisma.orgasmusAnforderung as unknown as Record<"findMany" | "count" | "update" | "updateMany", ReturnType<typeof vi.fn>>;
 const send = sendOrgasmusAnforderungNotifications as unknown as ReturnType<typeof vi.fn>;
 
 const NOW = new Date("2026-07-25T15:00:00Z");
@@ -36,31 +33,46 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.useFakeTimers();
   vi.setSystemTime(NOW);
-  findMany.mockResolvedValue([due]);
-  updateMany.mockResolvedValue({ count: 1 });
+  db.findMany.mockResolvedValue([due]);
+  db.count.mockResolvedValue(1);
+  db.updateMany.mockResolvedValue({ count: 1 });
 });
 
 describe("processDueOrgasmusAnforderungen", () => {
-  it("beansprucht die Zeile mit Zustandsbedingung und stellt dann zu", async () => {
+  it("offene Zeile: frisch gelesen, versendet, danach gestempelt (Reihenfolge Lesen → Senden → Stempel)", async () => {
     await processDueOrgasmusAnforderungen(NOW);
-    expect(updateMany).toHaveBeenCalledWith(expect.objectContaining({
-      where: expect.objectContaining({ id: "oa1", withdrawnAt: null, benachrichtigtAt: null }),
-    }));
+    expect(db.count).toHaveBeenCalledWith({ where: expect.objectContaining({ id: "oa1", withdrawnAt: null, benachrichtigtAt: null }) });
     expect(send).toHaveBeenCalledTimes(1);
+    expect(db.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ id: "oa1", withdrawnAt: null }),
+      data: expect.objectContaining({ benachrichtigtAt: expect.any(Date) }),
+    }));
+    const order = (m: ReturnType<typeof vi.fn>) => m.mock.invocationCallOrder[0];
+    expect(order(db.count)).toBeLessThan(order(send));
+    expect(order(send)).toBeLessThan(order(db.updateMany));
   });
 
-  it("zurückgezogen zwischen Auswahl und Versand (count 0): nicht benachrichtigen", async () => {
-    updateMany.mockResolvedValue({ count: 0 });
+  it("zwischen Auswahl und Versand zurückgezogen: keine Meldung, kein Stempel", async () => {
+    db.count.mockResolvedValue(0);
     await processDueOrgasmusAnforderungen(NOW);
     expect(send).not.toHaveBeenCalled();
+    expect(db.updateMany).not.toHaveBeenCalled();
   });
 
-  it("scheitert der Versand, wird der Anspruch zurückgenommen (nächster Tick versucht es erneut)", async () => {
+  it("der Stempel steht NICHT vor dem Versand: scheitert die Meldung, ist nichts gestempelt (Retry, kein stiller Verlust)", async () => {
     send.mockRejectedValueOnce(new Error("smtp down"));
     vi.spyOn(console, "error").mockImplementation(() => {});
     await processDueOrgasmusAnforderungen(NOW);
-    const revert = updateMany.mock.calls.at(-1)?.[0];
-    expect(revert.where).toMatchObject({ id: "oa1", withdrawnAt: null });
-    expect(revert.data).toMatchObject({ benachrichtigtAt: null, beginsAt: due.beginsAt, endsAt: due.endsAt });
+    expect(db.updateMany).not.toHaveBeenCalled();
+    expect(db.update).not.toHaveBeenCalled();
+  });
+
+  it("Container-Tod zwischen Versand und Stempel: die Zeile bleibt ungestempelt fällig (nächster Tick sendet höchstens doppelt)", async () => {
+    db.updateMany.mockRejectedValueOnce(new Error("killed"));
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    await processDueOrgasmusAnforderungen(NOW);
+    expect(send).toHaveBeenCalledTimes(1);
+    // nichts hat benachrichtigtAt gesetzt → dueForDispatchWhere trifft die Zeile im nächsten Tick wieder
+    expect(db.updateMany).toHaveBeenCalledTimes(1);
   });
 });
