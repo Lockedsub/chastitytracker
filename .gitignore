@@ -70,9 +70,9 @@ dev.db-journal
 # Persönlicher Keyholder-Rollentext — nicht ins öffentliche Repo
 keyholder-instructions.md
 
-# Runtime-Uploads gehören nie ins Repo (öffentlich!)
-/public/uploads/*
-!/public/uploads/.gitkeep
+# Fotos liegen in data/uploads (ausserhalb von public/, nur über die auth-geschützte Route).
+# public/uploads gibt es nicht mehr; die Zeile hält eine alte lokale Kopie aus dem Repo.
+/public/uploads/
 
 # Obsidian-Konfiguration des lokalen Vaults — persönlich, gehört nicht ins Repo
 docs/.obsidian/

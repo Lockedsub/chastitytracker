@@ -30,7 +30,7 @@ const DAY = 86_400_000;
 // Pick an existing upload so the auth-guarded /api/uploads/[...path] route can serve it.
 // If no uploads exist, imageUrl stays null for every entry (images are optional).
 function discoverPlaceholders() {
-  const uploadsDir = path.resolve(process.cwd(), "public/uploads");
+  const uploadsDir = path.resolve(process.cwd(), "data/uploads");
   try {
     const files = fs.readdirSync(uploadsDir).filter((f) => /\.(jpe?g|png|webp)$/i.test(f));
     return files.slice(0, 8).map((f) => `/api/uploads/${f}`);

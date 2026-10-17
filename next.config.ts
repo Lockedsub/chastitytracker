@@ -83,13 +83,6 @@ const nextConfig: NextConfig = {
         ],
       },
       {
-        // Hochgeladene Fotos dürfen gecacht werden
-        source: "/uploads/(.*)",
-        headers: [
-          { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
-        ],
-      },
-      {
         // Service Worker darf nicht langfristig gecacht werden
         source: "/sw.js",
         headers: [
