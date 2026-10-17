@@ -14,6 +14,7 @@ import { isUniqueConstraintOn } from "@/lib/prismaErrors";
 import { setBoxCommandForUser, boxCommandForEntry } from "@/lib/boxCommand";
 import { announceBoxCommand } from "@/lib/boxCommandNotify";
 import { deviceCheckApplies, runDeviceCheck } from "@/lib/deviceCheckService";
+import { codeChangeCheckApplies, runCodeChangeCheck } from "@/lib/lockboxCodeCheckService";
 import { runInspectionVerification } from "@/lib/inspectionVerificationService";
 import { structuredLog } from "@/lib/serverLog";
 import { applyEntryFulfilment, applyEntryAftermath } from "@/lib/entryFulfilment";
@@ -121,6 +122,10 @@ export async function POST(req: NextRequest) {
   // Trage-Kontrolle das gezeigte. Aus derselben Ziel-Auflösung wie `verification`, damit
   // Code-Prüfung und Geräte-Check dasselbe Ziel meinen.
   let inspectionExpectedDeviceId: string | null = null;
+  // Bildersafe-Codewechsel (#115): wie beim Geräte-Check entscheidet EINE Bedingung den
+  // "pending"-Startwert und den Lauf nach dem Commit. Vor der Transaktion, weil sie die
+  // Foto-Prüfungs-Einstellung liest.
+  const codeCheckRuns = type === "VERSCHLUSS" && (await codeChangeCheckApplies(codeImageUrl));
   try {
     entry = await prisma.$transaction(async (tx) => {
       // Validate deviceId ownership inside transaction (VERSCHLUSS / WEAR_*)
@@ -238,6 +243,7 @@ export async function POST(req: NextRequest) {
           // Bildersafe: versiegeltes Schlüsselbox-Code-Foto (nur VERSCHLUSS)
           codeImageUrl: type === "VERSCHLUSS" ? (codeImageUrl || null) : null,
           codeReadable: type === "VERSCHLUSS" && codeImageUrl ? (codeReadable ?? null) : null,
+          codeChangeCheck: codeCheckRuns ? "pending" : null,
           keyInBox: type === "VERSCHLUSS" ? keyInBoxDeclared : null,
           // Der Verschluss gilt sofort — ausser er wartet auf den Riegel. Die Regel steht in
           // `lockPending.ts`, weil JEDER Erzeuger eines VERSCHLUSS sie braucht.
@@ -366,6 +372,13 @@ export async function POST(req: NextRequest) {
       photoUrl: imageUrl!,
       expectedDeviceId: inspectionExpectedDeviceId,
     });
+  }
+
+  // Bildersafe-Codewechsel (#115): derselbe Vorgang wie im Formular „Code versiegeln", hier für das
+  // Code-Foto, das direkt mit dem Verschluss kam. Ersetzt das oben gesetzte "pending" und meldet
+  // `same`/`uncertain` der Keyholderin (lockboxCodeCheckService).
+  if (codeCheckRuns) {
+    void runCodeChangeCheck({ entryId: entry.id, userId: session.user.id, codeImageUrl, startTime: entry.startTime });
   }
 
   // Foto-Verifikation (Code bzw. nur Siegel) — der Vorgang inkl. der Pflicht, das oben gesetzte

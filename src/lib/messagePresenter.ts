@@ -76,7 +76,9 @@ export async function presentMessages(
     // parallel dazu und konnte den Posteingang noch nicht kennen.
     // Mit dem ZIEL (v5.0.1): ohne `categoryId` führte der Link einer Trage-Kontrolle aufs
     // KG-Formular, und die Einreichung von dort erfüllt sie nicht.
-    refHref: m.refActionCode ? inspectionHref(m.refActionCode, { categoryId: m.refActionCategoryId }) : null,
+    refHref: m.refActionCode
+      ? inspectionHref(m.refActionCode, { categoryId: m.refActionCategoryId })
+      : m.refTarget,
     subjectUsername: m.subjectUsername,
     senderKind: m.senderKind,
     senderName: m.senderName,

@@ -556,6 +556,13 @@ export const FM_CAPABILITIES: FmCapability[] = [
     actors: ["sub"], surfaces: ["sub-ui"], routes: ["/api/bildersafe/seal"],
     note: "Gespeichert wird nur, ob Ziffern lesbar waren — nie die Zahl selbst.",
   }),
+  c({
+    id: "bildersafe-code-change", mechanic: "Bildersafe", title: "Codewechsel beim Versiegeln prüfen",
+    what: "Vergleicht das neue Code-Foto mit dem zuletzt versiegelten: derselbe Code fordert den Sub zum Verstellen auf, ein unsicherer oder trotzdem gleicher Vergleich geht als Meldung an die Keyholderin, mit beiden Fotos in einer Vergleichsansicht.",
+    actors: ["sub", "system", "admin", "mcp"], surfaces: ["sub-ui", "automatik", "admin-ui", "mcp"],
+    routes: ["/api/bildersafe/code-check"], tools: ["list_entries"],
+    note: "Nur mit Vision-Provider; jedes Foto wird zweimal gelesen, „sicher\" nur bei gleichen Lesungen. Blockiert nie den Verschluss. Gespeichert und gemeldet wird nur das Urteil, nie die Ziffern. Die Vergleichsansicht sieht nur die ZUGEORDNETE Keyholderin.",
+  }),
 
   // ── Nachrichten ────────────────────────────────────────────────────────────────────────────
   c({

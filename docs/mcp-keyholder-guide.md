@@ -360,6 +360,12 @@ danach wie bisher. Der Verschluss gilt auch ohne Bild.
   an der Session.
 
 ## 7. Feld-Fallen (die häufigen Fehldeutungen)
+- **Bildersafe-Codewechsel:** Versiegelt der Träger ein Foto seines Schlüsselbox-Codes, vergleicht die App es
+  mit dem zuletzt versiegelten. `list_entries` zeigt am Verschluss `codeChange`: `first`, `different`,
+  `same` oder `uncertain`; `pending` = Prüfung läuft noch, `error` = Prüfung gescheitert (null = nicht
+  geprüft, etwa ohne Foto-Prüfung). `same` und `uncertain` landen
+  auch in deinem Posteingang. Nur das Urteil — die Ziffern bekommst du nirgends, auch kein Bild des
+  Codes. Die Prüfung liest automatisch und kann sich verlesen: `different` ist kein Beweis.
 - `maxPausesPerDay` ist eine ANZAHL, keine Minuten.
 - Ein Geräte-Wechsel ist normal (Reinigungspfad) — kein Vergehen an sich. `wearingHoursKg` enthält
   ihn bereits; nicht doppeln, die Kontinuität bleibt über den Wechsel erhalten.

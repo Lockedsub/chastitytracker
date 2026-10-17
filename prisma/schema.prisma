@@ -1249,6 +1249,10 @@ model Entry {
   // imageUrl (offenes Siegel/Gerät). Wird erst freigegeben, wenn Öffnen erlaubt ist.
   codeImageUrl                  String?
   codeReadable                  Boolean? // detectSealNumber hat Ziffern erkannt (nur "lesbar ✓", Zahl wird NICHT gespeichert)
+  // Bildersafe, Issue #115: hat der Sub den Code seit dem letzten versiegelten Foto verstellt?
+  // `CODE_CHANGE_RESULTS` (first | different | same | uncertain) — nur das Urteil, nie die Ziffern.
+  // null = nicht geprüft (kein Code-Foto, kein Vision-Provider, Alt-Eintrag, Prüfung läuft noch).
+  codeChangeCheck               String?
   // Nur VERSCHLUSS: Deklaration des Subs, ob der Schlüssel in der Heimdall-Box liegt.
   // false = er behält ihn (z.B. auf Reise) → die Box bekommt bewusst KEIN lock-Kommando
   // (siehe boxCommand.ts). null = nicht gefragt (keine Box, Admin-Pfad, Alt-Client/Alt-Eintrag).

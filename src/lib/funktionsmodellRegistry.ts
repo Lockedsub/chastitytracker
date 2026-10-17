@@ -845,6 +845,8 @@ export const FM_REGISTRY: FmEntry[] = [
     "Bildersafe: versiegeltes Foto des Schlüsselbox-Codes, für den Träger erst frei, wenn danach eine Öffnung erfasst ist."),
   x("runtime", "Entry", "codeReadable",
     "Ob im Bildersafe-Foto überhaupt Ziffern erkennbar waren. Die Zahl selbst wird bewusst nicht gespeichert."),
+  x("runtime", "Entry", "codeChangeCheck",
+    "Bildersafe (#115): ob der Code seit dem letzten versiegelten Foto verstellt wurde — first/different/same/uncertain, dazu pending (läuft) und error. Nur das Urteil, nie die Ziffern; bei same/uncertain geht eine Meldung an die Keyholderin."),
   x("record", "Entry", "boxImageUrl", "Aufnahme durch das Sichtfenster der Box als Schlüssel-Nachweis."),
   x("runtime", "Entry", "boxPhotoDueAt",
     "Ab wann das Box-Foto fällig ist: gesetzt, wenn die Box „Riegel zu\" meldet — ein Foto vorher belegte nichts. Einmal je Verschluss."),

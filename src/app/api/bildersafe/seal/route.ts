@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { bildersafeEnabled, isValidImageUrl } from "@/lib/constants";
 import { markLastAction } from "@/lib/appMeta";
 import { bildersafeMenuAction, getLatestKgEntry } from "@/lib/queries";
+import { codeChangeCheckApplies, runCodeChangeCheck } from "@/lib/lockboxCodeCheckService";
 
 /**
  * Bildersafe: ein versiegeltes Schlüsselbox-Code-Foto an den AKTUELLEN Verschluss hängen.
@@ -41,15 +42,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: ALREADY_SEALED }, { status: 409 });
   }
 
+  // Codewechsel gegen das zuletzt versiegelte Foto (#115) — verbindlich hier, nicht im Browser. Eine
+  // Bedingung für den "pending"-Startwert und den Lauf unten (lockboxCodeCheckService).
+  const codeCheckRuns = await codeChangeCheckApplies(codeImageUrl);
   // Zusätzlich bedingt schreiben: zwei gleichzeitige Anfragen bestehen beide die Prüfung oben,
   // gewinnen darf aber nur eine.
   const { count } = await prisma.entry.updateMany({
     where: { id: latest.id, codeImageUrl: null },
-    data: { codeImageUrl, codeReadable: codeReadable ?? null },
+    data: { codeImageUrl, codeReadable: codeReadable ?? null, codeChangeCheck: codeCheckRuns ? "pending" : null },
   });
   if (count === 0) {
     return NextResponse.json({ error: ALREADY_SEALED }, { status: 409 });
   }
   markLastAction();
+  if (codeCheckRuns) void runCodeChangeCheck({ entryId: latest.id, userId, codeImageUrl, startTime: latest.startTime });
   return NextResponse.json({ ok: true });
 }

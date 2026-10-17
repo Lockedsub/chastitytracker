@@ -1,3 +1,4 @@
+import { isCodeChangeState, type CodeChangeState } from "@/lib/lockboxCodeCheck";
 import { prisma } from "@/lib/prisma";
 import { formatDateTime, isTimeCorrected } from "@/lib/utils";
 import { effectiveDeviceCheckStatus } from "@/lib/deviceCheck";
@@ -65,6 +66,12 @@ export interface EntryRow {
   /** Das Box-Foto trägt eine Aufnahmezeit VOR „Riegel zu" (Hinweis aus EXIF/Dateizeit des Geräts, kein
    *  Beweis): es zeigt womöglich die noch offene Box und belegt dann nichts. Additiv. */
   boxImageBeforeBolt: boolean;
+  /** Bildersafe-Codewechsel (nur VERSCHLUSS mit Code-Foto, Issue #115): `first` = erstes versiegeltes
+   *  Foto · `different` = anderer Code als beim letzten · `same` = derselbe Code · `uncertain` = nicht
+   *  sicher lesbar, selbst ansehen · `pending` = Prüfung läuft noch · `error` = Prüfung gescheitert.
+   *  null = nicht geprüft (kein Code-Foto, kein Vision-Provider, Alt-Eintrag). Nur das Urteil — die
+   *  Ziffern gibt es nirgends. Additiv. */
+  codeChange: CodeChangeState | null;
   imageExifTime: string | null;
   /** True when the entered time differs from the creation time (back-/post-dated). */
   timeCorrected: boolean;
@@ -139,6 +146,7 @@ export async function listEntries(username: string, opts: ListEntriesOptions = {
       hasBoxImage: !!e.boxImageUrl,
       // Aufnahme VOR „Riegel zu" (EXIF/Dateizeit des Geräts, also ein Hinweis): das Foto zeigt womöglich die noch offene Box.
       boxImageBeforeBolt: e.boxImageBeforeBolt,
+      codeChange: isCodeChangeState(e.codeChangeCheck) ? e.codeChangeCheck : null,
       imageExifTime: e.imageExifTime ? formatDateTime(e.imageExifTime, undefined, timezone) : null,
       timeCorrected: isTimeCorrected(e.startTime, e.createdAt),
     })),

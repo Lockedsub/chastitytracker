@@ -1,5 +1,18 @@
 [
   {
+    "version": "6.4.3",
+    "date": "2026-10-17",
+    "changes": [
+      {
+        "type": "feat",
+        "text": {
+          "de": "Bildersafe: Beim Versiegeln vergleicht die App das Code-Foto mit dem letzten und warnt, wenn der Code nicht verstellt wurde. Bleibt es dabei oder ist der Vergleich unsicher, erfährt es die Keyholderin und sieht beide Fotos nebeneinander.",
+          "en": "Bildersafe: when sealing, the app compares the code photo with the previous one and warns if the code was not changed. If it stays that way or the comparison is uncertain, the keyholder is told and sees both photos side by side."
+        }
+      }
+    ]
+  },
+  {
     "version": "6.4.2",
     "date": "2026-10-15",
     "changes": [

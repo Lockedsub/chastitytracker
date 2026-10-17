@@ -6,7 +6,7 @@
 Was der Tracker kann — flach aufgelistet, nach Mechanik gruppiert. Für den Betrieb, nicht für
 Endnutzer: die Spalte **Endpunkt** nennt die API-Route bzw. das MCP-Werkzeug dahinter.
 
-115 Funktionen über 18 Mechaniken, davon 13 ohne jede Bedienung — sie laufen von selbst.
+116 Funktionen über 18 Mechaniken, davon 14 ohne jede Bedienung — sie laufen von selbst.
 
 **Wer** ist der Auslöser, **Wo** die Oberfläche. Eine Funktion mit zwei Oberflächen ist EINE
 Funktion: „Kontrolle anfordern" gibt es in der App und über den MCP, und beide Wege enden im
@@ -179,6 +179,7 @@ Steckbrief: [15-eintraege.md](15-eintraege.md)
 | Funktion | Was sie tut | Wer | Wo | Endpunkt |
 |---|---|---|---|---|
 | **Schlüsselbild versiegeln** | Legt das Foto des Schlüsselbox-Codes versiegelt ab, einmal pro Verschluss; für den Träger frei wird es erst, wenn danach eine Öffnung erfasst ist. <br>*Gespeichert wird nur, ob Ziffern lesbar waren — nie die Zahl selbst.* | Sub | App (Träger) | `/api/bildersafe/seal` |
+| **Codewechsel beim Versiegeln prüfen** | Vergleicht das neue Code-Foto mit dem zuletzt versiegelten: derselbe Code fordert den Sub zum Verstellen auf, ein unsicherer oder trotzdem gleicher Vergleich geht als Meldung an die Keyholderin, mit beiden Fotos in einer Vergleichsansicht. <br>*Nur mit Vision-Provider; jedes Foto wird zweimal gelesen, „sicher" nur bei gleichen Lesungen. Blockiert nie den Verschluss. Gespeichert und gemeldet wird nur das Urteil, nie die Ziffern. Die Vergleichsansicht sieht nur die ZUGEORDNETE Keyholderin.* | Sub, System, Keyholder (UI), Keyholder (MCP) | App (Träger), läuft von selbst, App (Keyholder), MCP | `/api/bildersafe/code-check` `list_entries` |
 
 ## Nachrichten
 
@@ -271,6 +272,7 @@ Grund für die Frage, welche Einstellung etwas verursacht hat: bei den meisten g
 | **Geräte-Abgleich beim Kontroll-Foto** | Geräte | Vergleicht nach dem Einreichen das Bild mit den Referenzbildern des deklarierten Geräts. |
 | **Box-Foto nach „Riegel zu" nachreichen** | Box | Sobald die Box den Riegel als zu meldet, fordert das Dashboard ein Bild der Box mit sichtbarem Schlüssel an; es hängt am Verschluss. |
 | **Siegel im Foto erkennen** | Box | Prüft, ob das Siegel auf dem Bild unversehrt und lesbar ist. |
+| **Codewechsel beim Versiegeln prüfen** | Bildersafe | Vergleicht das neue Code-Foto mit dem zuletzt versiegelten: derselbe Code fordert den Sub zum Verstellen auf, ein unsicherer oder trotzdem gleicher Vergleich geht als Meldung an die Keyholderin, mit beiden Fotos in einer Vergleichsansicht. |
 | **Posteingang beschneiden** | Nachrichten | Löscht einmal täglich gelesene Meldungen jenseits der Aufbewahrungsfrist (Vorgabe ein Jahr, per MESSAGE_RETENTION_DAYS einstellbar, 0 = aus). |
 | **Terminierte Direktiven zustellen** | Benachrichtigungen | Der Minuten-Takt stellt Kontrollen, Sperrzeiten, Orgasmus-Fenster und Aufgaben zu, sobald sie wirksam werden. |
 | **Auf neue Fassung prüfen** | Zugang | Liest den Changelog der veröffentlichten Fassung und meldet, wenn diese Instanz zurückliegt. |

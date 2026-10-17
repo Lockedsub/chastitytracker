@@ -5,6 +5,8 @@ import { useLocale, useTranslations } from "next-intl";
 
 import { fromDatetimeLocal, formatDateTime, toDateLocale } from "@/lib/utils";
 import { useEntryStartTime } from "@/app/hooks/useEntryStartTime";
+import { useLockboxCodePhoto } from "@/app/hooks/useLockboxCodePhoto";
+import LockboxCodePhotoField from "@/app/components/LockboxCodePhotoField";
 import { usePhotoUpload } from "@/app/hooks/usePhotoUpload";
 import { useEntrySubmit } from "@/app/hooks/useEntrySubmit";
 import PhotoCapture from "@/app/components/PhotoCapture";
@@ -128,25 +130,9 @@ export default function VerschlussFormCore({
     enableDeviceDetection: false,
     uploadErrorText: () => t("uploadError"),
   });
-  const [codeReadable, setCodeReadable] = useState<boolean | null>(null);
-  const [codeChecking, setCodeChecking] = useState(false);
   const codeUrl = codePhoto.imageUrl;
-  useEffect(() => {
-    if (!bildersafe || !codeUrl) { setCodeReadable(null); return; }
-    let cancelled = false;
-    setCodeChecking(true);
-    fetch("/api/detect-seal", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ imageUrl: codeUrl, readableOnly: true, lockbox: true }),
-    })
-      .then((r) => (r.ok ? r.json() : { readable: null }))
-      // true = lesbar · false = unlesbar · null = nicht geprüft (KI aus) → Versiegeln erlaubt
-      .then(({ readable }) => { if (!cancelled) setCodeReadable(typeof readable === "boolean" ? readable : null); })
-      .catch(() => { if (!cancelled) setCodeReadable(null); })
-      .finally(() => { if (!cancelled) setCodeChecking(false); });
-    return () => { cancelled = true; };
-  }, [bildersafe, codeUrl]);
+  // Lesbarkeit + Codewechsel (#115) — Urteile, nie Ziffern.
+  const codeCheck = useLockboxCodePhoto(codeUrl, bildersafe);
 
   // Die Rückfrage, wenn der Schlüssel NICHT in die Box soll — die Box verriegelt dann nicht. Das
   // Box-Foto fragt dieses Formular nicht mehr ab: es wird erst nach „Riegel zu" fällig und über das
@@ -175,7 +161,7 @@ export default function VerschlussFormCore({
       note: note.trim() || null,
       kontrollCode: sealNumber.trim() || null,
       deviceId: deviceId || null,
-      ...(bildersafe ? { codeImageUrl: codeUrl || null, codeReadable } : {}),
+      ...(bildersafe ? { codeImageUrl: codeUrl || null, codeReadable: codeCheck.readable } : {}),
     });
   }
 
@@ -193,7 +179,7 @@ export default function VerschlussFormCore({
           semantic={submitVariant === "semantic" ? "lock" : undefined}
           fullWidth
           loading={saving || uploading || codePhoto.uploading}
-          disabled={bildersafe && (!codeUrl || codeReadable === false)}
+          disabled={bildersafe && (!codeUrl || codeCheck.blocksSubmit)}
           icon={submitVariant === "primary" ? <LockClosedIcon size={16} /> : undefined}
         >
           {submitLabel ?? defaultLabel}
@@ -275,39 +261,7 @@ export default function VerschlussFormCore({
         )}
       </FormField>
 
-      {bildersafe && (
-        <FormField label={tForm("codePhotoLabel")}>
-          {codeUrl ? (
-            // Ganze Fläche = neu aufnehmen.
-            <button type="button" onClick={codePhoto.clearPhoto} className="text-left w-full">
-              <Card variant="semantic" semantic={codeReadable === false ? "warn" : "sperrzeit"}>
-                <div className="flex items-start gap-2.5">
-                  <LockClosedIcon size={16} className={`flex-shrink-0 mt-0.5 ${codeReadable === false ? "text-warn" : "text-sperrzeit"}`} />
-                  <div className="text-neben flex-1">
-                    <p className={`font-bold ${codeReadable === false ? "text-warn-text" : "text-sperrzeit-text"}`}>{tForm("codePhotoSealed")}</p>
-                    <p className={`mt-0.5 ${codeReadable === false ? "text-warn" : "text-sperrzeit"}`}>
-                      {codeChecking
-                        ? tForm("codePhotoChecking")
-                        : codeReadable === false
-                          ? tForm("codePhotoUnreadable")
-                          : codeReadable === true
-                            ? tForm("codePhotoReadable")
-                            : tForm("codePhotoNoCheck")}
-                    </p>
-                    <p className="text-foreground-faint mt-1.5 underline">{tForm("codePhotoRetake")}</p>
-                  </div>
-                </div>
-              </Card>
-            </button>
-          ) : (
-            <>
-              <p className="text-neben text-foreground-faint mb-1.5">{tForm("codePhotoHint")}</p>
-              <PhotoCapture onFile={codePhoto.handleFile} uploading={codePhoto.uploading} variant="emerald" mobileDesktopMode={mobileDesktopMode} />
-              <PhotoUploadError uploadError={codePhoto.uploadError} uploading={codePhoto.uploading} />
-            </>
-          )}
-        </FormField>
-      )}
+      {bildersafe && <LockboxCodePhotoField photo={codePhoto} check={codeCheck} mobileDesktopMode={mobileDesktopMode} />}
 
       <div className="flex flex-col gap-1.5">
         <Input
