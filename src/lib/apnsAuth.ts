@@ -31,21 +31,22 @@ export async function apnsProviderToken(cfg: ApnsAuthConfig, nowMs: number = Dat
   const identity = `${cfg.keyId}:${cfg.teamId}`;
   if (cached && cached.identity === identity && nowMs - cached.issuedAtMs < APNS_TOKEN_REUSE_MS) return cached.jwt;
   if (pending) return pending;
-  pending = (async () => {
-    try {
-      const key = await cfg.loadKey();
-      const iat = Math.floor(nowMs / 1000);
-      const header = Buffer.from(JSON.stringify({ alg: "ES256", kid: cfg.keyId })).toString("base64url");
-      const claims = Buffer.from(JSON.stringify({ iss: cfg.teamId, iat })).toString("base64url");
-      const sig = createSign("SHA256").update(`${header}.${claims}`).sign({ key, dsaEncoding: "ieee-p1363" });
-      const jwt = `${header}.${claims}.${sig.toString("base64url")}`;
-      cached = { jwt, issuedAtMs: nowMs, identity };
-      return jwt;
-    } finally {
-      pending = null;
-    }
+  const signing = (async () => {
+    const key = await cfg.loadKey();
+    const iat = Math.floor(nowMs / 1000);
+    const header = Buffer.from(JSON.stringify({ alg: "ES256", kid: cfg.keyId })).toString("base64url");
+    const claims = Buffer.from(JSON.stringify({ iss: cfg.teamId, iat })).toString("base64url");
+    const sig = createSign("SHA256").update(`${header}.${claims}`).sign({ key, dsaEncoding: "ieee-p1363" });
+    const jwt = `${header}.${claims}.${sig.toString("base64url")}`;
+    cached = { jwt, issuedAtMs: nowMs, identity };
+    return jwt;
   })();
-  return pending;
+  // Zurücksetzen NACH der Zuweisung (auch bei Fehlschlag): ein `finally` im Rumpf liefe bei einem
+  // synchronen Wurf vor `pending = …` und liesse das gescheiterte Versprechen für immer stehen.
+  pending = signing;
+  const clear = () => { if (pending === signing) pending = null; };
+  signing.then(clear, clear);
+  return signing;
 }
 
 /** Nur für Tests: den Merker leeren. */

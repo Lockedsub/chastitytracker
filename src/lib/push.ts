@@ -2,7 +2,7 @@ import webpush from "web-push";
 import { prisma } from "@/lib/prisma";
 import { structuredLog } from "@/lib/serverLog";
 import { isAllowedPushEndpoint } from "@/lib/pushEndpoint";
-import { apnsProviderToken } from "@/lib/apnsAuth";
+import { apnsProviderToken, resetApnsTokenCache } from "@/lib/apnsAuth";
 
 const plog = (label: string, fields: Record<string, unknown>) => structuredLog("push", label, fields);
 
@@ -107,6 +107,9 @@ async function sendApns(token: string, title: string, body: string, url?: string
         // Nur diese Reasons bedeuten einen definitiv toten Token → löschen erlaubt.
         // (DeviceTokenNotForTopic = Topic-/Sandbox-Mismatch = Config-Fehler → Token NICHT löschen!)
         const invalid = status === 410 || reason === "BadDeviceToken" || reason === "Unregistered";
+        // Ein abgelehnter Provider-Token (Uhr, Schlüsselwechsel) bliebe sonst bis zum Ablauf der
+        // Wiederverwendung im Merker: beim nächsten Push neu bauen.
+        if (status === 403 && (reason === "ExpiredProviderToken" || reason === "InvalidProviderToken")) resetApnsTokenCache();
         plog("apns:failed", { status, reason, invalid });
         finish({ ok: false, invalid });
       });

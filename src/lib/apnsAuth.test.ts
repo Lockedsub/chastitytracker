@@ -51,6 +51,12 @@ describe("apnsProviderToken", () => {
     expect(b).not.toBe(a);
   });
 
+  it("ein synchron werfender Schlüssel-Zugriff bleibt nicht als Dauerfehler hängen", async () => {
+    const throwing = { ...cfg(), loadKey: vi.fn(() => { throw new Error("sync"); }) as unknown as () => Promise<string> };
+    await expect(apnsProviderToken(throwing, T0)).rejects.toThrow("sync");
+    await expect(apnsProviderToken(cfg(), T0)).resolves.toContain(".");
+  });
+
   it("ein gescheiterter Schlüssel-Zugriff wird nicht gemerkt", async () => {
     const failing = { ...cfg(), loadKey: vi.fn().mockRejectedValueOnce(new Error("ENOENT")).mockResolvedValue(PEM) };
     await expect(apnsProviderToken(failing, T0)).rejects.toThrow("ENOENT");
