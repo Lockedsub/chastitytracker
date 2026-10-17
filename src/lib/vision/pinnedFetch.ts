@@ -31,7 +31,7 @@ export async function pinnedFetch(rawUrl: string, init: RequestInit = {}): Promi
         headers,
         signal: init.signal ?? undefined,
         lookup: ((_host: string, opts: { all?: boolean }, cb: (...a: unknown[]) => void) =>
-          opts?.all ? cb(null, [{ address: target.address, family: target.family }]) : cb(null, target.address, target.family)) as never,
+          opts?.all ? cb(null, target.addresses) : cb(null, target.addresses[0].address, target.addresses[0].family)) as never,
       },
       (res) => {
         const status = res.statusCode ?? 0;

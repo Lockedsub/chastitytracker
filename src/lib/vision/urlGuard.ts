@@ -99,9 +99,8 @@ export function isInternalAddress(ip: string): boolean {
 }
 
 export interface VisionTarget {
-  /** Die geprüfte Adresse — GENAU an sie verbindet `pinnedFetch`. */
-  address: string;
-  family: 4 | 6;
+  /** Die geprüften Adressen — NUR an sie verbindet `pinnedFetch`. Alle, nicht eine: `localhost` löst oft zu `::1` UND `127.0.0.1` auf, und der Dienst hört nur auf einer davon (Happy Eyeballs probiert sie durch). */
+  addresses: { address: string; family: 4 | 6 }[];
 }
 
 /**
@@ -122,14 +121,14 @@ export async function resolveVisionTarget(raw: string): Promise<VisionTarget | n
   const open = privateVisionUrlsAllowed();
   const host = url.hostname.replace(/^\[|\]$/g, "");
   const family = isIP(host);
-  if (family) return open || !isInternalAddress(host) ? { address: host, family: family as 4 | 6 } : null;
+  if (family) return open || !isInternalAddress(host) ? { addresses: [{ address: host, family: family as 4 | 6 }] } : null;
   // Einteilig heisst: ein Name im Docker-Netz (`heimdall`, `tracker-portal`) oder `localhost`.
   if (!open && !host.includes(".")) return null;
   try {
     const addresses = await lookup(host, { all: true });
     if (addresses.length === 0) return null;
     if (!open && !addresses.every((a) => !isInternalAddress(a.address))) return null;
-    return { address: addresses[0].address, family: addresses[0].family as 4 | 6 };
+    return { addresses: addresses.map((a) => ({ address: a.address, family: a.family as 4 | 6 })) };
   } catch {
     return null;
   }

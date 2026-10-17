@@ -46,6 +46,13 @@ describe("pinnedFetch", () => {
     expect(lookup).toHaveBeenCalledTimes(1);
   });
 
+  it("probiert alle geprüften Adressen durch — der Dienst hört oft nur auf einer von ::1 / 127.0.0.1", async () => {
+    process.env.VISION_ALLOW_PRIVATE_URLS = "true";
+    lookup.mockResolvedValue([{ address: "::1", family: 6 }, { address: "127.0.0.1", family: 4 }]);
+    const res = await pinnedFetch(`http://dual.example.test:${port}/x`);
+    expect(res.status).toBe(200);
+  });
+
   it("verweigert ein Ziel, das auf eine interne Adresse zeigt", async () => {
     lookup.mockResolvedValue([{ address: "127.0.0.1", family: 4 }]);
     await expect(pinnedFetch(`http://rebind.example.test:${port}/x`)).rejects.toThrow("not allowed");

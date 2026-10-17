@@ -1,5 +1,18 @@
 [
   {
+    "version": "6.5.3",
+    "date": "2026-10-17",
+    "changes": [
+      {
+        "type": "security",
+        "text": {
+          "de": "Die Außenhaut ist enger geschnürt: Bildadressen und Push-Ziele werden strenger geprüft, Passwort-Zurücksetzen und Anmelde-Hilfen haben Mengenbegrenzungen, und die Zustimmungsseite der KI-Anbindung zeigt, wohin sie weiterleitet.",
+          "en": "The outer shell is tighter: image addresses and push targets are checked more strictly, password reset and sign-in helpers are rate-limited, and the AI connection consent page shows where it redirects to."
+        }
+      }
+    ]
+  },
+  {
     "version": "6.5.2",
     "date": "2026-10-17",
     "changes": [

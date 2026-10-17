@@ -248,11 +248,13 @@ async function sendWebPushToUser(
     where: { userId },
   });
   // Abos aus der Zeit vor der Endpunkt-Prüfung (`subscribe`): eine Adresse, die kein Push-Dienst
-  // vergibt, wird weder angefragt (SSRF) noch behalten.
+  // vergibt, wird nicht angefragt (SSRF). Bewusst NICHT gelöscht: fehlte der Liste ein echter
+  // Dienst, ginge sonst das Abo aller seiner Nutzer unwiederbringlich verloren — übersprungen ist
+  // es mit einem Eintrag in `pushEndpoint.ts` wieder da.
   const subscriptions = stored.filter((s) => isAllowedPushEndpoint(s.endpoint));
-  const stale = stored.length === subscriptions.length ? [] : stored.filter((s) => !subscriptions.includes(s)).map((s) => s.id);
+  const stale: string[] = []; // 404/410 — nur diese werden gelöscht
   plog("web:subs", { userId, count: subscriptions.length, rejected: stale.length });
-  if (stored.length === 0) return;
+  if (subscriptions.length === 0) return;
 
   // Wie bei APNs: `unread` nur mitsenden, wenn es einen Wert gibt (siehe sw.js).
   const payload = JSON.stringify({ title, body, url, ...(badge !== undefined ? { unread: badge } : {}) });
