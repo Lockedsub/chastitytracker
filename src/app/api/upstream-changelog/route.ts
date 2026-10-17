@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import crypto from "crypto";
 import pkg from "../../../../package.json";
+import { censusEnabled, censusHeaders } from "@/lib/census";
 
 // Gelesen wird der Git-Tag `release`, NICHT main: `release` wandert nur, wenn ein Image als
 // :latest freigegeben wird. Von main gelesen würde der Update-Hinweis Versionen ankündigen,
@@ -37,22 +37,8 @@ let failedAt = 0;
 function resolveSource(): { url: string; census: boolean } {
   const override = process.env.UPSTREAM_CHANGELOG_URL;
   if (override) return { url: override, census: false };
-  if (process.env.DISABLE_UPDATE_CENSUS === "true") return { url: RELEASE_RAW, census: false };
+  if (!censusEnabled()) return { url: RELEASE_RAW, census: false };
   return { url: DEFAULT_COLLECTOR, census: true };
-}
-
-/**
- * Census headers: the app version plus a truncated SHA-256 of this instance's own NEXTAUTH_SECRET.
- * The hash is stable per instance but non-reversible and non-identifying — it lets the collector
- * dedupe distinct instances without learning anything about them. No user data, no hostname.
- */
-function censusHeaders(version: string): Record<string, string> {
-  const headers: Record<string, string> = { "X-Instance-Version": version };
-  const secret = process.env.NEXTAUTH_SECRET;
-  if (secret) {
-    headers["X-Instance-Id"] = crypto.createHash("sha256").update(secret).digest("hex").slice(0, 16);
-  }
-  return headers;
 }
 
 async function fetchChangelog(url: string, headers: Record<string, string>): Promise<unknown[] | null> {
@@ -85,7 +71,7 @@ export async function GET() {
 
   // Primary source first; on any failure fall back to the release ref on GitHub raw so the update
   // check never breaks when the collector is down.
-  let data = await fetchChangelog(url, census ? censusHeaders(pkg.version) : {});
+  let data = await fetchChangelog(url, census ? await censusHeaders(pkg.version) : {});
   if (!data && url !== RELEASE_RAW) {
     data = await fetchChangelog(RELEASE_RAW, {});
   }

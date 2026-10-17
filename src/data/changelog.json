@@ -1,5 +1,18 @@
 [
   {
+    "version": "6.4.4",
+    "date": "2026-10-17",
+    "changes": [
+      {
+        "type": "chore",
+        "text": {
+          "de": "Der Update-Check meldet jetzt zusätzlich, woher das Image stammt, welche Funktionen eingeschaltet sind und wie viele Konten die Instanz nutzen – ohne Namen, Adressen oder Inhalte und weiterhin abschaltbar. Neu gibt es ein Formular für GitHub-Issues, das die App vorausfüllt.",
+          "en": "The update check now also reports where the image comes from, which features are enabled and how many accounts use the instance – without names, addresses or content, and still optional. There is also a new GitHub issue form that the app fills in for you."
+        }
+      }
+    ]
+  },
+  {
     "version": "6.4.3",
     "date": "2026-10-17",
     "changes": [

@@ -72,5 +72,11 @@ ENV HOSTNAME="0.0.0.0"
 # den teuren Build.
 ARG BUILD_DATE
 ENV BUILD_DATE=${BUILD_DATE}
+# Woher das Image stammt (Census, docs/update-check.md): das Repo, dessen GitHub-Workflow es gebaut
+# hat, und der Commit. Ein lokales `docker build` setzt beides nicht — die App meldet dann „custom".
+ARG IMAGE_SOURCE_REPO
+ARG IMAGE_REVISION
+ENV IMAGE_SOURCE_REPO=${IMAGE_SOURCE_REPO}
+ENV IMAGE_REVISION=${IMAGE_REVISION}
 
 ENTRYPOINT ["./docker-entrypoint.sh"]

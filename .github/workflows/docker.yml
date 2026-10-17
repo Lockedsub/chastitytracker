@@ -225,6 +225,8 @@ jobs:
           cache-to: type=gha,mode=max,scope=${{ matrix.suffix }}
           build-args: |
             BUILD_DATE=${{ steps.builddate.outputs.value }}
+            IMAGE_SOURCE_REPO=${{ github.repository }}
+            IMAGE_REVISION=${{ github.sha }}
 
       - name: Export digest
         env:

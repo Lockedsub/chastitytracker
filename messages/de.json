@@ -880,6 +880,8 @@
     "version": "Version",
     "buildDate": "Build-Datum",
     "buildDateLocal": "lokal",
+    "imageOrigin": "Image-Herkunft",
+    "censusId": "Census-ID",
     "pushDenied": "Benachrichtigungen blockiert – bitte in den Browser-Einstellungen aktivieren.",
     "pushRegisterFailed": "Push-Registrierung fehlgeschlagen – bitte erneut versuchen.",
     "pushAllowTitle": "Push erlauben",

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireApi } from "@/lib/authGuards";
 import { isValidEmail } from "@/lib/constants";
+import { censusIdentity } from "@/lib/census";
 import { FEEDBACK_DEFAULT_UPSTREAM_URL, feedbackMode, isThrowawayEmail } from "@/lib/feedback";
 
 const VALID_TYPES = ["BUG", "IDEA", "QUESTION", "THANKS"] as const;
@@ -66,6 +67,7 @@ export async function POST(req: NextRequest) {
     ? (path.startsWith("http") ? path : `${instanceBase}${path.startsWith("/") ? path : `/${path}`}`)
     : path;
 
+  const census = censusIdentity();
   try {
     const upstream = await fetch(process.env.FEEDBACK_UPSTREAM_URL || FEEDBACK_DEFAULT_UPSTREAM_URL, {
       method: "POST",
@@ -78,6 +80,10 @@ export async function POST(req: NextRequest) {
         appVersion,
         platform: platform ?? "web",
         clientLocale: clientLocale ?? null,
+        // Census-Verknüpfung (Issue #15): dieselbe Instanz-ID wie im Update-Check, dazu die
+        // Image-Herkunft — so lässt sich eine Rückmeldung der Nutzung ihrer Instanz zuordnen.
+        instanceId: census.instanceId,
+        imageOrigin: census.image,
       }),
       // Keep the request quick — don't block the user's UI on upstream latency.
       signal: AbortSignal.timeout(10_000),

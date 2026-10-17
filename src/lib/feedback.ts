@@ -20,6 +20,21 @@ export const FEEDBACK_GITHUB_ISSUES_URL = "https://github.com/trublue-2/chastity
  */
 export type FeedbackMode = "off" | "standard" | "selfHosted";
 
+/** Was der Feedback-Knopf vom Server mitbekommt: den Modus und den Link aufs GitHub-Formular,
+ *  vorausgefüllt mit dem, was der Meldende nicht wissen muss (Issue #15). */
+export interface FeedbackSetup {
+  mode: FeedbackMode;
+  githubHref: string;
+}
+
+/** Das GitHub-Formular (`.github/ISSUE_TEMPLATE/report.yml`), vorausgefüllt mit Version, Census-ID
+ *  und Image-Herkunft. Die Feld-Namen sind die `id`s im Formular — wer dort umbenennt, ändert hier mit. */
+export function githubIssueHref(p: { version: string; instanceId: string | null; image: string }): string {
+  const q = new URLSearchParams({ template: "report.yml", version: p.version, image: p.image });
+  if (p.instanceId) q.set("instance", p.instanceId);
+  return `${FEEDBACK_GITHUB_ISSUES_URL}?${q}`;
+}
+
 export function feedbackMode(env: Record<string, string | undefined> = process.env): FeedbackMode {
   if (env.DISABLE_FEEDBACK === "true") return "off";
   if (isPortalInstance(env) || env.FEEDBACK_UPSTREAM_URL) return "standard";

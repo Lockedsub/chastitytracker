@@ -9,7 +9,7 @@ import { headerActionsCls, headerBarCls, headerBrandCls, headerHostCls, headerIc
 import type { OwnTrackerActor } from "@/lib/ownTracker";
 import pkg from "../../package.json";
 import { instanceHostname } from "@/lib/appMeta";
-import { feedbackMode } from "@/lib/feedback";
+import { feedbackSetup } from "@/lib/feedbackSetup";
 
 interface Props {
   username: string;
@@ -70,7 +70,7 @@ export default async function AdminHeader({ username, actor, hideOwnTracker }: P
               <Users size={18} />
             </Link>
           )}
-          <FeedbackButton mode={feedbackMode()} />
+          <FeedbackButton feedback={feedbackSetup()} />
           <AvatarMenu
             username={username}
             settingsHref="/admin/settings"

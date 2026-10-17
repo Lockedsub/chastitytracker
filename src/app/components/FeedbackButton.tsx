@@ -5,15 +5,16 @@ import { MessageSquareText } from "lucide-react";
 import { useTranslations } from "next-intl";
 import FeedbackSheet from "./FeedbackSheet";
 import { headerIconBtnCls } from "./inputStyles";
-import type { FeedbackMode } from "@/lib/feedback";
+import type { FeedbackSetup } from "@/lib/feedback";
 
-/** Feedback-Knopf (Kopfzeile oder Menü-Zeile). `mode` kommt vom Server (`feedbackMode()`);
- *  bei `off` rendert er nichts. */
-export default function FeedbackButton({ variant = "icon", mode }: { variant?: "icon" | "menu"; mode: FeedbackMode }) {
+/** Feedback-Knopf (Kopfzeile oder Menü-Zeile). `feedback` kommt vom Server (`feedbackSetup()`);
+ *  bei Modus `off` rendert er nichts. */
+export default function FeedbackButton({ variant = "icon", feedback }: { variant?: "icon" | "menu"; feedback: FeedbackSetup }) {
+  const { mode, githubHref } = feedback;
   const t = useTranslations("feedback");
   const [open, setOpen] = useState(false);
   if (mode === "off") return null;
-  const sheet = <FeedbackSheet open={open} onClose={() => setOpen(false)} mode={mode} />;
+  const sheet = <FeedbackSheet open={open} onClose={() => setOpen(false)} mode={mode} githubHref={githubHref} />;
 
   if (variant === "menu") {
     return (

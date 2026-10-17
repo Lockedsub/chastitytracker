@@ -13,7 +13,7 @@ import HelpLink from "./HelpLink";
 import Card from "./Card";
 import { parseApiError } from "@/lib/apiClient";
 import { isValidEmail } from "@/lib/constants";
-import { FEEDBACK_GITHUB_ISSUES_URL, isThrowawayEmail, type FeedbackMode } from "@/lib/feedback";
+import { isThrowawayEmail, type FeedbackMode } from "@/lib/feedback";
 
 type FeedbackType = "BUG" | "IDEA" | "QUESTION" | "THANKS";
 
@@ -40,7 +40,7 @@ const TYPE_CONFIG: Record<FeedbackType, { icon: typeof Bug; bgVar: string; color
 /** Bei `selfHosted` geht die Meldung von einer fremd betriebenen Instanz an den Portal-Posteingang
  *  (siehe `feedbackMode`). Die Adresse ist dann der einzige Rückweg — das Formular sagt es und nimmt
  *  keine Wegwerf-Adresse an. */
-export default function FeedbackSheet({ open, onClose, mode }: { open: boolean; onClose: () => void; mode: Exclude<FeedbackMode, "off"> }) {
+export default function FeedbackSheet({ open, onClose, mode, githubHref }: { open: boolean; onClose: () => void; mode: Exclude<FeedbackMode, "off">; githubHref: string }) {
   const selfHosted = mode === "selfHosted";
   const t = useTranslations("feedback");
   const tc = useTranslations("common");
@@ -132,7 +132,7 @@ export default function FeedbackSheet({ open, onClose, mode }: { open: boolean; 
           {selfHosted && (
             <Card variant="semantic" semantic="warn" padding="compact" className="flex flex-col gap-2">
               <p className="text-sm text-warn-text leading-relaxed">{t("selfHostedNote")}</p>
-              <HelpLink href={FEEDBACK_GITHUB_ISSUES_URL} label={t("selfHostedGithub")} className="text-warn-text" />
+              <HelpLink href={githubHref} label={t("selfHostedGithub")} className="text-warn-text" />
             </Card>
           )}
 

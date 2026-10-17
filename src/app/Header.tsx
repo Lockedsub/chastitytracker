@@ -9,7 +9,7 @@ import { ownTrackerHidden } from "@/lib/ownTracker";
 import pkg from "../../package.json";
 import { instanceHostname } from "@/lib/appMeta";
 import { APP_NAME } from "@/lib/constants";
-import { feedbackMode } from "@/lib/feedback";
+import { feedbackSetup } from "@/lib/feedbackSetup";
 
 export default async function Header() {
   const session = await auth();
@@ -37,7 +37,7 @@ export default async function Header() {
               eigenen Tracker hat, hat auch keinen eigenen Posteingang. Das App-Badge zählt hier
               trotzdem den Keyholder-Stand mit — die Regel dafür steht in `HeaderMessages`. */}
           {user?.id && !hideOwnTracker && <HeaderMessages actor={user} scope="own" />}
-          {user && <FeedbackButton mode={feedbackMode()} />}
+          {user && <FeedbackButton feedback={feedbackSetup()} />}
           {user && (
             <AvatarMenu
               username={user.name ?? ""}

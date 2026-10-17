@@ -31,7 +31,7 @@ import PushAllowRow from "./PushAllowRow";
 import type { SettingsFormProps } from "./getSettingsProps";
 import { formColCls } from "@/app/components/inputStyles";
 
-export default function SettingsForm({ username, email, locale, timezone, startPage, showStartPage, controlledSubs, isAdmin, hideOwnTracker, notifyMail, notifyPush, notifyTelegram, telegramConfigured, telegramLinked, mailReachable, pushReachable, mailConfigured, version, buildDate, feedbackMode, weight, box, instanceSections }: SettingsFormProps & {
+export default function SettingsForm({ username, email, locale, timezone, startPage, showStartPage, controlledSubs, isAdmin, hideOwnTracker, notifyMail, notifyPush, notifyTelegram, telegramConfigured, telegramLinked, mailReachable, pushReachable, mailConfigured, version, buildDate, feedback, census, weight, box, instanceSections }: SettingsFormProps & {
   /** Abschnitte, die der INSTANZ gehören statt der Person — heute die Foto-Prüfung. Nur die
    *  Admin-Seite reicht sie herein; im Träger-Bereich bleibt die Maske rein persönlich. Innerhalb
    *  des `<main>`, damit sie in derselben Spalte und Landmarke stehen wie der Rest. */
@@ -563,7 +563,7 @@ export default function SettingsForm({ username, email, locale, timezone, startP
           )}
 
           {/* Feedback */}
-          <FeedbackButton variant="menu" mode={feedbackMode} />
+          <FeedbackButton variant="menu" feedback={feedback} />
 
           {/* Sign out */}
           <button
@@ -580,14 +580,10 @@ export default function SettingsForm({ username, email, locale, timezone, startP
       <Section title={t("app")}>
         <div className="divide-y divide-border-subtle">
           <PasskeyManager />
-          <div className="flex items-center justify-between px-5 py-4">
-            <span className="text-sm text-foreground">{t("version")}</span>
-            <span className="text-sm text-foreground-faint font-mono">{version}</span>
-          </div>
-          <div className="flex items-center justify-between px-5 py-4">
-            <span className="text-sm text-foreground">{t("buildDate")}</span>
-            <span className="text-sm text-foreground-faint">{buildDate ?? t("buildDateLocal")}</span>
-          </div>
+          <InfoRow label={t("version")} value={version} mono />
+          <InfoRow label={t("buildDate")} value={buildDate ?? t("buildDateLocal")} />
+          {census && <InfoRow label={t("imageOrigin")} value={census.image} mono />}
+          {census?.instanceId && <InfoRow label={t("censusId")} value={census.instanceId} mono />}
         </div>
       </Section>
 
@@ -603,5 +599,15 @@ export default function SettingsForm({ username, email, locale, timezone, startP
         onCancel={() => setPwConfirm(false)}
       />
     </main>
+  );
+}
+
+/** Eine Auskunfts-Zeile der App-Sektion: Beschriftung links, Wert rechts. */
+function InfoRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div className="flex items-center justify-between gap-3 px-5 py-4">
+      <span className="text-sm text-foreground">{label}</span>
+      <span className={`text-sm text-foreground-faint select-all ${mono ? "font-mono" : ""}`}>{value}</span>
+    </div>
   );
 }

@@ -10,7 +10,9 @@ import { toBoxKind, type BoxKind } from "@/lib/boxStatus";
 import type { WeightSettingsProps } from "./WeightSettings";
 import type { UnitSystem } from "@/lib/weight";
 import pkg from "@/../package.json";
-import { feedbackMode, type FeedbackMode } from "@/lib/feedback";
+import type { FeedbackSetup } from "@/lib/feedback";
+import { feedbackSetup } from "@/lib/feedbackSetup";
+import { censusIdentity } from "@/lib/census";
 
 export interface SettingsFormProps {
   username: string;
@@ -51,7 +53,10 @@ export interface SettingsFormProps {
   mailConfigured: boolean;
   version: string;
   buildDate?: string;
-  feedbackMode: FeedbackMode;
+  feedback: FeedbackSetup;
+  /** Census-ID und Image-Herkunft dieser Instanz (Issue #15) — nur für Admins, zum Abschreiben in
+   *  ein GitHub-Issue. */
+  census: ReturnType<typeof censusIdentity> | null;
   /** Gewichtstracking — `null`, wenn die Keyholderin es für diesen Sub nicht freigeschaltet hat.
    *  Der Abschnitt erscheint dann gar nicht. */
   weight: WeightSettingsProps | null;
@@ -162,7 +167,8 @@ export async function getSettingsProps(): Promise<SettingsFormProps> {
     mailConfigured: mailConfigured(),
     version: pkg.version,
     buildDate: process.env.BUILD_DATE ?? undefined,
-    feedbackMode: feedbackMode(),
+    feedback: feedbackSetup(),
+    census: isAdmin ? censusIdentity() : null,
     weight,
     box: boxCouplingEnabled() && userId ? await boxSettings(userId) : null,
   };
