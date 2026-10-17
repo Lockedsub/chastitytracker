@@ -92,6 +92,9 @@ const CATEGORY_BY_BODY_KEY: Record<MessageBodyKey, MessageCategory> = {
   weightReleaseSetMessage: "weight",
   weightReleaseWithdrawnMessage: "weight",
   weightReleaseOpenedMessageKeyholder: "weight",
+  // Bildersafe (#115): der Code ist Teil des Verschlusses.
+  lockboxCodeSameMessageKeyholder: "lock",
+  lockboxCodeUncertainMessageKeyholder: "lock",
 
   // `lock`, obwohl der Gesundheits-Halt ALLE Direktiven aussetzt: `system` ist der Auffang für
   // Unbekanntes und keine Wahl (`messageCategories.test.ts` besteht darauf). Von den echten
@@ -181,6 +184,9 @@ const PRIORITY_BY_BODY_KEY: Record<MessageBodyKey, MessagePriority> = {
   inspectionAutoRemovedMessageKeyholderNoCode: "important",
   inspectionAutoRemovedMessageKeyholderWear: "important",
   inspectionAutoRemovedMessageKeyholderWearNoCode: "important",
+  // Derselbe Code: der Verschluss hält womöglich nicht, was er verspricht. Der unsichere Vergleich
+  // bleibt Alltag — er heisst nur „bitte selbst nachsehen", und er kommt bei schlechten Fotos oft.
+  lockboxCodeSameMessageKeyholder: "important",
 
   // Alltag: ein Rückzug nimmt eine Pflicht WEG, eine Bestätigung schliesst sie ab.
   offenseDismissedMessage: "info",
@@ -197,6 +203,7 @@ const PRIORITY_BY_BODY_KEY: Record<MessageBodyKey, MessagePriority> = {
   weightTargetLostMessageKeyholder: "info",
   weightReleaseWithdrawnMessage: "info",
   weightReleaseOpenedMessageKeyholder: "info",
+  lockboxCodeUncertainMessageKeyholder: "info",
 };
 
 /** Siehe {@link PRIORITY_BY_BODY_KEY}. Ein unbekannter Schlüssel gilt als `important`: lieber einmal

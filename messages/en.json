@@ -740,7 +740,12 @@
     "confirmKeyOutsideText": "Are you sure the key does not go into the box? The box will not lock then.",
     "confirmSaveAnyway": "Save anyway",
     "confirmNoBoxPhotoTitle": "No photo of the box",
-    "confirmNoBoxPhotoText": "Save without a photo of the box? Without one, there is nothing showing the key is really inside."
+    "confirmNoBoxPhotoText": "Save without a photo of the box? Without one, there is nothing showing the key is really inside.",
+    "codeSameTitle": "Same code as the last lock",
+    "codeSameText": "Change the key box code and take a new photo. If you seal it anyway, your keyholder will be told.",
+    "codeSameRetake": "Take a new photo",
+    "codeSameAnyway": "Seal anyway",
+    "codeSameAcknowledged": "Sealing anyway – your keyholder will be told."
   },
   "feedback": {
     "title": "Feedback",
@@ -1608,7 +1613,19 @@
     "boxInfoKind": "Box type",
     "boxInfoNumber": "Box no.",
     "boxKindHeimdall": "Heimdall",
-    "boxKindLockmebox": "LockMeBox"
+    "boxKindLockmebox": "LockMeBox",
+    "codeCheckTitle": "Key box code: comparison",
+    "codeCheckCurrent": "This lock",
+    "codeCheckPrevious": "Previous lock",
+    "codeCheckNoPrevious": "There is no earlier sealed code photo.",
+    "codeCheckResult_same": "The automatic check read the same code in both photos.",
+    "codeCheckResult_uncertain": "The automatic check could not reliably tell whether the code was changed. Compare the two photos yourself.",
+    "codeCheckResult_different": "The automatic check read two different codes.",
+    "codeCheckResult_first": "This is the first sealed code photo – there is nothing to compare.",
+    "codeCheckResult_none": "There is no automatic check for this lock.",
+    "codeCheckResult_pending": "The automatic check is still running. Reload the page in a few minutes.",
+    "codeCheckResult_error": "The automatic check failed. Compare the two photos yourself.",
+    "codeCheckLimits": "The check reads the photos automatically and can misread them. A detected difference does not guarantee that the code was really changed."
   },
   "forgotPassword": {
     "pageTitle": "Reset password",
@@ -2044,7 +2061,11 @@
     "taskProofReminderSubject": "Proof still missing",
     "taskProofReminderMessage": "The task “{title}” is still missing the proof “{description}” — due at {until}.",
     "boxPhotoDuePushTitle": "Add the box photo",
-    "boxPhotoDuePushBody": "The bolt is closed. Open the app and add a photo of the box with the key visible."
+    "boxPhotoDuePushBody": "The bolt is closed. Open the app and add a photo of the box with the key visible.",
+    "lockboxCodeSameSubjectKeyholder": "Key box code not changed?",
+    "lockboxCodeSameMessageKeyholder": "{username} apparently sealed the same key box code for the new lock as for the last one. Both photos are in the comparison view.",
+    "lockboxCodeUncertainSubjectKeyholder": "Please check the key box code",
+    "lockboxCodeUncertainMessageKeyholder": "For {username}'s new lock it could not be reliably detected whether the key box code was changed. Both photos are in the comparison view."
   },
   "tasks": {
     "titleLabel": "Title",

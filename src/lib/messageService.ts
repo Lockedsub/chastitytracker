@@ -5,6 +5,7 @@ import { getControllableSubsCached } from "@/lib/keyholder";
 import { bodyKeysOfCategory, bodyKeysOutsideSystem, messagePriority, type MessageFilter, type MessageSenderKind } from "@/lib/messageCategories";
 import { dismissalMessageStillApplies, judgmentMessageStillApplies } from "@/lib/offenseTypes";
 import { isHiddenFromSub } from "@/lib/delayedTrigger";
+import { codeCheckPath } from "@/lib/lockboxCodeCheck";
 import { mapAnforderungStatus } from "@/lib/utils";
 import { AI_AUTHOR, hasAuthor, type NotificationChannels } from "@/lib/constants";
 import { deliveryChannels, deliveryChannelsForUser, type DeliveryRecipient } from "@/lib/deliveryChannels";
@@ -109,6 +110,10 @@ export const MESSAGE_BODY_KEYS = [
   // Entscheidung, die sie gerade selbst getroffen hat.
   "healthHoldStartedMessage",
   "healthHoldEndedMessage",
+  // Bildersafe (#115): der Codewechsel liess sich beim neuen Verschluss nicht bestätigen. An die
+  // Keyholder, mit Verweis auf die Vergleichsansicht — ohne Ziffern.
+  "lockboxCodeSameMessageKeyholder",
+  "lockboxCodeUncertainMessageKeyholder",
 ] as const;
 
 export type MessageBodyKey = (typeof MESSAGE_BODY_KEYS)[number];
@@ -201,7 +206,7 @@ export const keyholderInbox = (readerId: string, subs: { id: string; username: s
  * eine `refId` gegen `StrafeRecord.id` aufzulösen — das findet nichts und die Nachricht stünde als
  * „nicht auflösbar" im Posteingang.
  */
-export type MessageRefType = "offense" | "detectedOffense" | "control" | "lockRequest" | "orgasmDirective" | "task";
+export type MessageRefType = "offense" | "detectedOffense" | "control" | "lockRequest" | "orgasmDirective" | "task" | "lockboxCode";
 export interface MessageRef {
   type: MessageRefType;
   id: string;
@@ -387,6 +392,9 @@ export interface InboxMessage {
   refActionCategoryId: string | null;
   /** Referenz gesetzt, Objekt aber nicht (mehr) auflösbar. Muster: `unknownRef` in lib/mcp/notes.ts. */
   refMissing: boolean;
+  /** Wohin der Bezug führt, wenn er ein festes Ziel hat (heute: die Codewechsel-Vergleichsansicht,
+   *  #115). Kontrollen bauen ihren Link im Presenter aus `refActionCode`. Sonst null. */
+  refTarget: string | null;
   /** Die `refId` des Vergehens, über das diese Zeile berichtet — sonst `null`. Trägt die
    *  Stellungnahme des Trägers (`OffenseStatement`). */
   offenseRefId: string | null;
@@ -650,6 +658,8 @@ type RefDetail = {
   /** Für den Sub verborgen (terminierte, noch nicht ausgelöste Direktive). */
   /** Nur bei Kontrollen: das Ziel für den Formular-Link (null = KG bzw. keine Handlung offen). */
   actionCategoryId?: string | null;
+  /** Ein festes Ziel des Bezugs, dort gebaut, wo die Zeile ohnehin gelesen wird (→ `refTarget`). */
+  target?: string;
   hidden: boolean;
 };
 
@@ -666,10 +676,10 @@ type RefDetail = {
 async function refDetails(rows: RefRow[], scope: InboxScope): Promise<Map<string, RefDetail>> {
   const subjectUserId = subjectFilter(scope);
   const detected = refsOfType(rows, OFFENSE_REF_TYPE);
-  const [offenseIds, detectedIds, controlIds, lockIds, orgasmIds, taskIds] =
-    (["offense", "detectedOffense", "control", "lockRequest", "orgasmDirective", "task"] as const).map((t) => idsOfType(rows, t));
+  const [offenseIds, detectedIds, controlIds, lockIds, orgasmIds, taskIds, lockboxIds] =
+    (["offense", "detectedOffense", "control", "lockRequest", "orgasmDirective", "task", "lockboxCode"] as const).map((t) => idsOfType(rows, t));
 
-  const [judgments, controls, lockRequests, orgasmDirectives, tasks] = await Promise.all([
+  const [judgments, controls, lockRequests, orgasmDirectives, tasks, lockboxEntries] = await Promise.all([
     // `status` mitlesen: ein verworfenes Urteil darf den Sub gar nicht erst erreichen — siehe
     // `judgmentMessageStillApplies`. Ohne diese Spalte zeigte eine alte „Strafe verhängt"-Nachricht nach
     // einer Korrektur auf PUNISHED→DISMISSED die VERWERFUNGS-Begründung.
@@ -700,6 +710,9 @@ async function refDetails(rows: RefRow[], scope: InboxScope): Promise<Map<string
     // wirksamAb/benachrichtigtAt aus demselben Grund wie bei der Verschluss-Anforderung darüber:
     // dieselbe Zeile beantwortet Text UND Sichtbarkeit.
     taskIds.length ? prisma.task.findMany({ where: { id: { in: taskIds }, userId: subjectUserId }, select: { id: true, userId: true, description: true, wirksamAb: true, benachrichtigtAt: true } }) : [],
+    // Der Verschluss mit dem verglichenen Code-Foto: nur ob es ihn (noch) gibt — kein Text, die
+    // Meldung sagt alles, und Ziffern gibt es ohnehin keine.
+    lockboxIds.length ? prisma.entry.findMany({ where: { id: { in: lockboxIds }, userId: subjectUserId, codeImageUrl: { not: null } }, select: { id: true, userId: true } }) : [],
   ]);
 
   const now = new Date();
@@ -744,6 +757,7 @@ async function refDetails(rows: RefRow[], scope: InboxScope): Promise<Map<string
   // `hidden: false` mit der Begründung, sie kenne keine Terminierung. Dieselbe Ableitung wie bei
   // Kontrolle und Verschluss-Anforderung, und aus demselben Grund: siehe {@link hiddenRefKeys}.
   for (const t of tasks) details.set(refKey(t.userId, "task", t.id), { text: t.description, actionCode: null, hidden: isHiddenFromSub(t) });
+  for (const e of lockboxEntries) details.set(refKey(e.userId, "lockboxCode", e.id), { text: null, actionCode: null, target: codeCheckPath(e.userId, e.id), hidden: false });
   return details;
 }
 
@@ -925,6 +939,7 @@ export async function listMessages(
       refActionCode: detail?.actionCode ?? null,
       refActionCategoryId: detail?.actionCategoryId ?? null,
       refMissing: key !== null && detail === undefined,
+      refTarget: detail?.target ?? null,
       // Die Vergehens-Referenz reist mit: an dieser Zeile hängt die Stellungnahme des Trägers, und
       // ohne sie wüsste die Anzeige nicht, WORÜBER er schreibt. Nur bei echten Vergehens-Meldungen
       // gesetzt — die Verwerfungs-Zeile trägt denselben `refEntityType`, meint aber ein

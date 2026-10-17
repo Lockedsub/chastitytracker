@@ -1,6 +1,6 @@
 [
   {
-    "version": "6.4.3",
+    "version": "6.5.0",
     "date": "2026-10-17",
     "changes": [
       {
@@ -8,6 +8,19 @@
         "text": {
           "de": "Neu: ein Tagebuch für Subs, erreichbar über das Buch-Symbol oben. Jeder Eintrag lässt sich mit der Keyholderin teilen, nur als Stimmung zeigen oder ganz für sich behalten.",
           "en": "New: a journal for subs, reached via the book icon at the top. Each entry can be shared with the keyholder, show only the mood, or be kept to yourself."
+        }
+      }
+    ]
+  },
+  {
+    "version": "6.4.3",
+    "date": "2026-10-17",
+    "changes": [
+      {
+        "type": "feat",
+        "text": {
+          "de": "Bildersafe: Beim Versiegeln vergleicht die App das Code-Foto mit dem letzten und warnt, wenn der Code nicht verstellt wurde. Bleibt es dabei oder ist der Vergleich unsicher, erfährt es die Keyholderin und sieht beide Fotos nebeneinander.",
+          "en": "Bildersafe: when sealing, the app compares the code photo with the previous one and warns if the code was not changed. If it stays that way or the comparison is uncertain, the keyholder is told and sees both photos side by side."
         }
       }
     ]

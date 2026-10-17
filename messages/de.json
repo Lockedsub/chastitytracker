@@ -740,7 +740,12 @@
     "confirmKeyOutsideText": "Sicher, dass der Schlüssel nicht in die Box muss? Die Box verriegelt dann nicht.",
     "confirmSaveAnyway": "Trotzdem speichern",
     "confirmNoBoxPhotoTitle": "Kein Foto der Box",
-    "confirmNoBoxPhotoText": "Sicher ohne Foto der Box speichern? Ohne Foto ist nicht belegt, dass der Schlüssel wirklich drin liegt."
+    "confirmNoBoxPhotoText": "Sicher ohne Foto der Box speichern? Ohne Foto ist nicht belegt, dass der Schlüssel wirklich drin liegt.",
+    "codeSameTitle": "Derselbe Code wie beim letzten Verschluss",
+    "codeSameText": "Verstell den Code der Schlüsselbox und fotografiere ihn neu. Versiegelst du trotzdem, erfährt es deine Keyholderin.",
+    "codeSameRetake": "Neu fotografieren",
+    "codeSameAnyway": "Trotzdem versiegeln",
+    "codeSameAcknowledged": "Wird trotzdem versiegelt – deine Keyholderin wird informiert."
   },
   "feedback": {
     "title": "Feedback",
@@ -1608,7 +1613,19 @@
     "boxInfoKind": "Box-Art",
     "boxInfoNumber": "Box-Nr.",
     "boxKindHeimdall": "Heimdall",
-    "boxKindLockmebox": "LockMeBox"
+    "boxKindLockmebox": "LockMeBox",
+    "codeCheckTitle": "Schlüsselbox-Code: Vergleich",
+    "codeCheckCurrent": "Dieser Verschluss",
+    "codeCheckPrevious": "Vorheriger Verschluss",
+    "codeCheckNoPrevious": "Es gibt kein früheres versiegeltes Code-Foto.",
+    "codeCheckResult_same": "Die automatische Prüfung hat in beiden Fotos denselben Code gelesen.",
+    "codeCheckResult_uncertain": "Die automatische Prüfung konnte nicht sicher erkennen, ob der Code gewechselt hat. Vergleiche die beiden Fotos selbst.",
+    "codeCheckResult_different": "Die automatische Prüfung hat zwei verschiedene Codes gelesen.",
+    "codeCheckResult_first": "Das ist das erste versiegelte Code-Foto – es gibt nichts zu vergleichen.",
+    "codeCheckResult_none": "Für diesen Verschluss liegt keine automatische Prüfung vor.",
+    "codeCheckResult_pending": "Die automatische Prüfung läuft noch. Lade die Seite in ein paar Minuten neu.",
+    "codeCheckResult_error": "Die automatische Prüfung ist gescheitert. Vergleiche die beiden Fotos selbst.",
+    "codeCheckLimits": "Die Prüfung liest die Fotos automatisch und kann sich verlesen. Ein erkannter Unterschied ist keine Garantie, dass der Code wirklich gewechselt wurde."
   },
   "forgotPassword": {
     "pageTitle": "Passwort zurücksetzen",
@@ -2044,7 +2061,11 @@
     "taskProofReminderSubject": "Nachweis fehlt noch",
     "taskProofReminderMessage": "Zur Aufgabe „{title}“ fehlt noch der Nachweis „{description}“ — fällig um {until}.",
     "boxPhotoDuePushTitle": "Box-Bild hinterlegen",
-    "boxPhotoDuePushBody": "Der Riegel ist zu. Öffne die App und hinterlege ein Bild der Box mit sichtbarem Schlüssel."
+    "boxPhotoDuePushBody": "Der Riegel ist zu. Öffne die App und hinterlege ein Bild der Box mit sichtbarem Schlüssel.",
+    "lockboxCodeSameSubjectKeyholder": "Schlüsselbox-Code nicht gewechselt?",
+    "lockboxCodeSameMessageKeyholder": "{username} hat beim neuen Verschluss offenbar denselben Schlüsselbox-Code versiegelt wie beim letzten. Beide Fotos stehen in der Vergleichsansicht.",
+    "lockboxCodeUncertainSubjectKeyholder": "Schlüsselbox-Code bitte prüfen",
+    "lockboxCodeUncertainMessageKeyholder": "Beim neuen Verschluss von {username} liess sich nicht sicher erkennen, ob der Schlüsselbox-Code gewechselt hat. Beide Fotos stehen in der Vergleichsansicht."
   },
   "tasks": {
     "titleLabel": "Titel",

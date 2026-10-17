@@ -13,16 +13,21 @@ vi.mock("@/lib/prisma", async () => {
   return { prisma: createPrismaMock() };
 });
 vi.mock("@/lib/authGuards", () => ({ requireApi: vi.fn() }));
+vi.mock("@/lib/lockboxCodeCheckService", () => ({
+  codeChangeCheckApplies: vi.fn(async () => true),
+  runCodeChangeCheck: vi.fn(async () => undefined),
+}));
 
 import { POST } from "./route";
 import { prisma } from "@/lib/prisma";
 import { requireApi } from "@/lib/authGuards";
+import { codeChangeCheckApplies, runCodeChangeCheck } from "@/lib/lockboxCodeCheckService";
 import type { PrismaMock } from "@/test/prismaMock";
 
 const db = prisma as unknown as PrismaMock;
 
 const CODE_URL = "/api/uploads/code-123.jpg";
-const LOCKED = { id: "e1", type: "VERSCHLUSS" };
+const LOCKED = { id: "e1", type: "VERSCHLUSS", startTime: new Date("2026-10-17T08:00:00Z") };
 
 const req = (body: unknown) =>
   new NextRequest("http://x/api/bildersafe/seal", { method: "POST", body: JSON.stringify(body) });
@@ -78,8 +83,17 @@ describe("POST /api/bildersafe/seal — Guard-Kette", () => {
     expect(await res.json()).toEqual({ ok: true });
     expect(db.entry.updateMany).toHaveBeenCalledWith({
       where: { id: "e1", codeImageUrl: null },
-      data: { codeImageUrl: CODE_URL, codeReadable: true },
+      data: { codeImageUrl: CODE_URL, codeReadable: true, codeChangeCheck: "pending" },
     });
+    // Codewechsel (#115): dieselbe Bedingung setzt "pending" und startet den Lauf, der es ersetzt.
+    expect(runCodeChangeCheck).toHaveBeenCalledWith({ entryId: "e1", userId: "u1", codeImageUrl: CODE_URL, startTime: LOCKED.startTime });
+  });
+
+  it("ohne Foto-Prüfung kein \"pending\" und kein Lauf", async () => {
+    vi.mocked(codeChangeCheckApplies).mockResolvedValueOnce(false);
+    await POST(req({ codeImageUrl: CODE_URL }));
+    expect(db.entry.updateMany.mock.calls[0][0].data.codeChangeCheck).toBeNull();
+    expect(runCodeChangeCheck).not.toHaveBeenCalled();
   });
 
   it("laufender Verschluss schon versiegelt → 409, ohne Schreibversuch", async () => {
@@ -97,7 +111,7 @@ describe("POST /api/bildersafe/seal — Guard-Kette", () => {
     await POST(req({ codeImageUrl: CODE_URL }));
     expect(db.entry.updateMany).toHaveBeenCalledWith({
       where: { id: "e1", codeImageUrl: null },
-      data: { codeImageUrl: CODE_URL, codeReadable: null },
+      data: { codeImageUrl: CODE_URL, codeReadable: null, codeChangeCheck: "pending" },
     });
   });
 });

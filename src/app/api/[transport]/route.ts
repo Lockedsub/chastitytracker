@@ -382,6 +382,9 @@ function registerTools(server: McpServer) {
           "why the code verification did not match (verifikationFailure: reason + what was read — the only way " +
           "to tell an unreadable code from a wrong one when verifikationStatus is null), " +
           "whether a photo exists (+ its EXIF capture time), whether a key-box photo exists (hasBoxImage), " +
+          "for locks with a sealed key-box code photo whether the code was changed since the last one " +
+          "(codeChange: first/different/same/uncertain, pending = still checking, error = check failed — same/uncertain also reach the keyholder inbox; " +
+          "the digits are never available, only the verdict), " +
           "the entry id (the address get_image takes) and whether the time was back-/post-dated. " +
           "Newest first. Use this for the narrative context that the aggregate tools (keyholder_dashboard, " +
           "get_session, get_offenses) leave out.",
