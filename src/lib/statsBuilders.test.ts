@@ -378,3 +378,15 @@ describe("Zeitzonen ab UTC+12", () => {
     expect(jahr.percentLocked).toBe(100);
   });
 });
+
+describe("buildDailyData — Zonen mit Zeitumstellung um Mitternacht", () => {
+  it("Santiago, Frühjahrs-Wende 06.09.2026 (00:00 → 01:00): die 23 Stunden gehören zum 6.9., nicht zum 5.9.", () => {
+    // Die lokale Mitternacht existiert nicht; ihre Näherung liegt eine Stunde vor dem Tag.
+    const pairs = [{ start: D("2026-09-05T04:00:00Z"), end: D("2026-09-07T03:00:00Z") }];
+    const m = buildDailyData(pairs, new Set(), "America/Santiago");
+    const total = [...m.values()].reduce((s, v) => s + v.hours, 0);
+    expect(total).toBeCloseTo(47, 6);
+    expect(m.get(key(2026, 9, 6))?.hours).toBeCloseTo(23, 6);
+    expect(m.get(key(2026, 9, 5))?.hours).toBeCloseTo(24, 6);
+  });
+});
