@@ -1080,7 +1080,9 @@ export function buildKgWearPairs<
   let pending: { startTime: Date } | null = null;
   for (const e of asc) {
     if (e.type === KG_PAIR.close) {
-      if (pending) pairs.push({ start: pending.startTime, end: now });
+      // Zweiter Verschluss ohne Öffnen dazwischen: das verwaiste Paar zählt NICHT (wie in
+      // `buildPairs`, das es als `orphaned` markiert) — es bei `now` zu schliessen überlappte das
+      // nächste und zählte die Stunden doppelt.
       pending = e;
     } else if (e.type === KG_PAIR.open && pending) {
       pairs.push({ start: pending.startTime, end: e.startTime });
