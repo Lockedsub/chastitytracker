@@ -1,4 +1,4 @@
-import { tzDateParts, midnightOfLocalDate, getWeekStart, getMidnightToday, formatDayMonth, formatMonthYear } from "@/lib/utils";
+import { tzDateParts, midnightOfLocalDate, midnightAfterDays, getWeekStart, getMidnightToday, formatDayMonth, formatMonthYear } from "@/lib/utils";
 import type { SessionEventData } from "@/app/dashboard/SessionEventRow";
 
 export interface TimelineBucket {
@@ -23,11 +23,6 @@ export interface TimelineBucket {
     cleaning: number;
     total: number;
   };
-}
-
-/** Naive ms arithmetic — fine for adding ±N days to a TZ-normalized midnight. */
-function addDaysMs(d: Date, days: number): Date {
-  return new Date(d.getTime() + days * 86_400_000);
 }
 
 function countEvents(items: SessionEventData[]): TimelineBucket["counts"] {
@@ -65,9 +60,9 @@ export function groupEventsIntoBuckets(
   const sorted = [...eventsWithTime].sort((a, b) => b._time.getTime() - a._time.getTime());
 
   const midnightToday = getMidnightToday(now, tz);
-  const midnightYesterday = addDaysMs(midnightToday, -1);
+  const midnightYesterday = midnightAfterDays(midnightToday, tz, -1);
   const weekStart = getWeekStart(now, tz);
-  const lastWeekStart = addDaysMs(weekStart, -7);
+  const lastWeekStart = midnightAfterDays(weekStart, tz, -7);
 
   type Draft = Omit<TimelineBucket, "counts" | "items"> & { items: SessionEventData[] };
   const buckets: Draft[] = [];
@@ -112,7 +107,7 @@ export function groupEventsIntoBuckets(
       const b = getOrCreate("thisWeek", () => ({
         id: "thisWeek",
         kind: "thisWeek",
-        dateRangeLabel: `${formatDayMonth(weekStart, dl)}–${formatDayMonth(addDaysMs(weekStart, 6), dl)}`,
+        dateRangeLabel: `${formatDayMonth(weekStart, dl, tz)}–${formatDayMonth(midnightAfterDays(weekStart, tz, 6), dl, tz)}`,
         rangeStart: weekStart,
         rangeEnd: midnightYesterday,
         items: [],
@@ -125,7 +120,7 @@ export function groupEventsIntoBuckets(
       const b = getOrCreate("lastWeek", () => ({
         id: "lastWeek",
         kind: "lastWeek",
-        dateRangeLabel: `${formatDayMonth(lastWeekStart, dl)}–${formatDayMonth(addDaysMs(lastWeekStart, 6), dl)}`,
+        dateRangeLabel: `${formatDayMonth(lastWeekStart, dl, tz)}–${formatDayMonth(midnightAfterDays(lastWeekStart, tz, 6), dl, tz)}`,
         rangeStart: lastWeekStart,
         rangeEnd: weekStart,
         items: [],
@@ -147,9 +142,9 @@ export function groupEventsIntoBuckets(
       const b = getOrCreate(id, () => ({
         id,
         kind: "week",
-        absoluteLabel: formatDayMonth(evWeekStart, dl),
+        absoluteLabel: formatDayMonth(evWeekStart, dl, tz),
         rangeStart: evWeekStart,
-        rangeEnd: addDaysMs(evWeekStart, 7),
+        rangeEnd: midnightAfterDays(evWeekStart, tz, 7),
         items: [],
         defaultExpanded: false,
       }));
@@ -161,7 +156,7 @@ export function groupEventsIntoBuckets(
       const b = getOrCreate(id, () => ({
         id,
         kind: "month",
-        absoluteLabel: formatMonthYear(t, dl),
+        absoluteLabel: formatMonthYear(t, dl, tz),
         rangeStart: monthStart,
         rangeEnd: monthEnd,
         items: [],

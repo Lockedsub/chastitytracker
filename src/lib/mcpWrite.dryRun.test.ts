@@ -62,6 +62,11 @@ vi.mock("@/lib/orgasmusAnforderungService", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/orgasmusAnforderungService")>();
   return { ...actual, createOrgasmusAnforderung: vi.fn(), withdrawOrgasmusAnforderung: vi.fn() };
 });
+// `checkWeightRelease` bleibt ECHT — die Vorschau ruft genau sie auf; nur die Bestandsleser stehen daneben.
+vi.mock("@/lib/weightReleaseService", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/weightReleaseService")>();
+  return { ...actual, openWeightRelease: vi.fn(async () => null), weightReleaseStatus: vi.fn(async () => null), setWeightRelease: vi.fn(), withdrawWeightRelease: vi.fn() };
+});
 vi.mock("@/lib/releaseNowService", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/releaseNowService")>();
   // `previewReleaseNow` bleibt ECHT — sie ist genau das, was hier geprüft wird.
@@ -81,7 +86,7 @@ import {
   mcpRequestLock, mcpSetLockPeriod, mcpRequestInspection, mcpRequestOrgasm, mcpSetTrainingGoal,
   mcpWithdraw, mcpEditTrainingGoal, mcpDeleteTrainingGoal, mcpSetCleaning, mcpResolveInspection,
   mcpEditLockPeriod, mcpEditLockRequest, mcpJudgeOffense, mcpCreateTask, mcpEditTask, mcpSetAutoInspections,
-  mcpReviewTaskProof, mcpReleaseNow,
+  mcpReviewTaskProof, mcpReleaseNow, mcpSetWeightRelease,
 } from "./mcpWrite";
 import { prisma } from "@/lib/prisma";
 import { createVerschlussAnforderung, updateLockPeriodEnd, updateLockRequest, withdrawVerschlussAnforderungById } from "@/lib/verschlussAnforderungService";
@@ -92,6 +97,7 @@ import { setAutoKontrolleSettings } from "@/lib/autoKontrolleService";
 import { createOrgasmusAnforderung } from "@/lib/orgasmusAnforderungService";
 import { judgeOffense, requireDetectedOffense } from "@/lib/strafurteilService";
 import { releaseNow } from "@/lib/releaseNowService";
+import { setWeightRelease } from "@/lib/weightReleaseService";
 import { CLEANING_WINDOWS_MAX } from "@/lib/constants";
 import { ALL_WEEKDAYS, weekdayMaskOf } from "@/lib/weekdays";
 import { taskRow } from "@/test/taskRow";
@@ -970,5 +976,49 @@ describe("set_cleaning: Reinigungs-Fenster", () => {
     const r = await mcpSetCleaning("sub", { dryRun: true, allowed: true }) as { diff: Record<string, [unknown, unknown]> };
     expect(r.diff.windows).toBeUndefined();
     expect(r.diff.allowed).toEqual([false, true]);
+  });
+});
+
+describe("set_weight_release: die Vorschau prüft mit checkWeightRelease, nicht mit einer Abschrift", () => {
+  const ZUKUNFT = new Date("2026-07-20T00:00:00Z").toISOString();
+  const preview = async (args: Record<string, unknown> = {}, user: Record<string, unknown> = {}) => {
+    userMock.mockResolvedValue({ id: "u1", username: "sub", role: "admin", weightTrackingEnabled: true, heightCm: 180, ...user });
+    return await mcpSetWeightRelease("sub", { dryRun: true, thresholdKg: 80, notBeforeAt: ZUKUNFT, ...args }) as { wouldSucceed: boolean; problem?: string };
+  };
+
+  it("zulässige Vorgabe: Erfolg, nichts geschrieben", async () => {
+    expect((await preview()).wouldSucceed).toBe(true);
+    expect(setWeightRelease).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["Gewichts-Tracking aus", {}, { weightTrackingEnabled: false }, "WEIGHT_TRACKING_DISABLED"],
+    ["unbekannte Richtung", { direction: "sideways" }, {}, "RELEASE_INVALID_DIRECTION"],
+    ["Schwelle ausserhalb des Bereichs", { thresholdKg: 5 }, {}, "WEIGHT_OUT_OF_RANGE"],
+    ["Schwelle im Untergewicht", { thresholdKg: 40 }, {}, "RELEASE_UNDERWEIGHT"],
+    ["frühester Zeitpunkt liegt in der Vergangenheit", { notBeforeAt: new Date("2026-07-10T00:00:00Z").toISOString() }, {}, "RELEASE_NOT_BEFORE_MUST_BE_FUTURE"],
+    ["mehr Messungen verlangt als das Fenster Tage hat", { averageDays: 3, minMeasurements: 5 }, {}, "RELEASE_TOO_MANY_MEASUREMENTS"],
+  ])("%s wird gemeldet (früher: immer wouldSucceed:true)", async (_name, args, user, code) => {
+    const r = await preview(args, user);
+    expect(r.wouldSucceed).toBe(false);
+    expect(r.problem).toBe(code);
+  });
+});
+
+describe("Vorschau-Angleichung an den Service (request_orgasm, set_lock_period)", () => {
+  it("request_orgasm: ein unlesbares scheduledAt ist ein Problem mit Code (wie beim Commit), kein Wurf", async () => {
+    const r = await mcpRequestOrgasm("sub", {
+      dryRun: true, art: "GELEGENHEIT", endsAt: MORGEN.toISOString(), scheduledAt: "kein-datum",
+    }) as { wouldSucceed: boolean; problem?: string };
+    expect(r.wouldSucceed).toBe(false);
+    expect(r.problem).toBe("ORGASM_INVALID_SEND_TIME");
+  });
+
+  it("set_lock_period: eine TERMINIERTE Sperrzeit ist auch bei offenem Träger zulässig (der Service prüft den Zustand nur bei sofortiger)", async () => {
+    // entryFindFirstMock steht per Default auf NICHT_VERSCHLOSSEN.
+    const r = await mcpSetLockPeriod("sub", {
+      dryRun: true, untilAt: new Date("2026-07-25T12:00:00Z").toISOString(), scheduledAt: new Date("2026-07-20T12:00:00Z").toISOString(),
+    }) as { wouldSucceed: boolean; problem?: string };
+    expect(r.wouldSucceed).toBe(true);
   });
 });

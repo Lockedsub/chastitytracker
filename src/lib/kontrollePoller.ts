@@ -378,9 +378,14 @@ async function processDueVerschlussAnforderungen(now: Date): Promise<void> {
  * `checkOrgasmWindowEnd` gegen `wirksamAb` gar nicht erst anlegen; hier fängt es den Fall ab, dass
  * der Poller lange stand (Container-Neustart) und das Fenster inzwischen verstrichen ist.
  *
+ * Zurückziehen: Die Keyholderin kann zwischen Auswahl und Versand zurückziehen. Deshalb wird
+ * UNMITTELBAR vor dem Versand der Zustand der Zeile frisch gelesen; der Zustellstempel kommt aber
+ * weiterhin erst NACH dem Versand (ein Absturz dazwischen kostet höchstens eine doppelte Meldung,
+ * nie eine stille Nicht-Zustellung), und das Update weckt eine zurückgezogene Zeile nicht auf.
+ *
  * Fehler → `benachrichtigtAt` bleibt null (Retry nächster Tick).
  */
-async function processDueOrgasmusAnforderungen(now: Date): Promise<void> {
+export async function processDueOrgasmusAnforderungen(now: Date): Promise<void> {
   const due = await prisma.orgasmusAnforderung.findMany({
     where: { ...dueForDispatchWhere(now), fulfilledAt: null },
     include: { user: { select: { email: true, username: true, orgasmusArtenConfig: true, locale: true } } },
@@ -390,7 +395,7 @@ async function processDueOrgasmusAnforderungen(now: Date): Promise<void> {
   for (const oa of due) {
     try {
       if (checkOrgasmWindowEnd(oa.endsAt, now)) {
-        await prisma.orgasmusAnforderung.update({ where: { id: oa.id }, data: { withdrawnAt: new Date() } });
+        await prisma.orgasmusAnforderung.updateMany({ where: { id: oa.id, withdrawnAt: null, benachrichtigtAt: null, fulfilledAt: null }, data: { withdrawnAt: new Date() } });
         continue;
       }
       // Das FENSTER wandert um die Verspätung mit — wie die ganze Geometrie einer Aufgabe
@@ -403,6 +408,12 @@ async function processDueOrgasmusAnforderungen(now: Date): Promise<void> {
       const lateMs = Math.max(0, sentAt.getTime() - (oa.wirksamAb?.getTime() ?? sentAt.getTime()));
       const beginsAtDate = new Date(oa.beginsAt.getTime() + lateMs);
       const endsAtDate = new Date(oa.endsAt.getTime() + lateMs);
+      // Frisch lesen, direkt vor dem Versand: das Fenster für ein Zurückziehen schrumpft von „seit der
+      // Auswahl" auf die Zeit zwischen dieser Zeile und der Mail.
+      const stillOpen = await prisma.orgasmusAnforderung.count({
+        where: { id: oa.id, withdrawnAt: null, benachrichtigtAt: null, fulfilledAt: null },
+      });
+      if (stillOpen === 0) continue;
       await sendOrgasmusAnforderungNotifications({
         userId: oa.userId,
         user: oa.user,
@@ -418,8 +429,9 @@ async function processDueOrgasmusAnforderungen(now: Date): Promise<void> {
       });
       // Verschobenes Fenster UND Stempel in EINEM Schreibvorgang: die Mail nennt bereits die neuen
       // Zeiten, eine Zeile mit alten Werten wäre ab hier eine Lüge gegenüber dem Träger.
-      await prisma.orgasmusAnforderung.update({
-        where: { id: oa.id },
+      // `updateMany` mit offenem Zustand: eine nach dem Versand zurückgezogene Zeile bleibt zurückgezogen.
+      await prisma.orgasmusAnforderung.updateMany({
+        where: { id: oa.id, withdrawnAt: null, benachrichtigtAt: null, fulfilledAt: null },
         data: { beginsAt: beginsAtDate, endsAt: endsAtDate, benachrichtigtAt: sentAt },
       });
     } catch (e) {

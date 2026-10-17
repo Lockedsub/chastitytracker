@@ -7,9 +7,8 @@ import { orgasmusValueAllowed, validOeffnenCodes } from "@/lib/reasonsService";
 import { validateDeviceOwnership } from "@/lib/queries";
 import { entryManageAccess } from "@/lib/keyholder";
 import { entryGuardCode } from "@/lib/entryErrors";
-import { assertEntryTimeOk, deleteEntryForUser, entryPairTypes, entryPersistsDevice } from "@/lib/entryCorrection";
+import { assertEntryTimeOk, chainBreakPartner, deleteEntryForUser, entryPairTypes, entryPersistsDevice } from "@/lib/entryCorrection";
 import { serviceFailure } from "@/lib/serviceResult";
-import { WEAR_PAIR } from "@/lib/utils";
 import { isDevBypassEnabled } from "@/lib/devMode";
 import { deleteUploadedFiles } from "@/lib/imageUtils";
 import { isPendingEntry } from "@/lib/lockPending";
@@ -170,57 +169,29 @@ export async function DELETE(
   const partnerId = req.nextUrl.searchParams.get("partnerId");
 
   const pair = entryPairTypes(existing.type);
-  const isWearPair = pair === WEAR_PAIR;
   const isPair = pair !== null;
 
-  // Chain-break detection for paired entries (VERSCHLUSS/OEFFNEN global; WEAR-pair per category)
-  //
-  // Ein schwebender Verschluss-AUFRUF ist von der Prüfung ausgenommen: er steht per Definition
-  // NICHT in der Kette (`effectiveEntryWhere` blendet ihn überall aus), also kann sein Löschen sie
-  // auch nicht brechen. Ohne diese Ausnahme müsste die Zurücknehmen-Aktion mit `force=true` an
-  // einer Prüfung vorbei, die für sie gar nicht gedacht ist.
-  if (isPair && !force && !isPendingEntry(existing)) {
-    const pairTypes = [pair.close, pair.open];
-    const wearCategoryId = isWearPair && existing.deviceId
-      ? (await prisma.device.findUnique({ where: { id: existing.deviceId }, select: { categoryId: true } }))?.categoryId
-      : null;
-    const categoryFilter = isWearPair && wearCategoryId ? { device: { categoryId: wearCategoryId } } : {};
-    const [prev, next] = await Promise.all([
-      prisma.entry.findFirst({
-        where: { userId: existing.userId, type: { in: [...pairTypes] }, startTime: { lt: existing.startTime }, ...categoryFilter },
-        orderBy: { startTime: "desc" },
-        select: { id: true, type: true, startTime: true, imageUrl: true, codeImageUrl: true, boxImageUrl: true },
-      }),
-      prisma.entry.findFirst({
-        where: { userId: existing.userId, type: { in: [...pairTypes] }, startTime: { gt: existing.startTime }, ...categoryFilter },
-        orderBy: { startTime: "asc" },
-        select: { id: true, type: true, startTime: true, imageUrl: true, codeImageUrl: true, boxImageUrl: true },
-      }),
-    ]);
-
-    const wouldBreak = prev && next && prev.type === next.type;
-
-    if (wouldBreak) {
-      // Pair partner is "next" for the start-half (VERSCHLUSS/WEAR_BEGIN), "prev" for the end-half.
-      const isStartHalf = existing.type === "VERSCHLUSS" || existing.type === "WEAR_BEGIN";
-      const partner = isStartHalf ? next : prev;
-
-      if (withPartner) {
-        if (partnerId && partnerId !== partner.id) {
-          return NextResponse.json({ error: "PARTNER_CHANGED" }, { status: 409 });
-        }
-        const result = await deleteEntryForUser(existing, partner.id);
-        if (!result.ok) return serviceFailure(result);
-        revalidatePath("/dashboard", "layout");
-        return new NextResponse(null, { status: 204 });
+  // Chain-break detection for paired entries (VERSCHLUSS/OEFFNEN global; WEAR-pair per category).
+  // Die Frage beantwortet `chainBreakPartner` — mit der Sicht der Kette (`effectiveEntryWhere`), in
+  // der ein schwebender Verschluss-AUFRUF nicht steht. Er ist auch selbst ausgenommen: sein Löschen
+  // kann die Kette nicht brechen, und die Zurücknehmen-Aktion soll ohne `force=true` auskommen.
+  const partner = isPair && !force ? await chainBreakPartner(existing) : null;
+  if (partner) {
+    if (withPartner) {
+      if (partnerId && partnerId !== partner.id) {
+        return NextResponse.json({ error: "PARTNER_CHANGED" }, { status: 409 });
       }
-
-      // Return chain break info without deleting
-      return NextResponse.json({
-        chainBreak: true,
-        partner: { id: partner.id, type: partner.type, startTime: partner.startTime },
-      });
+      const result = await deleteEntryForUser(existing, partner.id);
+      if (!result.ok) return serviceFailure(result);
+      revalidatePath("/dashboard", "layout");
+      return new NextResponse(null, { status: 204 });
     }
+
+    // Return chain break info without deleting
+    return NextResponse.json({
+      chainBreak: true,
+      partner: { id: partner.id, type: partner.type, startTime: partner.startTime },
+    });
   }
 
   // No chain break, force=true, or non-VO entry: delete normally. Was daran hängt (Box-Kommando

@@ -506,6 +506,18 @@ describe("buildKgWearPairs", () => {
     const result = buildKgWearPairs(entries, now);
     expect(result).toHaveLength(1);
   });
+
+  it("zwei VERSCHLUSS ohne OEFFNEN: das verwaiste Paar zählt nicht (wie in buildPairs), das letzte bleibt", () => {
+    // Früher schloss das erste Paar bei `now` und überlappte das zweite — die Stunden zählten doppelt.
+    const now = t("2026-05-01T20:00:00Z");
+    const entries = [
+      { type: "VERSCHLUSS", startTime: t("2026-05-01T10:00:00Z"), boltConfirmedAt: t("2026-05-01T10:00:00Z"), openAwaitsBolt: false },
+      { type: "VERSCHLUSS", startTime: t("2026-05-01T12:00:00Z"), boltConfirmedAt: t("2026-05-01T12:00:00Z"), openAwaitsBolt: false },
+    ];
+    const result = buildKgWearPairs(entries, now);
+    expect(result).toEqual([{ start: t("2026-05-01T12:00:00Z"), end: now }]);
+    expect(wearingHoursFromPairs(result, t("2026-05-01T00:00:00Z"), now)).toBe(8);
+  });
 });
 
 // ─── wearingHoursFromPairs ─────────────────────────────────────────────────

@@ -1,5 +1,5 @@
 import {
-  dayKeyOfLocalDate, formatMonthYear, formatTime, formatTotalHours, midnightInTZ, midnightOfLocalDate,
+  dayKeyOfLocalDate, formatMonthYear, formatTime, formatTotalHours, midnightAfterDays, midnightOfLocalDate,
   mondayIndexOfLocalDate, tzDateParts, tzDayKey, wearingHoursFromPairs, type WearPair,
 } from "@/lib/utils";
 import { periodTarget } from "@/lib/goalFulfillment";
@@ -45,8 +45,6 @@ export type Vorgabe = {
   minProTagWochentage?: string | null;
   notiz: string | null;
 };
-
-const DAY_MS = 86_400_000;
 
 /**
  * ZAHLEN-Rechner für den Kalender: reine Datums-Arithmetik ohne jeden Ortsbezug. `m`/`d` dürfen
@@ -105,17 +103,15 @@ export type DailyData = Map<string, { hours: number; hasOrgasm: boolean }>;
 export function buildDailyData(wearPairs: WearPair[], orgasmDates: Set<string>, tz: string): DailyData {
   const map = new Map<string, { hours: number; hasOrgasm: boolean }>();
   for (const pair of wearPairs) {
-    let d = midnightInTZ(pair.start, tz);
+    // Tag für Tag über KALENDERgrenzen (`midnightAfterDays`), nicht in festen 24-h-Schritten: an
+    // einer Zeitumstellung hat der Tag 23 oder 25 Stunden, und starre Schritte verschöben jedes
+    // folgende Tagesfenster um eine Stunde.
+    let d = midnightAfterDays(pair.start, tz, 0);
     while (d.getTime() < pair.end.getTime()) {
-      const nextD = new Date(d.getTime() + DAY_MS);
+      const nextD = midnightAfterDays(d, tz, 1);
       const overlap = Math.min(pair.end.getTime(), nextD.getTime()) - Math.max(pair.start.getTime(), d.getTime());
       if (overlap > 0) {
-        // Einen halben Tag hinein statt auf `d` selbst: `d` läuft in flachen 24-h-Schritten und
-        // driftet an einer DST-Wende um eine Stunde von der lokalen Mitternacht weg. Aus der
-        // Tagesmitte heraus benennt `tzDayKey` trotzdem noch den richtigen Tag. (Kein Widerspruch
-        // zum Mittags-Anker, den `calendarDate` oben verbietet: hier wird ein ECHTER Instant um
-        // Stunden verschoben, dort wurde ein Kalendertag über einen erfundenen Instant gebaut.)
-        const key = tzDayKey(new Date(d.getTime() + DAY_MS / 2), tz);
+        const key = tzDayKey(d, tz);
         const existing = map.get(key) ?? { hours: 0, hasOrgasm: false };
         existing.hours += overlap / 3_600_000;
         map.set(key, existing);
@@ -269,7 +265,7 @@ export function buildCalendarMonths(opts: {
       if (firstDayOfRow != null) {
         const dow = mondayIndexOfLocalDate(year, month, firstDayOfRow);
         const wkStart = midnightOfLocalDate(year, month, firstDayOfRow - dow, tz);
-        // Kalendertag-Arithmetik statt `+ 7 * DAY_MS`: in der Umstellungswoche hat die Woche 167
+        // Kalendertag-Arithmetik statt `+ 7 * 86_400_000`: in der Umstellungswoche hat die Woche 167
         // oder 169 Stunden, und die Millisekunden-Addition verfehlt die Mitternacht.
         const wkEnd = midnightOfLocalDate(year, month, firstDayOfRow - dow + 7, tz);
         weekGoal = goalIn("week", wkStart, wkEnd);

@@ -145,3 +145,17 @@ describe("was aus dem rohen Request-Body kommt", () => {
     expect(db.weightRelease.create.mock.calls[0][0].data.stepKg).toBe(0);
   });
 });
+
+describe("weightReleaseStatus — nextThresholdKg am 25-Stunden-Tag", () => {
+  it("Herbst-Wende 25.10.2026, 00:30 Ortszeit: 'morgen' ist der 26.10., nicht noch der 25.", async () => {
+    // Früher: now + 86_400_000 ms = 25.10. 23:30 Ortszeit — wieder HEUTE, die Schwelle rückte nicht vor.
+    const { weightReleaseStatus } = await import("@/lib/weightReleaseService");
+    db.weightRelease.findFirst.mockResolvedValue({
+      ...RELEASE, stepKg: 0.5, armedAt: new Date("2026-10-19T22:00:00Z"), notBeforeAt: new Date("2026-10-19T22:00:00Z"),
+    });
+    const status = await weightReleaseStatus(USER, new Date("2026-10-24T22:30:00Z"));
+    // armiert 20.10. (Ortszeit): am 25.10. = 5 Tage → 77,5; am 26.10. = 6 Tage → 78
+    expect(status?.thresholdKg).toBe(77.5);
+    expect(status?.nextThresholdKg).toBe(78);
+  });
+});
