@@ -12,7 +12,7 @@ import type { UnitSystem } from "@/lib/weight";
 import pkg from "@/../package.json";
 import type { FeedbackSetup } from "@/lib/feedback";
 import { feedbackSetup } from "@/lib/feedbackSetup";
-import { censusIdentity } from "@/lib/census";
+import { publicIdentity } from "@/lib/census";
 
 export interface SettingsFormProps {
   username: string;
@@ -54,9 +54,9 @@ export interface SettingsFormProps {
   version: string;
   buildDate?: string;
   feedback: FeedbackSetup;
-  /** Census-ID und Image-Herkunft dieser Instanz (Issue #15) — nur für Admins, zum Abschreiben in
+  /** Öffentliche Instanz-Kennung und Image-Herkunft (Issue #15) — nur für Admins, zum Abschreiben in
    *  ein GitHub-Issue. */
-  census: ReturnType<typeof censusIdentity> | null;
+  census: Awaited<ReturnType<typeof publicIdentity>> | null;
   /** Gewichtstracking — `null`, wenn die Keyholderin es für diesen Sub nicht freigeschaltet hat.
    *  Der Abschnitt erscheint dann gar nicht. */
   weight: WeightSettingsProps | null;
@@ -167,8 +167,8 @@ export async function getSettingsProps(): Promise<SettingsFormProps> {
     mailConfigured: mailConfigured(),
     version: pkg.version,
     buildDate: process.env.BUILD_DATE ?? undefined,
-    feedback: feedbackSetup(),
-    census: isAdmin ? censusIdentity() : null,
+    feedback: await feedbackSetup(),
+    census: isAdmin ? await publicIdentity() : null,
     weight,
     box: boxCouplingEnabled() && userId ? await boxSettings(userId) : null,
   };

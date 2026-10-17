@@ -58,12 +58,48 @@ export function censusEnabled(env: Record<string, string | undefined> = process.
   return !env.UPSTREAM_CHANGELOG_URL && env.DISABLE_UPDATE_CENSUS !== "true";
 }
 
-/** Wer diese Instanz für den Census ist: ID und Herkunft als Zeile — dieselben zwei Werte für das
- *  Feedback, den GitHub-Link und die Anzeige in den Einstellungen. Bei abgeschaltetem Census ohne ID:
- *  wer die Zählung abschaltet, soll auch über das Feedback nicht mehr wiedererkennbar sein. */
-export function censusIdentity(env: Record<string, string | undefined> = process.env): { instanceId: string | null; image: string } {
+const PUBLIC_ID_KEY = "censusPublicId";
+let publicIdMemo: Promise<string> | null = null;
+
+/**
+ * Die ÖFFENTLICHE Kennung der Instanz: zufällig, einmal erzeugt und in `AppMeta` gespeichert. Sie
+ * steht im vorausgefüllten GitHub-Issue und in den Einstellungen und reist in der Census-Nutzlast mit,
+ * damit der Collector ein Issue seiner Instanz zuordnen kann.
+ *
+ * **Bewusst NICHT die Census-ID.** Die folgt aus dem `NEXTAUTH_SECRET`; öffentlich in einem Issue
+ * liesse sie sich bei einem schwachen Secret offline durchprobieren — und mit dem Secret signiert man
+ * Sitzungen. Die Census-ID geht deshalb nur an den Collector und das Feedback-Postfach, nie in eine
+ * öffentliche URL.
+ */
+export function censusPublicId(): Promise<string> {
+  publicIdMemo ??= (async () => {
+    const existing = await prisma.appMeta.findUnique({ where: { key: PUBLIC_ID_KEY } });
+    if (existing) return existing.value;
+    // `upsert` mit leerem Update: zwei gleichzeitige erste Aufrufe einigen sich auf EINE Zeile.
+    const row = await prisma.appMeta.upsert({
+      where: { key: PUBLIC_ID_KEY },
+      create: { key: PUBLIC_ID_KEY, value: crypto.randomBytes(8).toString("hex") },
+      update: {},
+    });
+    return row.value;
+  })().catch((e) => {
+    publicIdMemo = null;
+    throw e;
+  });
+  return publicIdMemo;
+}
+
+/** Nur für Tests. */
+export function clearCensusPublicIdMemo(): void {
+  publicIdMemo = null;
+}
+
+/** Was eine Instanz ÖFFENTLICH von sich zeigt (GitHub-Link, Einstellungen): die zufällige Kennung und
+ *  die Herkunft als Zeile. Bei abgeschaltetem Census ohne Kennung — wer die Zählung abschaltet, soll
+ *  über ein Issue nicht mehr zuzuordnen sein. */
+export async function publicIdentity(env: Record<string, string | undefined> = process.env): Promise<{ publicId: string | null; image: string }> {
   return {
-    instanceId: censusEnabled(env) ? censusInstanceId(env.NEXTAUTH_SECRET) : null,
+    publicId: censusEnabled(env) ? await censusPublicId().catch(() => null) : null,
     image: imageOriginLabel(imageOrigin(env)),
   };
 }
@@ -76,6 +112,8 @@ export function censusInstanceId(secret: string | undefined = process.env.NEXTAU
 
 export interface CensusStats {
   v: number;
+  /** Die öffentliche Kennung (`censusPublicId`) — verbindet ein GitHub-Issue mit dieser Zeile. */
+  publicId: string;
   /** Wie die Instanz betrieben wird: über das Portal (auf trublues Server) oder selbst gehostet. */
   portal: boolean;
   image: ImageOrigin;
@@ -112,7 +150,8 @@ const DAY_MS = 86_400_000;
 
 /** Sammelt die Census-Nutzlast. Wirft bei Datenbankfehlern — der Aufrufer schickt dann ohne. */
 export async function collectCensusStats(now = new Date(), env: Record<string, string | undefined> = process.env): Promise<CensusStats> {
-  const [users, wearerRows, activeRows, keyholderRows, localeRows, boxRows, weight, kgEntries, vision] = await Promise.all([
+  const [publicId, users, wearerRows, activeRows, keyholderRows, localeRows, boxRows, weight, kgEntries, vision] = await Promise.all([
+    censusPublicId(),
     prisma.user.count(),
     prisma.entry.groupBy({ by: ["userId"] }),
     prisma.entry.groupBy({ by: ["userId"], where: { createdAt: { gte: new Date(now.getTime() - 7 * DAY_MS) } } }),
@@ -138,6 +177,7 @@ export async function collectCensusStats(now = new Date(), env: Record<string, s
 
   return {
     v: CENSUS_STATS_VERSION,
+    publicId,
     portal: isPortalInstance(env),
     image: imageOrigin(env),
     arch: process.arch,

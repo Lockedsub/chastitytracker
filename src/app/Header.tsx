@@ -37,7 +37,7 @@ export default async function Header() {
               eigenen Tracker hat, hat auch keinen eigenen Posteingang. Das App-Badge zählt hier
               trotzdem den Keyholder-Stand mit — die Regel dafür steht in `HeaderMessages`. */}
           {user?.id && !hideOwnTracker && <HeaderMessages actor={user} scope="own" />}
-          {user && <FeedbackButton feedback={feedbackSetup()} />}
+          {user && <FeedbackButton feedback={await feedbackSetup()} />}
           {user && (
             <AvatarMenu
               username={user.name ?? ""}

@@ -15,7 +15,7 @@ vi.mock("@/lib/vision/config", () => ({
 
 import { prisma } from "@/lib/prisma";
 import { currentVisionConfig, visionSpec } from "@/lib/vision/config";
-import { censusEnabled, censusHeaders, censusIdentity, censusInstanceId, clearCensusStatsMemo, collectCensusStats, imageOrigin, imageOriginLabel } from "./census";
+import { censusEnabled, censusHeaders, censusInstanceId, clearCensusPublicIdMemo, clearCensusStatsMemo, publicIdentity, collectCensusStats, imageOrigin, imageOriginLabel } from "./census";
 import type { PrismaMock } from "@/test/prismaMock";
 
 const db = prisma as unknown as PrismaMock;
@@ -28,6 +28,8 @@ const kg = (userId: string, type: string, at: string) =>
 beforeEach(() => {
   vi.clearAllMocks();
   clearCensusStatsMemo();
+  clearCensusPublicIdMemo();
+  db.appMeta.findUnique.mockResolvedValue({ value: "0123456789abcdef" });
   db.entry.groupBy.mockResolvedValue([]);
   db.adminUserRelationship.groupBy.mockResolvedValue([]);
   db.user.groupBy.mockResolvedValue([]);
@@ -65,13 +67,20 @@ describe("censusInstanceId", () => {
   });
 });
 
-describe("censusIdentity", () => {
-  it("lässt die ID weg, wenn der Census abgeschaltet ist", () => {
+describe("publicIdentity", () => {
+  it("ist zufällig gespeichert, nicht aus dem Secret abgeleitet — und fehlt bei abgeschaltetem Census", async () => {
+    db.appMeta.findUnique.mockResolvedValue(null);
+    db.appMeta.upsert.mockImplementation(async ({ create }: { create: { value: string } }) => create);
     const env = { NEXTAUTH_SECRET: "geheim", IMAGE_SOURCE_REPO: "trublue-2/chastitytracker" };
-    expect(censusIdentity(env)).toEqual({ instanceId: censusInstanceId("geheim"), image: "official" });
-    expect(censusIdentity({ ...env, DISABLE_UPDATE_CENSUS: "true" }).instanceId).toBeNull();
-    expect(censusIdentity({ ...env, UPSTREAM_CHANGELOG_URL: "https://x" }).instanceId).toBeNull();
-    expect(censusEnabled({})).toBe(true);
+    const id = await publicIdentity(env);
+    expect(id.image).toBe("official");
+    expect(id.publicId).toMatch(/^[0-9a-f]{16}$/);
+    expect(id.publicId).not.toBe(censusInstanceId("geheim"));
+    // Einmal erzeugt, danach aus dem Speicher.
+    expect((await publicIdentity(env)).publicId).toBe(id.publicId);
+    expect(db.appMeta.upsert).toHaveBeenCalledTimes(1);
+    expect((await publicIdentity({ ...env, DISABLE_UPDATE_CENSUS: "true" })).publicId).toBeNull();
+    expect(censusEnabled({ UPSTREAM_CHANGELOG_URL: "https://x" })).toBe(false);
   });
 });
 
@@ -92,7 +101,7 @@ describe("collectCensusStats", () => {
     const s = await collectCensusStats(NOW, { PORTAL_SHARED_SECRET: "x", ENABLE_MCP: "true", IMAGE_SOURCE_REPO: "trublue-2/chastitytracker" });
 
     expect(s).toMatchObject({
-      v: 1, portal: true, image: { origin: "official" },
+      v: 1, publicId: "0123456789abcdef", portal: true, image: { origin: "official" },
       users: 3, wearers: 2, active7d: 1, lockedNow: 1, keyholders: 1, wearHours: 12,
       locales: { de: 2, en: 1 },
       features: { boxes: { heimdall: 1 }, vision: "off", mcp: true, telegram: false, weight: 1 },

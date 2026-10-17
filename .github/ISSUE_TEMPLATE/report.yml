@@ -37,7 +37,7 @@ body:
   - type: input
     id: instance
     attributes:
-      label: Census-ID
+      label: Instanz-Kennung / Instance ID
       description: Füllt der GitHub-Link in der App selbst aus; Admins finden sie auch unter Einstellungen → App. Anonym; verknüpft die Meldung mit der Nutzungszählung deiner Instanz (docs/update-check.md). Leer lassen, wenn du das nicht willst. / Filled in by the app's GitHub link; admins also find it under Settings → App. Anonymous; links this report to your instance's usage census. Leave empty if you prefer.
   - type: textarea
     id: description

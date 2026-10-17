@@ -583,7 +583,7 @@ export default function SettingsForm({ username, email, locale, timezone, startP
           <InfoRow label={t("version")} value={version} mono />
           <InfoRow label={t("buildDate")} value={buildDate ?? t("buildDateLocal")} />
           {census && <InfoRow label={t("imageOrigin")} value={census.image} mono />}
-          {census?.instanceId && <InfoRow label={t("censusId")} value={census.instanceId} mono />}
+          {census?.publicId && <InfoRow label={t("censusId")} value={census.publicId} mono />}
         </div>
       </Section>
 

@@ -27,11 +27,12 @@ export interface FeedbackSetup {
   githubHref: string;
 }
 
-/** Das GitHub-Formular (`.github/ISSUE_TEMPLATE/report.yml`), vorausgefüllt mit Version, Census-ID
- *  und Image-Herkunft. Die Feld-Namen sind die `id`s im Formular — wer dort umbenennt, ändert hier mit. */
-export function githubIssueHref(p: { version: string; instanceId: string | null; image: string }): string {
+/** Das GitHub-Formular (`.github/ISSUE_TEMPLATE/report.yml`), vorausgefüllt mit Version, öffentlicher
+ *  Instanz-Kennung und Image-Herkunft. Die Feld-Namen sind die `id`s im Formular — wer dort umbenennt,
+ *  ändert hier mit. NIE die Census-ID: sie folgt aus dem Secret (siehe `censusPublicId`). */
+export function githubIssueHref(p: { version: string; publicId: string | null; image: string }): string {
   const q = new URLSearchParams({ template: "report.yml", version: p.version, image: p.image });
-  if (p.instanceId) q.set("instance", p.instanceId);
+  if (p.publicId) q.set("instance", p.publicId);
   return `${FEEDBACK_GITHUB_ISSUES_URL}?${q}`;
 }
 

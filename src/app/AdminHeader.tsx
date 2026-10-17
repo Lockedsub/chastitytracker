@@ -70,7 +70,7 @@ export default async function AdminHeader({ username, actor, hideOwnTracker }: P
               <Users size={18} />
             </Link>
           )}
-          <FeedbackButton feedback={feedbackSetup()} />
+          <FeedbackButton feedback={await feedbackSetup()} />
           <AvatarMenu
             username={username}
             settingsHref="/admin/settings"
