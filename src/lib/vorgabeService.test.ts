@@ -188,3 +188,22 @@ describe("createVorgabe — reines Kalenderdatum als LOKALE Mitternacht", () => 
     expect(storedGueltigAb()).toBe(d);
   });
 });
+
+describe("goalDateToInput — Gegenstück zu goalDateFromInput", () => {
+  // Der Fehler: das Bearbeiten-Formular formatierte in UTC, gespeichert wird aber Mitternacht in der
+  // Zone des Subs — wer nur etwas anderes änderte, schob das Ziel um einen Tag nach vorn.
+  it.each(["Europe/Zurich", "Asia/Tokyo", "America/Los_Angeles", "Pacific/Kiritimati"])(
+    "Hin-und-zurück in %s liefert dasselbe Datum",
+    async (tz) => {
+      const { goalDateFromInput, goalDateToInput } = await import("./vorgabeService");
+      for (const day of ["2026-03-29", "2026-06-12", "2026-10-25", "2026-01-01"]) {
+        expect(goalDateToInput(goalDateFromInput(day, tz), tz)).toBe(day);
+      }
+    },
+  );
+
+  it("Zürich: Mitternacht lokal ist am Vortag 22:00 UTC — UTC-Formatierung hätte den Vortag geliefert", async () => {
+    const { goalDateToInput } = await import("./vorgabeService");
+    expect(goalDateToInput(new Date("2026-06-11T22:00:00Z"), "Europe/Zurich")).toBe("2026-06-12");
+  });
+});

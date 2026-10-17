@@ -34,6 +34,7 @@ import QuickSettingsPicker from "@/app/admin/QuickSettingsPicker";
 import { QUICK_SETTINGS, quickSettingAvailable, parseQuickSettings } from "@/lib/quickSettings";
 import VorgabeForm from "../VorgabeForm";
 import VorgabeRow from "../VorgabeRow";
+import { goalDateToInput } from "@/lib/vorgabeService";
 import { parseWeekdayGoalRules } from "@/lib/weekdayGoal";
 import { getLocale, getTranslations } from "next-intl/server";
 import { toDateLocale, formatDate } from "@/lib/utils";
@@ -42,10 +43,6 @@ import { formColCls } from "@/app/components/inputStyles";
 function isActive(v: { gueltigAb: Date; gueltigBis: Date | null }): boolean {
   const now = new Date();
   return v.gueltigAb <= now && (v.gueltigBis === null || v.gueltigBis >= now);
-}
-
-function toDateInput(d: Date): string {
-  return d.toISOString().slice(0, 10);
 }
 
 export default async function EinstellungenPage({ params }: { params: Promise<{ id: string }> }) {
@@ -165,8 +162,8 @@ export default async function EinstellungenPage({ params }: { params: Promise<{ 
               categories={categories}
               categoryName={showHeaders ? null : (categories.find((c) => c.id === v.categoryId)?.name ?? null)}
               initialValues={{
-                gueltigAb: toDateInput(v.gueltigAb),
-                gueltigBis: v.gueltigBis ? toDateInput(v.gueltigBis) : "",
+                gueltigAb: goalDateToInput(v.gueltigAb, tz),
+                gueltigBis: v.gueltigBis ? goalDateToInput(v.gueltigBis, tz) : "",
                 validUntilManual: v.validUntilManual,
                 tagVal: v.minProTagH != null ? String(v.minProTagH) : "",
                 wocheVal: v.minProWocheH != null ? String(v.minProWocheH) : "",

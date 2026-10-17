@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { midnightOfLocalDate, APP_TZ } from "@/lib/utils";
+import { weightDayKey } from "@/lib/weight";
 import { getUserTimezone } from "@/lib/queries";
 import { reorderVorgabenDates } from "@/lib/vorgaben";
 import { serviceFail, type ServiceResult } from "@/lib/serviceResult";
@@ -53,6 +54,13 @@ export function goalDateFromInput(value: string | Date, tz: string): Date {
   const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
   if (!dateOnly) return new Date(value);
   return midnightOfLocalDate(+dateOnly[1], +dateOnly[2] - 1, +dateOnly[3], tz);
+}
+
+/** Gegenstück zu `goalDateFromInput`: das Kalenderdatum (`YYYY-MM-DD`) eines gespeicherten Ziel-Datums
+ *  in der Zone des Subs. In UTC formatiert läge die lokale Mitternacht am Vortag, und ein Speichern
+ *  des Bearbeiten-Formulars schöbe das Ziel um einen Tag nach vorn. */
+export function goalDateToInput(d: Date, tz: string): string {
+  return weightDayKey(d, tz);
 }
 
 /** Die Zeitzone des Subs — aber nur, wenn ein Datum als STRING kommt und die Kalenderdatum-Regel
