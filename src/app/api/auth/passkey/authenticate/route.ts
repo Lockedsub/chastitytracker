@@ -3,13 +3,22 @@ import { prisma } from "@/lib/prisma";
 import { getRpConfig, setChallenge, getAndDeleteChallenge, createPasskeyToken } from "@/lib/webauthn";
 import { generateAuthenticationOptions, verifyAuthenticationResponse } from "@simplewebauthn/server";
 import type { AuthenticatorTransportFuture } from "@simplewebauthn/types";
+import { checkRateLimit, clientIp, rateLimitResponse } from "@/lib/rate-limit";
+
+/** Eine Anmeldung sind zwei Aufrufe (POST Optionen, PUT Prüfung) — 30 in 15 Minuten sind 15 Anmeldungen je IP. */
+async function limited(req: Request) {
+  const rl = await checkRateLimit(`passkey-auth:${clientIp(req)}`, 30, 15 * 60_000);
+  return rl.limited ? rateLimitResponse(rl) : null;
+}
 
 /**
  * POST /api/auth/passkey/authenticate
  * Generate authentication options (challenge).
  * No auth required — this is the login flow.
  */
-export async function POST() {
+export async function POST(req: Request) {
+  const blocked = await limited(req);
+  if (blocked) return blocked;
   const { rpId } = getRpConfig();
 
   const options = await generateAuthenticationOptions({
@@ -31,6 +40,8 @@ export async function POST() {
  * Body: { response }
  */
 export async function PUT(req: Request) {
+  const blocked = await limited(req);
+  if (blocked) return blocked;
   const { rpId, rpOrigin } = getRpConfig();
   const body = await req.json();
   const { response } = body;

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { registerClient, OAUTH_SUPPORTED_SCOPES } from "@/lib/oauth";
-import { checkRateLimit } from "@/lib/rate-limit";
+import { checkRateLimit, clientIp } from "@/lib/rate-limit";
 
 /**
  * POST /api/oauth/register
@@ -9,7 +9,7 @@ import { checkRateLimit } from "@/lib/rate-limit";
  * No auth required — rate-limited by IP.
  */
 export async function POST(req: NextRequest) {
-  const ip = req.headers.get("x-forwarded-for")?.split(",").at(-1)?.trim() ?? "unknown";
+  const ip = clientIp(req);
   const rl = await checkRateLimit(`oauth-register:${ip}`, 20, 60_000);
   if (rl.limited) {
     return NextResponse.json({ error: "too_many_requests" }, { status: 429 });

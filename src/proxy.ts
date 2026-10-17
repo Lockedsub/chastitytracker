@@ -4,6 +4,7 @@ import { ownTrackerHidden } from "@/lib/ownTracker";
 import { touchAppMeta } from "@/lib/appMeta";
 import { logTimestamp } from "@/lib/logFormat";
 import { isPublicPath } from "@/lib/publicRoutes";
+import { clientIp } from "@/lib/clientIp";
 
 // ── Rate limiter für Login-Endpunkt ──────────────────────────────────────────
 const loginBucket = new Map<string, { count: number; resetAt: number }>();
@@ -38,10 +39,7 @@ export default auth(async (req) => {
 
   // Rate-Limit auf Login-Endpunkt
   if (req.method === "POST" && req.nextUrl.pathname === "/api/auth/callback/credentials") {
-    const ip =
-      req.headers.get("x-forwarded-for")?.split(",").at(-1)?.trim() ??
-      req.headers.get("x-real-ip") ??
-      "unknown";
+    const ip = clientIp(req);
     if (isRateLimited(ip)) {
       return NextResponse.json(
         { error: "Zu viele Anmeldeversuche. Bitte warte 15 Minuten." },
@@ -136,10 +134,7 @@ export default auth(async (req) => {
   const isAdminUserDetailPath = /^\/admin\/users\/[a-z0-9]{20,}(\/|$)/.test(pathname);
   if (isLoggedIn && !pathname.startsWith("/api") && !isAdminUserDetailPath) {
     const user = req.auth?.user as { id?: string; name?: string } | undefined;
-    const ip =
-      req.headers.get("x-forwarded-for")?.split(",").at(-1)?.trim() ??
-      req.headers.get("x-real-ip") ??
-      "unknown";
+    const ip = clientIp(req);
     console.log(`[ACCESS] ${logTimestamp().replace("T", " ")} | ${user?.name ?? "?"} | ${pathname} | ${ip}`);
   }
 

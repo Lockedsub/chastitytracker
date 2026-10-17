@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { checkRateLimit } from "@/lib/rate-limit";
+import { checkRateLimit, clientIp } from "@/lib/rate-limit";
 import {
   getClient, consumeAuthorizationCode, createAccessToken, createRefreshToken, verifyRefreshToken,
   verifyPkceS256, OAUTH_TOKEN_TTL_MS, pruneExpiredOAuthRecords,
@@ -23,7 +23,7 @@ function tokenResponse(accessToken: string, refreshToken: string, scope: string)
  *  - grant_type=refresh_token (§6) → neuer access token, SELBER refresh token (nicht-rotierend)
  */
 export async function POST(req: NextRequest) {
-  const ip = req.headers.get("x-forwarded-for")?.split(",").at(-1)?.trim() ?? "unknown";
+  const ip = clientIp(req);
   const rl = await checkRateLimit(`oauth-token:${ip}`, 30, 60_000);
   if (rl.limited) {
     return NextResponse.json({ error: "too_many_requests" }, { status: 429 });

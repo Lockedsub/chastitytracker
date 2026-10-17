@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { errorResponse } from "@/lib/serviceResult";
 
+// Die IP-Auslese für `ip:<ip>`-Schlüssel — EINE Quelle, siehe `clientIp.ts` (importfrei, damit auch der Proxy sie nimmt).
+export { clientIp } from "@/lib/clientIp";
+
 /**
  * Persistent rate limiter backed by SQLite.
  *

@@ -1,12 +1,10 @@
+import { clientIpFromHeaders } from "@/lib/clientIp";
 import { headers } from "next/headers";
 import { logTimestamp } from "@/lib/logFormat";
 
 export async function logAccess(adminName: string, path: string) {
   const h = await headers();
-  const ip =
-    h.get("x-forwarded-for")?.split(",").at(-1)?.trim() ??
-    h.get("x-real-ip") ??
-    "unknown";
+  const ip = clientIpFromHeaders(h);
   console.log(`[ACCESS] ${logTimestamp().replace("T", " ")} | ${adminName} | ${path} | ${ip}`);
 }
 

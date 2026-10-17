@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getBlockedUntil } from "@/lib/login-attempts";
 import { resolveLogin } from "@/lib/loginIdentity";
 import { errorResponse } from "@/lib/serviceResult";
+import { checkRateLimit, clientIp, rateLimitResponse } from "@/lib/rate-limit";
 
 /**
  * Sagt der Login-Seite, ob die Eingabe im Anmeldefeld gerade gesperrt ist — Benutzername ODER
@@ -18,6 +19,11 @@ import { errorResponse } from "@/lib/serviceResult";
  * obwohl nur die Zusatz-Auskunft fehlte.
  */
 export async function GET(req: NextRequest) {
+  // Die Seite fragt beim Tippen nach; 60/min ist mehr, als ein Mensch braucht, und nimmt dem
+  // Endpunkt den Reiz, Benutzernamen durchzuprobieren (er ruft `resolveLogin`, also die Datenbank).
+  const rl = await checkRateLimit(`lockout:${clientIp(req)}`, 60, 60_000);
+  if (rl.limited) return rateLimitResponse(rl);
+
   const identifier = req.nextUrl.searchParams.get("username") ?? "";
   try {
     const { identity } = await resolveLogin(identifier);

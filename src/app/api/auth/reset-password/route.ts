@@ -4,8 +4,14 @@ import bcrypt from "bcryptjs";
 import { hashToken } from "@/lib/oauth";
 import { passwordErrorCode } from "@/lib/constants";
 import { buildAdminPasswordChangeRows } from "@/lib/passwordAudit";
+import { checkRateLimit, clientIp, rateLimitResponse } from "@/lib/rate-limit";
 
 export async function POST(req: Request) {
+  // Der Token hat 256 Bit — Raten ist aussichtslos —, aber der Endpunkt hasht und schreibt bcrypt (Kosten 12):
+  // ohne Grenze wäre er ein billiger Hebel, den Server zu beschäftigen.
+  const rl = await checkRateLimit(`reset-pw:${clientIp(req)}`, 10, 60 * 60 * 1000);
+  if (rl.limited) return rateLimitResponse(rl);
+
   const { token, password } = await req.json();
   if (!token || !password) return NextResponse.json({ error: "missingFields" }, { status: 400 });
   const pwErr = passwordErrorCode(password);
