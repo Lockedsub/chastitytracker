@@ -1717,6 +1717,8 @@
     "syncFailed": "Sync failed",
     "pendingEntries": "{count, plural, =1 {1 entry waiting to sync} other {# entries waiting to sync}}",
     "savedOffline": "Saved offline — will sync when connected",
+    "rejected": "{count, plural, =1 {1 entry was rejected by the server and not saved.} other {# entries were rejected by the server and not saved.}}",
+    "authRequired": "Session expired — waiting entries will sync after your next login.",
     "poorConnection": "Poor connection"
   },
   "passkey": {

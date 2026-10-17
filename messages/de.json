@@ -1717,6 +1717,8 @@
     "syncFailed": "Synchronisierung fehlgeschlagen",
     "pendingEntries": "{count, plural, =1 {1 Eintrag wartet auf Synchronisierung} other {# Einträge warten auf Synchronisierung}}",
     "savedOffline": "Offline gespeichert — wird bei Verbindung synchronisiert",
+    "rejected": "{count, plural, =1 {1 Eintrag wurde vom Server abgelehnt und nicht übernommen.} other {# Einträge wurden vom Server abgelehnt und nicht übernommen.}}",
+    "authRequired": "Anmeldung abgelaufen — wartende Einträge werden nach dem nächsten Login synchronisiert.",
     "poorConnection": "Verbindung stockt"
   },
   "passkey": {

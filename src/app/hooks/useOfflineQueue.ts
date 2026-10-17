@@ -6,9 +6,11 @@ import {
   getBlob, deleteBlob, isOfflineBlobUrl, parseOfflineBlobToken,
   type QueuedMutation,
 } from "@/lib/idb";
-import { fetchWithTimeout, uploadPhoto } from "@/lib/apiClient";
+import { fetchWithTimeout, parseApiErrorCode, uploadPhoto } from "@/lib/apiClient";
+import { classifyQueueResponse, stopsQueueRun } from "@/lib/offlineQueueOutcome";
 import { registerBackgroundSync } from "@/lib/swMessages";
 import useToast from "@/app/hooks/useToast";
+import { useApiError } from "@/app/hooks/useApiError";
 import { useTranslations } from "next-intl";
 
 /**
@@ -105,6 +107,7 @@ export default function useOfflineQueue() {
   const syncingRef = useRef(false);
   const toast = useToast();
   const t = useTranslations("offline");
+  const apiError = useApiError();
 
   // ── Load initial queue count ──
   useEffect(() => {
@@ -132,6 +135,10 @@ export default function useOfflineQueue() {
 
       let synced = 0;
       let failed = 0;
+      let rejected = 0;
+      let needsLogin = false;
+      /** Grund der ersten Ablehnung (stabiler Fehler-Code) — nur dieser wird dem Nutzer genannt. */
+      let firstRejection: string | null = null;
 
       for (const item of queue) {
         try {
@@ -149,14 +156,21 @@ export default function useOfflineQueue() {
             body,
           });
 
-          if (res.ok || res.status === 400 || res.status === 409) {
-            // Success or client error (don't retry bad data)
+          const outcome = classifyQueueResponse(res.status);
+          if (outcome === "sent") {
             await clearQueueItem(item.id!);
             synced++;
-          } else if (res.status >= 500) {
-            // Server error — stop draining, retry later
+          } else if (outcome === "rejected") {
+            // Endgültig abgelehnt: aus der Warteschlange nehmen (Wiederholen ändert nichts), aber
+            // NICHT als Erfolg zählen — der Eintrag existiert auf dem Server nicht.
+            if (rejected === 0) firstRejection = await parseApiErrorCode(res);
+            await clearQueueItem(item.id!);
+            rejected++;
+          } else {
+            // auth / retry / skip: die Zeile bleibt liegen.
             failed++;
-            break;
+            if (outcome === "auth") needsLogin = true;
+            if (stopsQueueRun(outcome)) break;
           }
         } catch {
           // Network error — stop draining
@@ -173,7 +187,12 @@ export default function useOfflineQueue() {
       if (synced > 0) {
         toast.success(t("synced"));
       }
-      if (failed > 0) {
+      if (rejected > 0) {
+        toast.error(`${t("rejected", { count: rejected })} ${apiError(firstRejection)}`);
+      }
+      if (needsLogin) {
+        toast.warning(t("authRequired"));
+      } else if (failed > 0) {
         toast.warning(t("syncFailed"));
       }
     } catch {
@@ -182,7 +201,7 @@ export default function useOfflineQueue() {
       syncingRef.current = false;
       setIsSyncing(false);
     }
-  }, [toast, t]);
+  }, [toast, t, apiError]);
 
   // ── Listen for online event → drain queue ──
   useEffect(() => {
