@@ -39,7 +39,7 @@ export default auth(async (req) => {
 
   // Rate-Limit auf Login-Endpunkt
   if (req.method === "POST" && req.nextUrl.pathname === "/api/auth/callback/credentials") {
-    const ip = clientIp(req);
+    const ip = clientIp(req.headers);
     if (isRateLimited(ip)) {
       return NextResponse.json(
         { error: "Zu viele Anmeldeversuche. Bitte warte 15 Minuten." },
@@ -134,7 +134,7 @@ export default auth(async (req) => {
   const isAdminUserDetailPath = /^\/admin\/users\/[a-z0-9]{20,}(\/|$)/.test(pathname);
   if (isLoggedIn && !pathname.startsWith("/api") && !isAdminUserDetailPath) {
     const user = req.auth?.user as { id?: string; name?: string } | undefined;
-    const ip = clientIp(req);
+    const ip = clientIp(req.headers);
     console.log(`[ACCESS] ${logTimestamp().replace("T", " ")} | ${user?.name ?? "?"} | ${pathname} | ${ip}`);
   }
 

@@ -250,12 +250,12 @@ async function sendWebPushToUser(
   // Abos aus der Zeit vor der Endpunkt-Prüfung (`subscribe`): eine Adresse, die kein Push-Dienst
   // vergibt, wird weder angefragt (SSRF) noch behalten.
   const subscriptions = stored.filter((s) => isAllowedPushEndpoint(s.endpoint));
-  plog("web:subs", { userId, count: subscriptions.length, rejected: stored.length - subscriptions.length });
+  const stale = stored.length === subscriptions.length ? [] : stored.filter((s) => !subscriptions.includes(s)).map((s) => s.id);
+  plog("web:subs", { userId, count: subscriptions.length, rejected: stale.length });
   if (stored.length === 0) return;
 
   // Wie bei APNs: `unread` nur mitsenden, wenn es einen Wert gibt (siehe sw.js).
   const payload = JSON.stringify({ title, body, url, ...(badge !== undefined ? { unread: badge } : {}) });
-  const stale: string[] = stored.filter((s) => !subscriptions.includes(s)).map((s) => s.id);
 
   await Promise.allSettled(
     subscriptions.map(async (sub) => {

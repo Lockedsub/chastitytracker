@@ -2,14 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendMailSafe, escHtml, appBaseUrl } from "@/lib/mail";
 import { emailT, emailGreeting } from "@/lib/emailI18n";
-import { checkRateLimit, clientIp } from "@/lib/rate-limit";
+import { checkRateLimit } from "@/lib/rate-limit";
+import { clientIp } from "@/lib/clientIp";
 import { hashToken } from "@/lib/oauth";
 import crypto from "crypto";
 import { APP_NAME } from "@/lib/constants";
 import { findUserByLogin } from "@/lib/loginIdentity";
 
 export async function POST(req: NextRequest) {
-  const ip = clientIp(req);
+  const ip = clientIp(req.headers);
 
   const rl = await checkRateLimit(`fp:${ip}`, 5, 60 * 60 * 1000);
   if (rl.limited) {

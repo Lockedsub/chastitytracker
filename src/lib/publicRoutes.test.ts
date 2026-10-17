@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { PUBLIC_ROUTES, isPublicPath } from "./publicRoutes";
+import { expectImportFree } from "@/test/importFree";
 
 /** Die Bedingung, wie `proxy.ts` sie vor der Auslagerung inline trug — das Orakel für „byte-identisch". */
 const legacyIsAuthRoute = (pathname: string) =>
@@ -27,6 +28,10 @@ describe("publicRoutes", () => {
       expect(r.reason.length, r.path).toBeGreaterThan(15);
       expect(r.guard, r.path).toBeTruthy();
     }
+  });
+
+  it("ist importfrei (Proxy und Tests lesen sie)", () => {
+    expectImportFree("src/lib/publicRoutes.ts");
   });
 
   it("hat keine doppelten Pfade", () => {

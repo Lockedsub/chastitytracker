@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { isAllowedPushEndpoint } from "./pushEndpoint";
+import { expectImportFree } from "@/test/importFree";
 
 describe("isAllowedPushEndpoint", () => {
   it.each([
@@ -33,6 +34,10 @@ describe("isAllowedPushEndpoint", () => {
     "",
     "https://fcm.googleapis.com/" + "a".repeat(2100),
   ])("lehnt %s ab", (u) => expect(isAllowedPushEndpoint(u)).toBe(false));
+
+  it("ist importfrei", () => {
+    expectImportFree("src/lib/pushEndpoint.ts");
+  });
 
   it("lehnt Nicht-Strings ab", () => {
     for (const v of [null, undefined, 5, {}, ["https://fcm.googleapis.com/x"]]) expect(isAllowedPushEndpoint(v)).toBe(false);

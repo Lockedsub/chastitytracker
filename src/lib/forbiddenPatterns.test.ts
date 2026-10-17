@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readdirSync, readFileSync } from "fs";
+import { listFiles, readStripped } from "@/test/sourceScan";
 
 /**
  * Muster, die in diesem Baum nichts zu suchen haben — als Dateiscan, weil jede dieser Regeln
@@ -9,22 +9,13 @@ import { readdirSync, readFileSync } from "fs";
  *
  * Eine Ausnahme gehört in die Liste unten, MIT Begründung — nicht in eine Aufweichung des Musters.
  */
-const strip = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
-
-const SRC = readdirSync("src", { recursive: true, encoding: "utf8" })
-  .filter((f) => /\.(ts|tsx)$/.test(f) && !/\.test\.tsx?$/.test(f))
-  .map((f) => `src/${f}`)
-  .sort();
-
-const read = (f: string) => strip(readFileSync(f, "utf8"));
+const SRC = listFiles("src", (f) => /\.(ts|tsx)$/.test(f) && !/\.test\.tsx?$/.test(f));
 
 function scan(files: string[], re: RegExp, allow: Record<string, string> = {}): string[] {
   const hits: string[] = [];
   for (const f of files) {
     if (f in allow) continue;
-    const src = read(f);
-    const lines = src.split("\n");
-    lines.forEach((line, i) => {
+    readStripped(f).split("\n").forEach((line, i) => {
       if (re.test(line)) hits.push(`${f}:${i + 1}: ${line.trim()}`);
     });
   }
@@ -60,19 +51,5 @@ describe("verbotene Muster", () => {
     );
     expect(SECURITY.length).toBeGreaterThan(5);
     expect(scan(SECURITY, /Math\.random\(/)).toEqual([]);
-  });
-
-  it("die Auth-Endpunkte ohne Session sind rate-limitiert", () => {
-    // Genau die, die das Proxy-Gate durchlässt (`publicRoutes.ts`) und die für Fremde etwas tun.
-    const LIMITED = [
-      "src/app/api/auth/forgot-password/route.ts",
-      "src/app/api/auth/reset-password/route.ts",
-      "src/app/api/auth/lockout/route.ts",
-      "src/app/api/auth/passkey/authenticate/route.ts",
-      "src/app/api/oauth/register/route.ts",
-      "src/app/api/oauth/revoke/route.ts",
-      "src/app/api/oauth/token/route.ts",
-    ];
-    expect(LIMITED.filter((f) => !/checkRateLimit\(/.test(read(f)))).toEqual([]);
   });
 });

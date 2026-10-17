@@ -880,6 +880,9 @@ export function isValidImageUrl(url: string | null | undefined): boolean {
   return ALLOWED_IMAGE_URL.test(url);
 }
 
+/** Die Foto-Felder einer Eintrags-Anfrage, die `validateEntryPayload` gegen `isValidImageUrl` prüft. */
+const ENTRY_IMAGE_URL_FIELDS = ["imageUrl", "boxImageUrl", "codeImageUrl"] as const;
+
 /**
  * Shared payload validation for entry creation (used by both user and admin routes).
  * Returns a stable error code on failure (always a 400 for the caller), or null on success.
@@ -896,19 +899,17 @@ export function validateEntryPayload(
   reasonCtx?: { orgasmAllowed?: (value: string) => boolean; openingCodes?: Set<string> },
 ): EntryValidationCode | null {
   const { requirePhotoForPruefung = true, allowFuture = false } = opts;
-  const { type, startTime, imageUrl, boxImageUrl, codeImageUrl, oeffnenGrund, orgasmusArt, note, keyInBox } = body;
+  const { type, startTime, imageUrl, oeffnenGrund, orgasmusArt, note, keyInBox } = body;
 
   // Schlüssel-Deklaration: nur ein echter Boolean oder gar nichts. Ein Client, der `"false"` schickt,
   // darf weder als "ja" durchrutschen (String ist truthy) noch als String in der Spalte landen.
   if (keyInBox !== undefined && keyInBox !== null && typeof keyInBox !== "boolean") {
     return "INVALID_KEY_IN_BOX";
   }
-  if (!isValidImageUrl(imageUrl)) return "INVALID_IMAGE_URL";
-  // Box-Foto (Schlüssel im Sichtfenster): derselbe Pfad-Guard wie das Haupt-Foto. Es wird
-  // server-seitig an die Vision gereicht — eine fremde URL wäre hier direkt ein SSRF-Hebel.
-  if (!isValidImageUrl(boxImageUrl)) return "INVALID_IMAGE_URL";
-  // Code-Foto des Bildersafes (POST /api/entries): geht ebenfalls an die Vision und wird später gelöscht.
-  if (!isValidImageUrl(codeImageUrl)) return "INVALID_IMAGE_URL";
+  // Alle Foto-Felder: derselbe Pfad-Guard. Sie werden server-seitig an die Vision gereicht (Box-Foto,
+  // Code-Foto des Bildersafes) bzw. beim Löschen aufgelöst — eine fremde URL wäre direkt ein SSRF-Hebel.
+  // Ein neues Foto-Feld gehört in `ENTRY_IMAGE_URL_FIELDS`, nicht in eine weitere Zeile hier.
+  for (const field of ENTRY_IMAGE_URL_FIELDS) if (!isValidImageUrl(body[field])) return "INVALID_IMAGE_URL";
   if (!startTime) return "START_TIME_REQUIRED";
   if (!allowFuture && new Date(startTime) > new Date()) return "TIME_IN_FUTURE";
   if (!type || !VALID_TYPES.includes(type as (typeof VALID_TYPES)[number])) {

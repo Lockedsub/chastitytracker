@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readdirSync, readFileSync } from "fs";
+import { listFiles, readStripped } from "@/test/sourceScan";
 import { PUBLIC_ROUTES, isPublicPath } from "./publicRoutes";
 
 /**
@@ -25,10 +25,8 @@ import { PUBLIC_ROUTES, isPublicPath } from "./publicRoutes";
  * wird. Das prüft das Review.
  */
 
-const strip = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
-
 const ROUTE_FILES = (["src/app/api", "src/app/.well-known"] as const)
-  .flatMap((root) => readdirSync(root, { recursive: true, encoding: "utf8" }).filter((f) => f.endsWith("route.ts")).map((f) => `${root}/${f}`))
+  .flatMap((root) => listFiles(root, (f) => f.endsWith("route.ts")))
   .sort();
 
 /** Pfad, unter dem der Proxy die Route sieht (dynamische Segmente durch Beispielwerte ersetzt). */
@@ -44,10 +42,11 @@ function samplePath(file: string): string {
 /** Die Pfade, die `[transport]` bedient (mcp-handler). */
 const TRANSPORTS = ["/api/mcp", "/api/sse", "/api/message"];
 
-/** Bekannte Guard-Aufrufe. `auth()` zählt, weil Routen mit eigener Session-Logik (heartbeat, oauth) sie nutzen. */
-const GUARD = /\b(requireApi|requireAdminApi|requireKeyholderOrAdminApi|requireKeyholderOrAdminActor|requireControllerApi|requireJournalReaderApi|requireBoxSync|userSelfFieldRoute|withMcpAuth|assert(?:Admin|KeyholderOrAdmin|Controller)|auth)\(/;
 /** Die Guards, die auch eine Rolle verlangen — für `/api/admin/*` reicht eine blosse Session nicht. */
-const ROLE_GUARD = /\b(requireAdminApi|requireKeyholderOrAdminApi|requireKeyholderOrAdminActor|requireControllerApi|requireJournalReaderApi|assert(?:Admin|KeyholderOrAdmin|Controller))\(/;
+const ROLE_GUARD_NAMES = "requireAdminApi|requireKeyholderOrAdminApi|requireKeyholderOrAdminActor|requireControllerApi|requireJournalReaderApi|assert(?:Admin|KeyholderOrAdmin|Controller)";
+const ROLE_GUARD = new RegExp(`\\b(${ROLE_GUARD_NAMES})\\(`);
+/** Alle bekannten Guard-Aufrufe: die Rollen-Guards plus Session-Guards. `auth()` zählt, weil Routen mit eigener Session-Logik (heartbeat, oauth) sie nutzen. */
+const GUARD = new RegExp(`\\b(${ROLE_GUARD_NAMES}|requireApi|requireBoxSync|userSelfFieldRoute|withMcpAuth|auth)\\(`);
 
 interface Chunk { name: string; text: string; exported: boolean }
 
@@ -75,7 +74,7 @@ const GATED_BUT_OPEN: Record<string, string> = {
 
 /**
  * Routen unter einem vom Proxy ausgenommenen Pfad: die Marke ihres EIGENEN Schutzes (muss im Quelltext
- * vorkommen) oder `null` mit Begründung, warum sie offen sein darf. Eine neue Route unter
+ * vorkommen; wo ein Fremder Eingaben schickt, ist es `checkRateLimit(`) oder `null` mit Begründung, warum sie offen sein darf. Eine neue Route unter
  * `/api/auth/`, `/api/oauth/` usw. muss HIER eingetragen werden — sonst schlüpft sie ungeprüft durch
  * die Ausnahme ihres Verzeichnisses.
  */
@@ -85,11 +84,11 @@ const PUBLIC_ROUTE_FILES: Record<string, { marker: RegExp | null; why: string }>
   "src/app/api/[transport]/route.ts": { marker: /withMcpAuth\(/, why: "MCP: Bearer-Token" },
   "src/app/api/auth/[...nextauth]/route.ts": { marker: /handlers/, why: "Auth.js" },
   "src/app/api/auth/forgot-password/route.ts": { marker: /checkRateLimit\(/, why: "Reset-Anfrage ohne Konto; Rate-Limit, einheitliche Antwort" },
-  "src/app/api/auth/lockout/route.ts": { marker: null, why: "Sperr-Auskunft der Anmeldeseite; antwortet für bekannte und unbekannte Eingaben gleich" },
-  "src/app/api/auth/passkey/authenticate/route.ts": { marker: null, why: "Passkey-Anmeldung: der Aufrufer ist noch nicht angemeldet; die Prüfung ist die WebAuthn-Signatur" },
+  "src/app/api/auth/lockout/route.ts": { marker: /checkRateLimit\(/, why: "Sperr-Auskunft der Anmeldeseite; antwortet für bekannte und unbekannte Eingaben gleich, Rate-Limit" },
+  "src/app/api/auth/passkey/authenticate/route.ts": { marker: /checkRateLimit\(/, why: "Passkey-Anmeldung: der Aufrufer ist noch nicht angemeldet; die Prüfung ist die WebAuthn-Signatur, dazu Rate-Limit" },
   "src/app/api/auth/passkey/list/route.ts": { marker: /requireApi\(/, why: "Passkey-Verwaltung, Session" },
   "src/app/api/auth/passkey/register/route.ts": { marker: /requireApi\(/, why: "Passkey-Registrierung, Session" },
-  "src/app/api/auth/reset-password/route.ts": { marker: /token/i, why: "Passwort-Reset über einmaliges Token" },
+  "src/app/api/auth/reset-password/route.ts": { marker: /checkRateLimit\(/, why: "Passwort-Reset über einmaliges Token, Rate-Limit" },
   "src/app/api/heartbeat/route.ts": { marker: /auth\(\)/, why: "Session selbst gelesen; ohne sie keine Nutzdaten" },
   "src/app/api/integration/box/config/route.ts": { marker: /requireBoxSync\(/, why: "Box-Secret" },
   "src/app/api/integration/box/event/route.ts": { marker: /requireBoxSync\(/, why: "Box-Secret" },
@@ -104,6 +103,18 @@ const PUBLIC_ROUTE_FILES: Record<string, { marker: RegExp | null; why: string }>
   "src/app/api/version/route.ts": { marker: null, why: "Version und Build-Datum" },
 };
 
+/** Exportierte Handler einer Datei, die `guard` weder selbst noch über einen lokalen Helfer (oder eine Fabrik) rufen. */
+function unguardedHandlers(file: string, guard: RegExp): string[] {
+  const parts = chunks(readStripped(file));
+  // Lokale Helfer, die selbst einen Guard rufen (z.B. eine Besitz-Prüfung vor dem Handler).
+  const helpers = new Set(parts.filter((c) => !METHODS.includes(c.name) && guard.test(c.text)).map((c) => c.name));
+  const handlers = parts.filter((c) => c.exported && METHODS.includes(c.name));
+  if (handlers.length === 0) return ["(kein exportierter Handler gefunden)"];
+  return handlers
+    .filter((h) => !(guard.test(h.text) || FACTORY_EXPORTS.test(h.text.trim()) || [...helpers].some((n) => new RegExp(`\\b${n}\\(`).test(h.text))))
+    .map((h) => h.name);
+}
+
 describe("Routen-Inventar", () => {
   it("findet die Routen — sonst prüft der Test nichts", () => {
     expect(ROUTE_FILES.length).toBeGreaterThan(100);
@@ -116,7 +127,7 @@ describe("Routen-Inventar", () => {
       const entry = PUBLIC_ROUTE_FILES[file];
       if (exempt && !entry) problems.push(`${file}: vom Proxy ausgenommen, aber nicht in PUBLIC_ROUTE_FILES`);
       if (!exempt && entry) problems.push(`${file}: steht in PUBLIC_ROUTE_FILES, ist aber nicht ausgenommen`);
-      if (exempt && entry?.marker && !entry.marker.test(strip(readFileSync(file, "utf8")))) {
+      if (exempt && entry?.marker && !entry.marker.test(readStripped(file))) {
         problems.push(`${file}: erwartete Schutz-Marke ${entry.marker} fehlt`);
       }
     }
@@ -125,40 +136,19 @@ describe("Routen-Inventar", () => {
   });
 
   it("jeder exportierte Handler einer vom Proxy erfassten Route ruft einen bekannten Guard", () => {
-    const problems: string[] = [];
-    for (const file of ROUTE_FILES) {
-      if (isPublicPath(samplePath(file)) || file in GATED_BUT_OPEN) continue;
-      const parts = chunks(strip(readFileSync(file, "utf8")));
-      // Lokale Helfer, die selbst einen Guard rufen (z.B. eine Besitz-Prüfung vor dem Handler).
-      const guardedHelpers = new Set(parts.filter((c) => !METHODS.includes(c.name) && GUARD.test(c.text)).map((c) => c.name));
-      const handlers = parts.filter((c) => c.exported && METHODS.includes(c.name));
-      if (handlers.length === 0) problems.push(`${file}: kein exportierter Handler gefunden`);
-      for (const h of handlers) {
-        const ok =
-          GUARD.test(h.text) ||
-          FACTORY_EXPORTS.test(h.text.trim()) ||
-          [...guardedHelpers].some((n) => new RegExp(`\\b${n}\\(`).test(h.text));
-        if (!ok) problems.push(`${file}: ${h.name} ohne erkennbaren Guard`);
-      }
-    }
+    const problems = ROUTE_FILES.filter((f) => !isPublicPath(samplePath(f)) && !(f in GATED_BUT_OPEN))
+      .flatMap((f) => unguardedHandlers(f, GUARD).map((h) => `${f}: ${h} ohne erkennbaren Guard`));
     expect(problems).toEqual([]);
   });
 
   it("unter /api/admin reicht eine blosse Session nicht: jeder Handler verlangt eine Rolle", () => {
-    const problems: string[] = [];
-    for (const file of ROUTE_FILES.filter((f) => f.startsWith("src/app/api/admin/"))) {
-      const parts = chunks(strip(readFileSync(file, "utf8")));
-      const roleHelpers = new Set(parts.filter((c) => !METHODS.includes(c.name) && ROLE_GUARD.test(c.text)).map((c) => c.name));
-      for (const h of parts.filter((c) => c.exported && METHODS.includes(c.name))) {
-        const ok = ROLE_GUARD.test(h.text) || FACTORY_EXPORTS.test(h.text.trim()) || [...roleHelpers].some((n) => new RegExp(`\\b${n}\\(`).test(h.text));
-        if (!ok) problems.push(`${file}: ${h.name}`);
-      }
-    }
+    const problems = ROUTE_FILES.filter((f) => f.startsWith("src/app/api/admin/"))
+      .flatMap((f) => unguardedHandlers(f, ROLE_GUARD).map((h) => `${f}: ${h}`));
     expect(problems).toEqual([]);
   });
 
   it("die Fabrik der Posteingänge setzt ihre Wächter selbst", () => {
-    const src = strip(readFileSync("src/lib/messageInboxRoutes.ts", "utf8"));
+    const src = readStripped("src/lib/messageInboxRoutes.ts");
     expect(src).toMatch(/requireApi\(|requireControllerApi\(/);
   });
 

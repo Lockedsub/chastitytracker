@@ -1,10 +1,10 @@
-import { clientIpFromHeaders } from "@/lib/clientIp";
+import { clientIp } from "@/lib/clientIp";
 import { headers } from "next/headers";
 import { logTimestamp } from "@/lib/logFormat";
 
 export async function logAccess(adminName: string, path: string) {
   const h = await headers();
-  const ip = clientIpFromHeaders(h);
+  const ip = clientIp(h);
   console.log(`[ACCESS] ${logTimestamp().replace("T", " ")} | ${adminName} | ${path} | ${ip}`);
 }
 

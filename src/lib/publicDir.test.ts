@@ -11,6 +11,7 @@ import { readdirSync } from "fs";
  * werden, und ein Verzeichnis, das nach Nutzerdaten klingt, ist nie eine Ausnahme.
  */
 const ALLOWED_DIRS = ["screenshots", "splash"];
+/** Für DATEIEN im Wurzelverzeichnis — Verzeichnisse pinnt `ALLOWED_DIRS` schon genau. */
 const FORBIDDEN_NAMES = /upload|photo|foto|image|bild|data|backup|export/i;
 
 describe("public/", () => {

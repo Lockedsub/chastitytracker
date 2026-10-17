@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readdirSync, readFileSync } from "fs";
+import { listFiles, readStripped } from "@/test/sourceScan";
 import { isValidImageUrl, validateEntryPayload } from "./constants";
 
 /**
@@ -17,12 +17,7 @@ import { isValidImageUrl, validateEntryPayload } from "./constants";
  * Nicht Teil davon: WEM die Datei gehört. Ein Upload ist an keinen Nutzer gebunden — das braucht
  * eine Tabelle und ist eine Schema-Änderung (siehe Bericht zur Sicherheits-Phase).
  */
-const strip = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
-
-const ROUTES = readdirSync("src/app/api", { recursive: true, encoding: "utf8" })
-  .filter((f) => f.endsWith("route.ts"))
-  .map((f) => `src/app/api/${f}`)
-  .sort();
+const ROUTES = listFiles("src/app/api", (f) => f.endsWith("route.ts"));
 
 /** Liest die Route ein `*ImageUrl`-Feld aus der Anfrage? (Destrukturierung aus `body`/`req.json()` oder `body.xImageUrl`.) */
 const READS_IMAGE_FIELD =
@@ -36,7 +31,7 @@ describe("Bild-URL-Prüfung", () => {
     const missing: string[] = [];
     let readers = 0;
     for (const file of ROUTES) {
-      const src = strip(readFileSync(file, "utf8"));
+      const src = readStripped(file);
       if (!READS_IMAGE_FIELD.test(src)) continue;
       readers++;
       if (!VALIDATING_CALLS.test(src)) missing.push(file);
