@@ -197,7 +197,7 @@ async function sendNativePushToUser(
  * vergessene wäre die, die dem Nutzer sagt, seine Meldungen seien aus.
  *
  * Gebraucht von Aktionen, die der Nutzer AUSLÖST und deren einziges Ergebnis eine Push ist (heute
- * die Code-Wiederholung an der Kontrolle): `firePush` ist fire-and-forget und kann nicht
+ * die Code-Wiederholung an der Kontrolle): der Versand selbst kann nicht
  * beantworten, ob überhaupt jemand zuhört — ohne diese Vorabfrage meldete der Knopf Erfolg und auf
  * dem Gerät bliebe es still.
  */

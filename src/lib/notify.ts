@@ -140,7 +140,7 @@ export type NotifyContent = NotifyContentBase & (
 export const CHANNEL_DEADLINE_MS = 20_000;
 
 /** Die drei Felder des Empfängers, an denen die Zustellung hängt (Teil von {@link DeliveryRecipient}). */
-export type ChannelRecipient = Pick<DeliveryRecipient, "id" | "email" | "telegramChatId">;
+type ChannelRecipient = Pick<DeliveryRecipient, "id" | "email" | "telegramChatId">;
 
 export interface ChannelContent {
   /** Der Mail-Inhalt, als FUNKTION: gebaut wird er nur, wenn die Mail wirklich hinausgeht (Kanal an UND

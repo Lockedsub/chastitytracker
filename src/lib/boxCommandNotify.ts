@@ -53,6 +53,7 @@ async function pushImportant(
 ): Promise<void> {
   if (!(await deliveryChannels(user, "important")).push) return;
   const t = emailT(user.locale);
+  // Bewusst NUR Push (kein Mail/Telegram): ein Anstoss zum Öffnen der App, keine Meldung mit Text.
   firePush(userId, t(titleKey), t(bodyKey), "/dashboard");
 }
 

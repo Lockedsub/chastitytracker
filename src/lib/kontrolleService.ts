@@ -751,7 +751,7 @@ export function buildInspectionCodePush(opts: {
  * BEWUSST kein neues Ereignis: keine Mail, keine Posteingangs-Zeile, kein Badge, kein Zeitstempel an
  * der Anforderung. Es wird nichts angefordert und nichts erfüllt — derselbe Code erscheint nur noch
  * einmal auf dem Bildschirm. Eine Zeile je Knopfdruck wäre ein Protokoll des Ablesens, kein Ereignis.
- * Aus demselben Grund geht `firePush` ohne `badge`: ein Wert dort erfände einen Zähler, eine feste 0
+ * Aus demselben Grund geht die Push ohne `badge`: ein Wert dort erfände einen Zähler, eine feste 0
  * löschte den bestehenden (siehe `sendPushToUser`).
  */
 export async function resendInspectionCode(
@@ -772,7 +772,7 @@ export async function resendInspectionCode(
 
   // Ohne angemeldetes Gerät ginge die Push ins Leere und der Knopf meldete trotzdem Erfolg. Der
   // Sub soll erfahren, dass er Push erst einschalten muss, statt auf eine Uhr zu warten, die nichts
-  // bekommt — `firePush` ist fire-and-forget und könnte das nie beantworten.
+  // bekommt — der Versand selbst könnte das nie beantworten.
   if (!await hasPushTarget(userId)) return serviceFail(400, "PUSH_NOT_ENABLED");
 
   // Läuft noch eine zweite Kontrolle (KG und Trage-Ziel parallel, seit v5.0.1), bekommt die
