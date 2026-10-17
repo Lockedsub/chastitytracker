@@ -395,7 +395,7 @@ export async function processDueOrgasmusAnforderungen(now: Date): Promise<void> 
   for (const oa of due) {
     try {
       if (checkOrgasmWindowEnd(oa.endsAt, now)) {
-        await prisma.orgasmusAnforderung.update({ where: { id: oa.id }, data: { withdrawnAt: new Date() } });
+        await prisma.orgasmusAnforderung.updateMany({ where: { id: oa.id, withdrawnAt: null, benachrichtigtAt: null, fulfilledAt: null }, data: { withdrawnAt: new Date() } });
         continue;
       }
       // Das FENSTER wandert um die Verspätung mit — wie die ganze Geometrie einer Aufgabe
@@ -431,7 +431,7 @@ export async function processDueOrgasmusAnforderungen(now: Date): Promise<void> 
       // Zeiten, eine Zeile mit alten Werten wäre ab hier eine Lüge gegenüber dem Träger.
       // `updateMany` mit offenem Zustand: eine nach dem Versand zurückgezogene Zeile bleibt zurückgezogen.
       await prisma.orgasmusAnforderung.updateMany({
-        where: { id: oa.id, withdrawnAt: null, benachrichtigtAt: null },
+        where: { id: oa.id, withdrawnAt: null, benachrichtigtAt: null, fulfilledAt: null },
         data: { beginsAt: beginsAtDate, endsAt: endsAtDate, benachrichtigtAt: sentAt },
       });
     } catch (e) {
