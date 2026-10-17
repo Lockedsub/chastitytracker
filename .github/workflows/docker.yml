@@ -65,6 +65,23 @@ jobs:
       - run: npx tsc --noEmit
       - run: npm test
 
+  # ── Abhängigkeits-Audit ────────────────────────────────────────────────────
+  # Meldet bekannte Schwachstellen in den Produktions-Abhängigkeiten. Bewusst NICHT blockierend:
+  # ein neu veröffentlichtes Advisory darf weder einen Build noch einen Deploy aufhalten, es soll
+  # nur im Lauf sichtbar werden. Deshalb `continue-on-error` und kein Eintrag in `needs` von
+  # `build-and-push`/`deploy`.
+  audit:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: "npm"
+      - run: npm ci
+      - run: npm audit --omit=dev --audit-level=high
+
   # ── Image-Metadaten: Tags, Labels, bewegte Kanäle ──────────────────────────
   # Einmal berechnet und an Build und Merge gereicht — die Tag-Logik darf nicht an zwei Stellen
   # stehen (siehe die Begründung am Schritt „Bewegte Kanäle").
