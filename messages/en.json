@@ -2478,5 +2478,14 @@
     "loggedInAs": "Signed in as <strong>{name}</strong>",
     "allow": "Allow",
     "deny": "Deny"
+  },
+  "errorPages": {
+    "errorTitle": "That didn't work",
+    "errorDescription": "Something went wrong while loading this page. Please try again.",
+    "retry": "Try again",
+    "reference": "Reference: {digest}",
+    "notFoundTitle": "Page not found",
+    "notFoundDescription": "This address doesn't exist — or no longer does.",
+    "home": "Back to start"
   }
 }

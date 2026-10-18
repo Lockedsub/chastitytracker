@@ -2478,5 +2478,14 @@
     "loggedInAs": "Eingeloggt als <strong>{name}</strong>",
     "allow": "Erlauben",
     "deny": "Ablehnen"
+  },
+  "errorPages": {
+    "errorTitle": "Das hat nicht geklappt",
+    "errorDescription": "Beim Laden dieser Seite ist etwas schiefgegangen. Versuche es noch einmal.",
+    "retry": "Erneut versuchen",
+    "reference": "Referenz: {digest}",
+    "notFoundTitle": "Seite nicht gefunden",
+    "notFoundDescription": "Diese Adresse gibt es nicht — oder nicht mehr.",
+    "home": "Zur Startseite"
   }
 }
