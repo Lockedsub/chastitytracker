@@ -23,6 +23,27 @@
           "de": "Abmelden fragt überall gleich nach, Löschen und der Passkey-Name nutzen die App-Dialoge, Fehler- und 404-Seiten passen zur App, und Symbol-Knöpfe haben Namen für Screenreader.",
           "en": "Signing out asks the same way everywhere, deleting and naming a passkey use the app's dialogs, error and 404 pages match the app, and icon buttons have names for screen readers."
         }
+      },
+      {
+        "type": "fix",
+        "text": {
+          "de": "Trägt die Keyholderin eine Öffnung ein, öffnet sich jetzt auch die Box (die LockMeBox, sobald das Handy verbindet). Eine solche Öffnung beendet eine laufende Sperrzeit als Freigabe statt als Bruch. Steht die App auf offen, die LockMeBox aber noch zu, bietet die Box-Karte «Box nochmals öffnen» an.",
+          "en": "When the keyholder records an opening, the box now opens too (the LockMeBox as soon as the phone connects). Such an opening ends a running lock period as a release instead of a breach. If the app says open but the LockMeBox is still closed, the box card offers \"Open box again\"."
+        }
+      },
+      {
+        "type": "feat",
+        "text": {
+          "de": "Die gekoppelte LockMeBox lässt sich in den Einstellungen abfragen: Riegel, Akku und Firmware.",
+          "en": "The paired LockMeBox can be queried in the settings: bolt, battery and firmware."
+        }
+      },
+      {
+        "type": "feat",
+        "text": {
+          "de": "«Falsche Orgasmusart» ist eine eigene Vergehensart und lässt sich unter Vergehen abschalten. Eine Anweisung, die mit einer anderen Art beantwortet wurde, zählt nicht mehr als versäumt.",
+          "en": "\"Wrong orgasm type\" is its own offense type and can be switched off under Offenses. A directive answered with a different type no longer counts as missed."
+        }
       }
     ]
   },

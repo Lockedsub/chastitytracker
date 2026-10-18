@@ -1,13 +1,15 @@
 import { prisma } from "@/lib/prisma";
 import type { Entry, User } from "@prisma/client";
-import { validateEntryPayload, DEVICE_BEARING_TYPES } from "@/lib/constants";
+import { validateEntryPayload, DEVICE_BEARING_TYPES, LOCK_ENDED_REASON, lockmeboxEnabled } from "@/lib/constants";
 import { orgasmusValueAllowed, validOeffnenCodes } from "@/lib/reasonsService";
-import { validateDeviceOwnership, releaseLockPeriodsOnOpen, prepareWearEntry, getKgNeighbors } from "@/lib/queries";
+import { validateDeviceOwnership, releaseLockPeriodsOnOpen, prepareWearEntry, getKgNeighbors, endableLockPeriods } from "@/lib/queries";
 import { entryGuardError, entryGuardCode } from "@/lib/entryErrors";
 import { applyEntryFulfilment } from "@/lib/entryFulfilment";
 import { triggerPostLockInspection } from "@/lib/autoKontrolleService";
 import { boltFieldsFor } from "@/lib/lockPending";
-import { findPendingLockTx } from "@/lib/lockCommit";
+import { findPendingLockTx, findPendingOpenTx, openAwaitsBolt } from "@/lib/lockCommit";
+import { boxCommandForEntry, setBoxCommandForUser } from "@/lib/boxCommand";
+import { announceBoxCommand } from "@/lib/boxCommandNotify";
 import { notifyControllersAboutEntry } from "@/lib/entryNotify";
 import type { EntryGuardCode, EntryValidationCode } from "@/lib/entryErrors";
 
@@ -19,6 +21,10 @@ import type { EntryGuardCode, EntryValidationCode } from "@/lib/entryErrors";
  * Kontrolle wird nicht geplant (der Planer rechnet ab jetzt, nicht ab der Eintrags-Zeit) — dafür
  * ahndet dieser Pfad ein falsches Gerät bewusst NICHT selbst. Die Begründungen stehen je an ihrer
  * Stelle im Code.
+ *
+ * **Eine Öffnung ist trotzdem ein Auftrag an die Box**, sobald sie der aktuelle Zustand wird: sonst
+ * steht der Tracker auf „offen", während der Riegel zu bleibt, und niemand erfährt es (Vorfall
+ * 18.10.2026). Dasselbe Kommando wie auf dem Sub-Pfad, bei der LockMeBox gilt sie erst mit dem Riegel.
  *
  * Als Dienst und nicht mehr in der Route, weil es einen zweiten Aufrufer gibt: die KI-Keyholderin
  * über den MCP (`add_entry`). Die Regeln hier sind zu viele und zu folgenreich, um sie ein zweites
@@ -144,6 +150,12 @@ export async function createEntryForUser(
 
   // In der Transaktion ermittelt, nach dem Commit für die Meldung wiederverwendet.
   let brokeLockPeriod = false;
+  // Nur für eine Öffnung, die der aktuelle Zustand wird: wartet sie auf den Riegel (LockMeBox), und
+  // welches Kommando haben wir der Box gegeben? Beides entscheidet die Transaktion, der Rest läuft
+  // erst nach dem Commit.
+  let awaitsBolt = false;
+  let boxFollows = false;
+  let boxCmd: "lock" | "open" | null = null;
   let entry: Entry;
   try {
     entry = await prisma.$transaction(async (tx) => {
@@ -192,9 +204,32 @@ export async function createEntryForUser(
 
         if (type === "OEFFNEN") {
           if (!prev || prev.type !== "VERSCHLUSS") throw entryGuardError("NOT_LOCKED");
+          // Öffnet die KEYHOLDERIN (oder ihre KI) — nicht der Träger für sich —, ist das eine FREIGABE,
+          // kein Bruch: die Sperrzeit endet als `released` (wie bei „Sofort aufschliessen"), das
+          // Strafbuch zählt die Öffnung nicht, und die Box bekommt ihren Befehl. Als „aufgebrochen"
+          // gebucht, bliebe die Box zu und der Reparatur-Knopf verweigerte sich (`BOX_REOPEN_HELD`).
+          // Nur für die Öffnung, die der aktuelle Zustand wird (`!next`: eine zwischen ein altes Paar
+          // nachgetragene beendet keine heutige Sperrzeit) und nicht für eine Reinigung, die die
+          // Sperrzeit ohnehin laufen lässt.
+          if (opts.actorUserId !== userId && !next && oeffnenGrund !== "REINIGUNG") {
+            const now = new Date();
+            await tx.verschlussAnforderung.updateMany({
+              where: endableLockPeriods(userId, now),
+              data: { withdrawnAt: now, endedReason: LOCK_ENDED_REASON.released },
+            });
+          }
           // Ein nachgetragenes Öffnen muss die Sperrzeit mit freigeben, sonst gilt der Träger
           // weiterhin als verschlossen.
           brokeLockPeriod = await releaseLockPeriodsOnOpen(userId, oeffnenGrund ?? undefined, tx, "user", user);
+          // Liegt der Eintrag zwischen einem bestehenden Paar, ist er reine Dokumentation: die Box
+          // steht längst anders, ein Kommando von heute träfe den Zustand von gestern nicht.
+          if (!next) {
+            boxFollows = true;
+            // Wie auf dem Sub-Pfad: eine schwebende Öffnung zählt für die Nachbar-Suche nicht — ohne
+            // diese Sperre legte die Keyholderin Aufruf auf Aufruf, während die Box auf den ersten wartet.
+            if (lockmeboxEnabled() && await findPendingOpenTx(tx, userId)) throw entryGuardError("OPEN_ALREADY_PENDING");
+            awaitsBolt = await openAwaitsBolt(tx, userId, prev.keyInBox, brokeLockPeriod, new Date());
+          }
         }
       }
 
@@ -214,11 +249,13 @@ export async function createEntryForUser(
           // Datum am Eintrag: eine nachgetragene Prüfung erfüllt bewusst keine Anforderung (das tut
           // nur die Einreichung des Subs, siehe /api/entries).
           deviceId: DEVICE_BEARING_TYPES.includes(type) ? (deviceId || null) : null,
-          // Dieser Pfad wartet NIE auf den Riegel (docs/riegel-konzept.md): hier wird nachgetragen,
-          // oft rückdatiert, und einen Riegel, der zu diesem Zeitpunkt zufiele, gibt es nicht. Ohne
-          // diese Zeile bliebe JEDER so erfasste Verschluss dauerhaft schwebend — auf jeder Instanz,
-          // auch ganz ohne Box.
-          ...boltFieldsFor(type, entryTime),
+          // Ein VERSCHLUSS wartet auf diesem Pfad NIE auf den Riegel (docs/riegel-konzept.md): hier
+          // wird nachgetragen, oft rückdatiert, und einen Riegel, der zu diesem Zeitpunkt zufiele,
+          // gibt es nicht. Ohne diese Zeile bliebe JEDER so erfasste Verschluss dauerhaft schwebend
+          // — auf jeder Instanz, auch ganz ohne Box. Die ÖFFNUNG einer LockMeBox wartet dagegen
+          // (`awaitsBolt`, nur wenn sie der aktuelle Zustand wird): sie gilt erst, wenn der Riegel
+          // wirklich offen gemeldet hat.
+          ...boltFieldsFor(type, entryTime, awaitsBolt),
         },
       });
 
@@ -231,8 +268,17 @@ export async function createEntryForUser(
       // 2. KEINE Kontroll-Anforderung (`verification: null`): eine nachgetragene Prüfung erfüllt
       //    bewusst keine — das tut nur die Einreichung des Subs. Bleibt sie offen und läuft ab, ist
       //    der Rückzug der Anforderung das vorgesehene Mittel, nicht ein Eintrag ohne Nachweis.
+      //
+      // Eine schwebende Öffnung hakt NICHTS ab — das holt `commitPendingOpen` nach, sobald die Box meldet.
       const fulfilAt = userId === opts.actorUserId ? new Date() : entryTime;
-      await applyEntryFulfilment(tx, created, { verification: null, targetWhere: null }, fulfilAt);
+      if (!awaitsBolt) await applyEntryFulfilment(tx, created, { verification: null, targetWhere: null }, fulfilAt);
+
+      // Die Box folgt dem Eintrag (`boxCommandForEntry` — die EINE Regel, samt der Fälle, in denen sie
+      // ihm nicht folgt). Nur für die Öffnung, die der aktuelle Zustand wird; ohne Box bleibt `boxCmd` leer.
+      // Ein nachgetragener VERSCHLUSS gibt auf diesem Pfad weiterhin KEIN Kommando (bekannte Lücke in der
+      // Gegenrichtung: Tracker zu, Box offen — dort fängt es `/api/box/relock`).
+      const cmd = boxFollows ? boxCommandForEntry({ type, brokeLockPeriod }) : null;
+      if (cmd && await setBoxCommandForUser(tx, userId, cmd)) boxCmd = cmd;
 
       return created;
     });
@@ -250,23 +296,32 @@ export async function createEntryForUser(
   // Kontrolle nach dem Einschliessen — auch auf diesem Pfad, siehe die Begründung oben.
   if (type === "VERSCHLUSS") triggerPostLockInspection(userId);
 
+  // Das Kommando ansagen (Heimdall-Instant-Push bzw. LockMeBox-Mitteilung ans Handy) — der
+  // pendingCommand-Pull aus der Transaktion bleibt der Fallback. Dieselbe Entscheidung, nicht
+  // dieselbe Bedingung noch einmal (siehe `/api/entries`).
+  if (boxCmd) announceBoxCommand(userId, boxCmd);
+
   // Meldung an die übrigen Kontrolleure des Subs. Der Handelnde ist NICHT Empfänger — er hat den
   // Eintrag gerade erfasst. (Bis v5 fehlte die Meldung auf diesem Pfad ganz, Vorfall 03.08.2026.)
-  void notifyControllersAboutEntry({
-    userId,
-    actorUserId: opts.actorUserId ?? undefined,
-    username: user.username,
-    type,
-    startTime: entry.startTime,
-    withdrawnLockPeriod: brokeLockPeriod,
-    oeffnenGrund: entry.oeffnenGrund,
-    orgasmusArt: entry.orgasmusArt,
-    kontrollCode: entry.kontrollCode,
-    note: entry.note,
-    imageUrl: entry.imageUrl,
-    deviceId: entry.deviceId,
-    reasonConfig: user,
-  });
+  // Eine Öffnung, die noch auf den Riegel wartet, meldet erst `commitPendingOpen`: vorher wäre es
+  // eine Behauptung über etwas, das noch nicht passiert ist.
+  if (!awaitsBolt) {
+    void notifyControllersAboutEntry({
+      userId,
+      actorUserId: opts.actorUserId ?? undefined,
+      username: user.username,
+      type,
+      startTime: entry.startTime,
+      withdrawnLockPeriod: brokeLockPeriod,
+      oeffnenGrund: entry.oeffnenGrund,
+      orgasmusArt: entry.orgasmusArt,
+      kontrollCode: entry.kontrollCode,
+      note: entry.note,
+      imageUrl: entry.imageUrl,
+      deviceId: entry.deviceId,
+      reasonConfig: user,
+    });
+  }
 
   return { ok: true, entry };
 }

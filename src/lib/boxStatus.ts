@@ -53,6 +53,10 @@ export type BoxRow = {
   /** Firmware-Stand der Box, wie zuletzt gemeldet; null = nie gemeldet. Reine Anzeige neben dem
    *  Namen — beim Nachfragen zu einem Box-Problem ist die erste Frage immer die Version. */
   fwVersion: string | null;
+  /** Tracker offen, Box meldet den Riegel zu, und nichts hält sie absichtlich zu — dann bietet die Karte
+   *  „Box nochmals öffnen" an (`boxReopenBlockReason`). Vom Server gerechnet, weil die Sperrbruch-
+   *  Frage die Datenbank braucht; fehlt es (Alt-Antwort), gilt es als nicht anbietbar. */
+  reopenable?: boolean;
 };
 
 export type Translate = (key: string, values?: Record<string, string | number>) => string;

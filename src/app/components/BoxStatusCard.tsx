@@ -9,6 +9,7 @@ import WarnLine from "@/app/components/WarnLine";
 import BlockHeading from "@/app/components/BlockHeading";
 import BoxDeviceInfo from "@/app/components/BoxDeviceInfo";
 import LockmeboxConnect from "@/app/components/LockmeboxConnect";
+import BoxReopenButton from "@/app/components/BoxReopenButton";
 
 /** Eine Zeile dieser Karte. Die Kette stand fünfmal wörtlich darin — `listRowCls` passt nicht,
  *  weil es `blockInsetCls` mitbringt und die Karte ihre Polsterung selbst hat. */
@@ -96,7 +97,10 @@ export default function BoxStatusCard({ userId, wearerLocked = true, keyInBox }:
   // Die Fläche richtet sich nach der lautesten Box. Im Normalfall die STILLE Karte (kein Rahmen,
   // keine Bedeutungsfarbe) — sie hebt sich durch die Fläche allein ab, und das reicht für eine
   // Auskunft. Erst wenn etwas nicht stimmt, wird sie zur semantischen Karte.
-  const hasWarning = boxRows.some((s) => s.boltAlert !== null || s.batteryLow || s.failsafes.some((w) => w.severity !== "info"));
+  // `reopenable`: der Tracker steht auf offen, die Box meldet zu — das ist die lauteste Lage, die diese
+  // Karte kennt: der Träger glaubt sich frei, sein Schlüssel sitzt fest.
+  const reopenable = boxRows.some((s) => s.b.reopenable);
+  const hasWarning = reopenable || boxRows.some((s) => s.boltAlert !== null || s.batteryLow || s.failsafes.some((w) => w.severity !== "info"));
   const hasTransition = boxRows.some((s) => s.transition);
   const semantic = hasWarning ? "warn" : hasTransition ? "sperrzeit" : null;
 
@@ -176,9 +180,14 @@ export default function BoxStatusCard({ userId, wearerLocked = true, keyInBox }:
               )}
               {/* Riegel zu, obwohl niemand verschlossen ist — leise, es ist keine Störung, nur
                   eine Auskunft, die sonst niemand gäbe. */}
-              {!wearerLocked && isLocked && (
-                <p className={`${boxRowCls} text-neben text-foreground-muted`}>{prefix}{boxIstLabel(b, t)}</p>
-              )}
+              {/* Tracker offen, Box zu, und nichts hält sie absichtlich zu: genau der Zustand, in dem ein
+                  Öffnen-Befehl die Box nie erreicht hat. Der Knopf darunter setzt ihn neu. Sonst nur die
+                  leise Auskunft, dass die Box zu ist. */}
+              {b.reopenable
+                ? <WarnLine>{prefix}{userId ? t("reopenHintKeyholder") : t("reopenHintSelf")}</WarnLine>
+                : !wearerLocked && isLocked && (
+                  <p className={`${boxRowCls} text-neben text-foreground-muted`}>{prefix}{boxIstLabel(b, t)}</p>
+                )}
               {transition && (
                 <p className={`${boxRowCls} text-neben font-medium text-sperrzeit-text`}>
                   {/* Die LockMeBox hat keinen Knopf-Vollzug wie Heimdall: sie tut etwas, sobald sich
@@ -202,6 +211,10 @@ export default function BoxStatusCard({ userId, wearerLocked = true, keyInBox }:
             </div>
           );
         })}
+        {/* Der Reparatur-Knopf, solange der Befehl noch nicht neu gesetzt ist; danach zeigt die Karte den
+            Übergang („Öffnung freigegeben …"), und die Verbindung unten führt ihn aus. Nur der Träger:
+            ausführen kann den Befehl ohnehin nur sein Handy an der Box. */}
+        {!userId && reopenable && !hasTransition && <BoxReopenButton />}
         {/* Nur in der Sicht des Trägers: verbinden kann nur, wer an der Box steht. Und nur, wenn ein
             Befehl ansteht — bei einem Konflikt ohne Befehl gliche der Knopf bloss den Stand ab und
             behöbe nichts; abgleichen lässt sich die Box jederzeit in den Einstellungen. */}

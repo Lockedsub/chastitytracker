@@ -1672,7 +1672,10 @@ function registerTools(server: McpServer) {
           "locked in your presence and did not log it, his phone was dead, the wear session started while he " +
           "slept. BACKDATING IS ALLOWED here (that is the difference from his own path, where it would let " +
           "him date his way out of every deadline). What follows from the entry follows on its own: what it " +
-          "fulfils, whether it releases a lock period, whether an inspection follows the lock-in. " +
+          "fulfils, whether it releases a lock period, whether an inspection follows the lock-in. An OEFFNEN you " +
+          "record as the keyholder is a RELEASE: it ends a running lock period (not a breach, no offense) and tells " +
+          "the box to open; a LockMeBox counts it once the user's phone connects and the bolt reports open. " +
+          "An opening placed inside an older lock/open pair stays documentation only, with no box command. " +
           "NO PHOTO — you cannot supply one. A wear category that demands a photo refuses the entry; an " +
           "inspection (PRUEFUNG) is accepted without one, but it fulfils no inspection request either way " +
           "(only the user's own submission does that). Chain checks (already locked / not locked / two of a " +

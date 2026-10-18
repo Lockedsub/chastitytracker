@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { createOeffnenEntryTx } from "@/lib/oeffnenService";
-import { getBoxFormContext, getIsLocked } from "@/lib/queries";
+import { getBoxFormContext, getIsLocked, endableLockPeriods } from "@/lib/queries";
 import { setBoxCommandForUser } from "@/lib/boxCommand";
 import { announceBoxCommand } from "@/lib/boxCommandNotify";
 import { notifyUser } from "@/lib/notify";
@@ -57,24 +57,6 @@ const errors = serviceErrors({
   TIME_BEFORE: { status: 400, error: "TIME_BEFORE" },
 } as const);
 
-/**
- * Welche Sperrzeiten der Knopf beendet — EINE Where-Klausel für Vorschau UND Vollzug.
- *
- * Sie stand kurz zweimal da, und die beiden waren schon verschieden: die Vorschau zählte ohne
- * `endsAt`-Filter also auch längst ABGELAUFENE, nie zurückgezogene Sperrzeiten mit. Die
- * Trockenübung versprach damit „beendet 3 Sperrzeiten", der Vollzug beendete eine — genau die
- * Abweichung, gegen die es die Trennung von Vorschau und Vollzug überhaupt gibt.
- *
- * Die Auswahl ist DIESELBE wie beim Rückzug von Hand (`withdrawVerschlussAnforderung`): alles, was
- * noch nicht abgelaufen ist — auch TERMINIERTE, noch nicht ausgelöste. Ohne die wäre eine in fünf
- * Minuten anspringende Sperre übriggeblieben und hätte gleich wieder verriegelt.
- */
-const endableLockPeriods = (userId: string, now: Date) => ({
-  userId,
-  art: "SPERRZEIT",
-  withdrawnAt: null,
-  OR: [{ endsAt: null }, { endsAt: { gt: now } }],
-});
 
 export interface ReleaseNowPreview {
   /**

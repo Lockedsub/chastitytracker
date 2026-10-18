@@ -33,6 +33,9 @@ export const STORED_TYPE = {
   cleaning_limit: "REINIGUNG_LIMIT",
   wrong_device: "FALSCHES_GERAET",
   missed_orgasm: "ORGASMUS_ANWEISUNG",
+  // Der Träger hat im Fenster einen Orgasmus gemeldet, aber nicht von der geforderten Art. Bis 6.5.2
+  // hiess das „Orgasmus-Anweisung versäumt"; als eigene Art lässt es sich getrennt abschalten.
+  wrong_orgasm_type: "ORGASMUS_ANWEISUNG",
   late_lock: "VERSCHLUSS_ANFORDERUNG",
   cleaning_not_relocked: "REINIGUNG_NICHT_VERSCHLOSSEN",
   unfulfilled_task: "AUFGABE",

@@ -796,6 +796,23 @@ export function parseOrgasmusArtBase(orgasmusArt: string | null | undefined): st
   return orgasmusArt?.split(ART_SEP)[0];
 }
 
+/**
+ * Erfüllt dieser gemeldete Orgasmus die geforderte Art? Die Vorgabe kann eine reine Hauptart sein
+ * ("Orgasmus" → jede Unterart erfüllt) ODER ein voller Kombi-Code ("Orgasmus – Masturbation" → nur
+ * genau diese). Beides kennt das Formular, also muss die Frage beide kennen: exakte Übereinstimmung
+ * mit der vollen Art, oder die Vorgabe trifft die Basis des Eintrags. Nur gegen die Basis zu
+ * vergleichen liesse eine Unterart-Vorgabe nie erfüllen (Vorfall 05.09.2026).
+ *
+ * EINE Frage für die Erfüllung (`entryFulfilment.ts`) und das Strafbuch („falsche Art" oder
+ * „versäumt"): sie lägen sonst an zwei Stellen und gingen auseinander. Ohne Vorgabe zählt jede Art.
+ */
+export function orgasmTypeSatisfies(
+  requiredType: string | null | undefined,
+  orgasmusArt: string | null | undefined,
+): boolean {
+  return !requiredType || requiredType === orgasmusArt || requiredType === parseOrgasmusArtBase(orgasmusArt);
+}
+
 // ── Validation ───────────────────────────────────────────────────────────────
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;

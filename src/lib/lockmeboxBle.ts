@@ -10,8 +10,8 @@ import { codedError, codeOf } from "@/lib/codedError";
 import { isNativePlatform } from "@/lib/nativePush";
 import {
   LOCKMEBOX_COMMAND_LETTER, LOCKMEBOX_NAME_PREFIX, LOCKMEBOX_NAME_RE, LOCKMEBOX_RX, LOCKMEBOX_SERVICE,
-  LOCKMEBOX_TX, splitLockmeboxFrames, type LockmeboxCommand, type LockmeboxProblem, type LockmeboxRelayInput,
-  type LockmeboxRelayResult,
+  LOCKMEBOX_TX, splitLockmeboxFrames, type LockmeboxCommand, type LockmeboxInfo, type LockmeboxProblem,
+  type LockmeboxRelayInput, type LockmeboxRelayResult,
 } from "@/lib/lockmeboxProtocol";
 
 /** So lange wartet das Handy auf die Antwort der Box auf einen Befehl. Der Motor braucht ein paar
@@ -37,7 +37,7 @@ export type LockmeboxSessionError =
   | "server";
 
 export type LockmeboxSessionOutcome =
-  | { ok: true; locked: boolean | null }
+  | { ok: true; locked: boolean | null; info: LockmeboxInfo | null }
   | { ok: false; error: LockmeboxSessionError; code?: string | null };
 
 /** Wie erreicht dieses Gerät die Box? `native` = die App (sucht selbst im Hintergrund), `web` =
@@ -176,7 +176,7 @@ async function relaySession(ble: BleModule, { deviceId, boxId }: FoundBox): Prom
     if (step.problem) return { ok: false, error: step.problem };
     // Grenze erreicht, obwohl der Server noch etwas schicken wollte: nicht als Erfolg melden.
     if (step.send) return { ok: false, error: "notApplied" };
-    return { ok: true, locked: step.locked };
+    return { ok: true, locked: step.locked, info: step.info };
   } catch (e) {
     const code = codeOf(e);
     if (code?.startsWith(RELAY_ERROR_PREFIX)) return { ok: false, error: "server", code: code.slice(RELAY_ERROR_PREFIX.length) || null };

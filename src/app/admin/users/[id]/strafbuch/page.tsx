@@ -9,7 +9,7 @@ import { missedWeightRef } from "@/lib/weightObligation";
 import { loadStatementsOfUser } from "@/lib/offenseStatementService";
 import { passwordChangeViaLabel } from "@/lib/constants";
 import { getLocale, getTranslations } from "next-intl/server";
-import StrafbuchClient, { type KontrollRow, type UnerlaubteOeffnungRow, type StrafeRecordData, type CleaningLimitRow, type AufgabeRow, type NichtVerschlossenRow, type VerschlussVersaeumtRow, type OrgasmusVersaeumtRow, type FalschesGeraetRow, type AdminPasswortRow, type UnerlaubterOrgasmusRow, type ManuellesVergehenRow, type MissedWeightRow, type StatementView } from "./StrafbuchClient";
+import StrafbuchClient, { type KontrollRow, type UnerlaubteOeffnungRow, type StrafeRecordData, type CleaningLimitRow, type AufgabeRow, type NichtVerschlossenRow, type VerschlussVersaeumtRow, type OrgasmusVersaeumtRow, type OrgasmusFalscheArtRow, type FalschesGeraetRow, type AdminPasswortRow, type UnerlaubterOrgasmusRow, type ManuellesVergehenRow, type MissedWeightRow, type StatementView } from "./StrafbuchClient";
 
 export default async function StrafbuchPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -109,6 +109,14 @@ export default async function StrafbuchPage({ params }: { params: Promise<{ id: 
     endsAtStr: fmtDual(m.endsAt),
     message: m.message,
     requiredType: m.requiredType,
+  }));
+
+  const orgasmusFalscheArt: OrgasmusFalscheArtRow[] = sb.wrongOrgasmTypes.map((m) => ({
+    id: m.id,
+    endsAtStr: fmtDual(m.endsAt),
+    message: m.message,
+    requiredType: m.requiredType,
+    reportedType: m.reportedType,
   }));
 
   const falschesGeraet: FalschesGeraetRow[] = sb.wrongDeviceViolations.map((v) => ({
@@ -242,6 +250,8 @@ export default async function StrafbuchPage({ params }: { params: Promise<{ id: 
     strafbuchOrgasmusVersaeumt: t("strafbuchOrgasmusVersaeumt"),
     strafbuchOrgasmusAbgelaufen: t("strafbuchOrgasmusAbgelaufen"),
     strafbuchOrgasmusVorgegeben: t("strafbuchOrgasmusVorgegeben"),
+    strafbuchOrgasmusFalscheArt: t("strafbuchOrgasmusFalscheArt"),
+    strafbuchOrgasmusGemeldet: t("strafbuchOrgasmusGemeldet"),
     strafbuchFalschesGeraet: t("strafbuchFalschesGeraet"),
     strafbuchFalschesGeraetAm: t("strafbuchFalschesGeraetAm"),
     strafbuchAdminPasswort: t("strafbuchAdminPasswort"),
@@ -269,6 +279,7 @@ export default async function StrafbuchPage({ params }: { params: Promise<{ id: 
       nichtVerschlossen={nichtVerschlossen}
       verschlussVersaeumt={verschlussVersaeumt}
       orgasmusVersaeumt={orgasmusVersaeumt}
+      orgasmusFalscheArt={orgasmusFalscheArt}
       falschesGeraet={falschesGeraet}
       adminPasswort={adminPasswort}
       unerlaubteOrgasmen={unerlaubteOrgasmen}

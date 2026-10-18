@@ -94,3 +94,19 @@ describe("currentOffenseRules", () => {
     expect(rules.late_lock).toBe("on");
   });
 });
+
+describe("wrong_orgasm_type — dieselbe Anweisung, anders eingeordnet", () => {
+  it("teilt den gespeicherten Wert mit missed_orgasm: ein gefälltes Urteil bleibt an der Anweisung hängen", async () => {
+    // Urteile hängen an `offenseType` + `refId`. Ein eigener Wert öffnete jeden schon beurteilten Fall
+    // wieder, sobald die Zeile von „versäumt" nach „falsche Art" wandert.
+    const { STORED_TYPE } = await import("./offenseTypes");
+    expect(STORED_TYPE.wrong_orgasm_type).toBe(STORED_TYPE.missed_orgasm);
+  });
+
+  it("gilt standardmässig wie bisher (an) und ist abschaltbar", async () => {
+    const { OFFENSE_RULE_DEFAULT, isValidOffenseMode } = await import("./offenseRules");
+    expect(OFFENSE_RULE_DEFAULT.wrong_orgasm_type).toBe("on");
+    expect(isValidOffenseMode("wrong_orgasm_type", "off")).toBe(true);
+    expect(isValidOffenseMode("wrong_orgasm_type", "lockedOnly")).toBe(false);
+  });
+});

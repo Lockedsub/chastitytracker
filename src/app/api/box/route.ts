@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getActiveLockPeriod } from "@/lib/queries";
 import { boxCouplingEnabled } from "@/lib/constants";
 import { toBoxKind, toPendingCommand } from "@/lib/boxStatus";
+import { boxNeedsReopen, boxReopenBlockReason } from "@/lib/boxReopenService";
 
 export const dynamic = "force-dynamic";
 
@@ -42,6 +43,10 @@ export async function GET(req: NextRequest) {
     getActiveLockPeriod(userId),
   ]);
 
+  // Darf die Karte „Box nochmals öffnen" zeigen? EINE Frage für alle Boxen (sie betrifft den Träger,
+  // nicht die einzelne Box), danach je Box: nur eine, die selbst zu meldet.
+  const reopenBlocked = await boxReopenBlockReason(userId, boxes);
+
   // Tracker-eigene Sperrzeit sofort überlagern — der gepushte BoxStatus hinkt ihr nach (Heimdall
   // zieht sie erst beim nächsten Box-Sync), sonst zeigte das Soll fälschlich „offen".
   return NextResponse.json(
@@ -74,6 +79,7 @@ export async function GET(req: NextRequest) {
       lowBatteryOpenPercent: b.lowBatteryOpenPercent,
       // Firmware-Stand: reine Anzeige neben dem Box-Namen, keine Logik hängt daran.
       fwVersion: b.fwVersion,
+      reopenable: reopenBlocked === null && boxNeedsReopen(b),
     })),
     NO_STORE,
   );

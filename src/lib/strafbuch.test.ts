@@ -929,3 +929,90 @@ describe("buildStrafbuch — Öffnung und die Sperrzeit zum Öffnungszeitpunkt",
     });
   });
 });
+
+/**
+ * „Falsche Orgasmusart" statt „versäumt": eine Anweisung mit Vorgabe, die mit einem Orgasmus ANDERER
+ * Art beantwortet wurde (Vorgabe „durch Technik", gemeldet „durch andere Person"), blieb unerfüllt und
+ * zählte als versäumt — obwohl die Keyholderin den Orgasmus bekam. Als eigene Art lässt sie sich
+ * getrennt abschalten; dieselbe Zeile, dieselbe `refId`, also bleibt ein gefälltes Urteil daran hängen.
+ */
+describe("buildStrafbuch — falsche Orgasmusart", () => {
+  const NOW = new Date("2026-10-18T12:00:00Z");
+  const BEGINS = new Date("2026-10-17T08:00:00Z");
+  const ENDS = new Date("2026-10-17T20:00:00Z");
+  const TECHNIK = "Orgasmus – durch Technik";
+
+  const anweisung = (over: object = {}) => ({
+    id: "a1", art: "ANWEISUNG", beginsAt: BEGINS, endsAt: ENDS, requiredType: TECHNIK, message: null,
+    fulfilledAt: null, withdrawnAt: null, wirksamAb: null, benachrichtigtAt: null, ...over,
+  });
+  const orgasmus = (art: string, startTime = new Date("2026-10-17T15:00:00Z")) => ({ id: "o1", startTime, orgasmusArt: art, note: null });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    db.user.findUnique.mockResolvedValue({
+      cleaningAllowed: false, cleaningMaxPerDay: 0, cleaningMaxMinutes: 15,
+      cleaningWindows: null, timezone: "Europe/Zurich",
+    });
+    mockLockPeriods([]);
+    mockStichtag("2026-07-01T00:00:00Z");
+    db.offenseRuleChange.findMany.mockResolvedValue([]);
+    db.strafeRecord.findMany.mockResolvedValue([]);
+    db.orgasmusAnforderung.findMany.mockResolvedValue([anweisung()]);
+  });
+
+  it("ein Orgasmus anderer Art im Fenster ist eine FALSCHE ART, nicht versäumt", async () => {
+    mockOrgasmen([orgasmus("Orgasmus – durch andere Person")]);
+    const sb = await buildStrafbuch("u1", NOW);
+    expect(sb.wrongOrgasmTypes).toMatchObject([{ id: "a1", requiredType: TECHNIK, reportedType: "Orgasmus – durch andere Person" }]);
+    expect(sb.missedOrgasmInstructions).toEqual([]);
+  });
+
+  it("ohne jeden Orgasmus im Fenster bleibt es versäumt", async () => {
+    mockOrgasmen([]);
+    const sb = await buildStrafbuch("u1", NOW);
+    expect(sb.missedOrgasmInstructions.map((m) => m.id)).toEqual(["a1"]);
+    expect(sb.wrongOrgasmTypes).toEqual([]);
+  });
+
+  it("ein Orgasmus AUSSERHALB des Fensters ändert daran nichts", async () => {
+    mockOrgasmen([orgasmus("Orgasmus – durch andere Person", new Date("2026-10-18T09:00:00Z"))]);
+    const sb = await buildStrafbuch("u1", NOW);
+    expect(sb.missedOrgasmInstructions.map((m) => m.id)).toEqual(["a1"]);
+    expect(sb.wrongOrgasmTypes).toEqual([]);
+  });
+
+  it("eine Anweisung OHNE Vorgabe kann keine falsche Art haben", async () => {
+    db.orgasmusAnforderung.findMany.mockResolvedValue([anweisung({ requiredType: null })]);
+    mockOrgasmen([orgasmus("Orgasmus – durch andere Person")]);
+    const sb = await buildStrafbuch("u1", NOW);
+    expect(sb.wrongOrgasmTypes).toEqual([]);
+    expect(sb.missedOrgasmInstructions.map((m) => m.id)).toEqual(["a1"]);
+  });
+
+  it("die Regel AUS: weder falsche Art noch versäumt — ab dem Zeitpunkt, an dem sie gilt", async () => {
+    db.offenseRuleChange.findMany.mockResolvedValue([
+      { offenseType: "wrong_orgasm_type", mode: "off", effectiveFrom: new Date("2026-10-01T00:00:00Z") },
+    ]);
+    mockOrgasmen([orgasmus("Orgasmus – durch andere Person")]);
+    const sb = await buildStrafbuch("u1", NOW);
+    expect(sb.wrongOrgasmTypes).toEqual([]);
+    expect(sb.missedOrgasmInstructions).toEqual([]);
+  });
+
+  it("die Regel AUS gilt nicht rückwirkend: war sie zur Tatzeit noch an, zählt es weiter", async () => {
+    db.offenseRuleChange.findMany.mockResolvedValue([
+      { offenseType: "wrong_orgasm_type", mode: "off", effectiveFrom: new Date("2026-10-18T10:00:00Z") },
+    ]);
+    mockOrgasmen([orgasmus("Orgasmus – durch andere Person")]);
+    expect((await buildStrafbuch("u1", NOW)).wrongOrgasmTypes.map((m) => m.id)).toEqual(["a1"]);
+  });
+
+  it("eine Regel AUS lässt keine versäumte Anweisung verschwinden", async () => {
+    db.offenseRuleChange.findMany.mockResolvedValue([
+      { offenseType: "wrong_orgasm_type", mode: "off", effectiveFrom: new Date("2026-10-01T00:00:00Z") },
+    ]);
+    mockOrgasmen([]);
+    expect((await buildStrafbuch("u1", NOW)).missedOrgasmInstructions.map((m) => m.id)).toEqual(["a1"]);
+  });
+});

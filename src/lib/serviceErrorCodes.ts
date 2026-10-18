@@ -249,6 +249,11 @@ export const CATEGORY_RULE_CODES = [
 export const BOX_CODES = [
   "BOX_RELOCK_NOT_LOCKED",
   "BOX_RELOCK_KEY_NOT_IN_BOX",
+  // /api/box/reopen — das Gegenstück (`boxReopenService.ts`): Tracker offen, Box zu. Der dritte Fall
+  // ist die Sperrbruch-Öffnung, bei der die Box mit Absicht zubleibt.
+  "BOX_REOPEN_NOT_OPEN",
+  "BOX_REOPEN_NOT_LOCKED",
+  "BOX_REOPEN_HELD",
   // /api/box/ble — die Handy-Brücke zur LockMeBox (lockmeboxService.ts).
   "BOX_BLE_BAD_STATUS",
   "BOX_BLE_OTHER_BOX",

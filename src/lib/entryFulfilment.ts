@@ -1,4 +1,4 @@
-import { parseOrgasmusArtBase } from "@/lib/constants";
+import { orgasmTypeSatisfies } from "@/lib/constants";
 import type { Prisma } from "@prisma/client";
 import type { InspectionVerification } from "@/lib/kontrolleService";
 
@@ -235,19 +235,9 @@ export async function applyEntryFulfilment(
       },
       orderBy: { createdAt: "desc" },
     });
-    // Die Vorgabe kann eine reine Hauptart sein ("Orgasmus" → jede Unterart erfüllt) ODER ein voller
-    // Kombi-Code inkl. Unterart ("Orgasmus – Masturbation" → nur genau diese). Das Formular und
-    // `orgasmusValueAllowed` erlauben beide Formen, also muss die Erfüllung beide kennen: der Eintrag
-    // passt bei EXAKTER Übereinstimmung mit der vollen Art oder wenn die Vorgabe die Basis des
-    // Eintrags trifft. Nur gegen `parseOrgasmusArtBase` zu vergleichen liesse eine Unterart-Vorgabe
-    // nie erfüllen — die Anweisung liefe zwangsläufig als „abgelaufen" aus (Vorfall 05.09.2026).
-    const requiredType = offeneAnforderung?.requiredType;
-    if (
-      offeneAnforderung &&
-      (!requiredType ||
-        requiredType === entry.orgasmusArt ||
-        requiredType === parseOrgasmusArtBase(entry.orgasmusArt))
-    ) {
+    // Welche Art die Vorgabe verlangt und wann ein Eintrag sie erfüllt, sagt `orgasmTypeSatisfies` —
+    // dieselbe Frage stellt das Strafbuch, um „falsche Art" von „versäumt" zu trennen.
+    if (offeneAnforderung && orgasmTypeSatisfies(offeneAnforderung.requiredType, entry.orgasmusArt)) {
       await tx.orgasmusAnforderung.update({
         where: { id: offeneAnforderung.id },
         data: { fulfilledAt: at, entryId },

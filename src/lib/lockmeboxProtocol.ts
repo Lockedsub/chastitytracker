@@ -100,6 +100,9 @@ export interface LockmeboxRelayInput {
   sent: LockmeboxCommand | null;
 }
 
+/** Was die Box beim Abfragen über sich selbst sagt — für die Rückmeldung nach „Box abfragen". */
+export type LockmeboxInfo = Pick<LockmeboxStatus, "battery" | "charging" | "fwVersion">;
+
 export interface LockmeboxRelayResult {
   /** Der nächste Befehl samt fertig verschlüsselter Zeile — `null` = fertig, Verbindung trennen. */
   send: { command: LockmeboxCommand; frame: string } | null;
@@ -107,6 +110,8 @@ export interface LockmeboxRelayResult {
   problem: LockmeboxProblem | null;
   /** Riegel zu laut der zuletzt gelesenen Zeile; `null` = noch keine gelesen. */
   locked: boolean | null;
+  /** Akku, Ladezustand und Firmware aus derselben Zeile; `null` = noch keine gelesen. */
+  info: LockmeboxInfo | null;
 }
 
 /**

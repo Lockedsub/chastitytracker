@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { LOCK_ENDED_REASON } from "@/lib/constants";
+import { LOCK_ENDED_REASON, orgasmTypeSatisfies } from "@/lib/constants";
 import { deployCutoff } from "@/lib/appMeta";
 import { mapAnforderungStatus, tzDayKey, isPastDeadlineUnfulfilled, dateAtLocalMinutes, APP_TZ, hhmmToMinutes } from "@/lib/utils";
 import { cleaningBlockReason, type CleaningPermissionUser } from "@/lib/queries";
@@ -68,6 +68,16 @@ export interface StrafbuchData {
     endsAt: Date;
     message: string | null;
     requiredType: string | null;
+  }[];
+  /** Orgasmus-Anweisungen, in deren Fenster ein Orgasmus gemeldet wurde — aber nicht von der geforderten
+   *  Art. Dieselben Zeilen zählten bis 6.5.2 als versäumt; als eigene Art lassen sie sich getrennt
+   *  abschalten (`wrong_orgasm_type`). `reportedType` = was der Träger gemeldet hat. */
+  wrongOrgasmTypes: {
+    id: string;
+    endsAt: Date;
+    message: string | null;
+    requiredType: string | null;
+    reportedType: string | null;
   }[];
   /** Verschluss-Anforderungen (lock requests) whose deadline (`endsAt`) passed without a timely VERSCHLUSS. */
   lateLocks: {
@@ -283,6 +293,9 @@ export const OFFENSE_LISTS = {
   cleaning_limit: spec("cleaningLimitViolations", (v) => v.entryId, (v) => v.startTime),
   wrong_device: spec("wrongDeviceViolations", (v) => v.entryId, (v) => v.startTime),
   missed_orgasm: spec("missedOrgasmInstructions", (m) => m.id, (m) => m.endsAt),
+  // Dieselbe `refId` wie `missed_orgasm` (und derselbe gespeicherte Wert): es ist DIESELBE Anweisung,
+  // nur anders eingeordnet — ein schon gefälltes Urteil bleibt an ihr hängen.
+  wrong_orgasm_type: spec("wrongOrgasmTypes", (m) => m.id, (m) => m.endsAt),
   late_lock: spec("lateLocks", (a) => a.id, (a) => a.fulfilledAt ?? a.endsAt),
   cleaning_not_relocked: spec("cleaningNotRelocked", (c) => cleaningNotRelockedRef(c.entryId), (c) => c.relockAt ?? c.deadline),
   // refId = Task.id. Anders als bei den Reinigungs-Vergehen braucht es kein Präfix: die id gehört
@@ -957,6 +970,40 @@ export async function buildStrafbuch(userId: string, now: Date = new Date()): Pr
       })
     : [];
 
+  // Abgelaufene Orgasmus-Anweisungen ohne Erfüllung.
+  //
+  // `!isHiddenFromSub`: eine terminierte Anweisung, die nie zugestellt wurde, ist kein Versäumnis
+  // — der Träger hat von ihr nie erfahren. Der Poller zieht solche Zeilen zwar zurück, sobald ihr
+  // Fenster durch ist; stand er (Neustart, Ausfall) über das Fensterende hinaus still, stünde hier
+  // sonst genau die unverdiente Strafe, gegen die schon `checkOrgasmWindowEnd` gebaut ist.
+  const missedInstructions = orgasmusAnforderungen
+    .filter((a) => a.art === "ANWEISUNG" && a.withdrawnAt === null && a.fulfilledAt === null && a.endsAt < now && !isHiddenFromSub(a))
+    .sort((a, b) => b.endsAt.getTime() - a.endsAt.getTime());
+  // Von diesen: in welchen Fenstern hat der Träger TROTZDEM einen Orgasmus gemeldet? Eine Anweisung mit
+  // Vorgabe, die unerfüllt blieb, obwohl im Fenster ein Orgasmus erfasst wurde, war keine versäumte,
+  // sondern eine falsch erfüllte (`wrong_orgasm_type`) — das ist der Fall der „durch Technik"-Vorgabe,
+  // die mit „durch andere Person" gemeldet wurde. Nur geladen, wenn es so eine Anweisung überhaupt gibt.
+  const wrongTypeCandidates = missedInstructions.filter((a) => a.requiredType);
+  const reportedInWindows = wrongTypeCandidates.length === 0 ? [] : await prisma.entry.findMany({
+    where: {
+      userId,
+      type: "ORGASMUS",
+      startTime: {
+        gte: new Date(Math.min(...wrongTypeCandidates.map((a) => a.beginsAt.getTime()))),
+        lte: new Date(Math.max(...wrongTypeCandidates.map((a) => a.endsAt.getTime()))),
+      },
+    },
+    orderBy: { startTime: "asc" },
+    select: { startTime: true, orgasmusArt: true },
+  });
+  // Je Anweisung der gemeldete Orgasmus, der sie hätte erfüllen sollen und es nicht tat — `undefined`,
+  // wenn im Fenster keiner gemeldet wurde (dann war sie versäumt). EINMAL gerechnet, beide Listen leiten daraus ab.
+  const classifiedInstructions = missedInstructions.map((a) => ({
+    a,
+    reported: !a.requiredType ? undefined : reportedInWindows.find((e) =>
+      e.startTime >= a.beginsAt && e.startTime <= a.endsAt && !orgasmTypeSatisfies(a.requiredType, e.orgasmusArt)),
+  }));
+
   const data: StrafbuchData = {
     unauthorizedOpenings,
     lateControls: kontrollAnforderungen
@@ -970,14 +1017,10 @@ export async function buildStrafbuch(userId: string, now: Date = new Date()): Pr
       .map(toAutoRemovedControl),
     cleaningLimitViolations: cleaningLimitRows,
     wrongDeviceViolations,
-    missedOrgasmInstructions: orgasmusAnforderungen
-      // `!isHiddenFromSub`: eine terminierte Anweisung, die nie zugestellt wurde, ist kein Versäumnis
-      // — der Träger hat von ihr nie erfahren. Der Poller zieht solche Zeilen zwar zurück, sobald ihr
-      // Fenster durch ist; stand er (Neustart, Ausfall) über das Fensterende hinaus still, stünde hier
-      // sonst genau die unverdiente Strafe, gegen die schon `checkOrgasmWindowEnd` gebaut ist.
-      .filter((a) => a.art === "ANWEISUNG" && a.withdrawnAt === null && a.fulfilledAt === null && a.endsAt < now && !isHiddenFromSub(a))
-      .sort((a, b) => b.endsAt.getTime() - a.endsAt.getTime())
-      .map((a) => ({ id: a.id, endsAt: a.endsAt, message: a.message, requiredType: a.requiredType })),
+    missedOrgasmInstructions: classifiedInstructions.flatMap(({ a, reported }) => reported ? [] : [{ id: a.id, endsAt: a.endsAt, message: a.message, requiredType: a.requiredType }]),
+    wrongOrgasmTypes: classifiedInstructions.flatMap(({ a, reported }) => reported
+      ? [{ id: a.id, endsAt: a.endsAt, message: a.message, requiredType: a.requiredType, reportedType: reported.orgasmusArt }]
+      : []),
     lateLocks,
     cleaningNotRelocked,
     unfulfilledTasks,

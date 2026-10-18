@@ -532,6 +532,8 @@ export default function SettingsForm({ username, email, locale, timezone, startP
                   <p className="text-sm text-foreground-muted">
                     {box.paired.kind === "lockmebox" ? tBox("pairedHint") : tBoxStatus("pairedHintHeimdall")}
                   </p>
+                  {/* Die Box jetzt fragen: Riegel, Akku, Firmware — und der Tracker lernt den Stand gleich mit. */}
+                  {box.paired.kind === "lockmebox" && <LockmeboxConnect query />}
                   <BoxRemoveButton boxId={box.paired.boxId} />
                 </>
               ) : (

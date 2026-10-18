@@ -25,6 +25,7 @@ der Reihe.
 | `cleaning_not_relocked` | nach der Reinigungspause nicht wieder verschlossen |
 | `wrong_device` | anderes Gerät als angefordert |
 | `missed_orgasm` | ANWEISUNG ungenutzt verstrichen |
+| `wrong_orgasm_type` | ANWEISUNG mit einem Orgasmus anderer Art beantwortet (abschaltbar) |
 | `unauthorized_orgasm` | Orgasmus ohne deckende Direktive |
 | `late_lock` | Einschliess-Anforderung zu spät erfüllt |
 | `unfulfilled_task` | Aufgabe nicht erfüllt |

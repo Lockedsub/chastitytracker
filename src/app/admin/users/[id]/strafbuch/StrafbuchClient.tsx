@@ -163,6 +163,11 @@ export interface OrgasmusVersaeumtRow {
   requiredType: string | null;
 }
 
+/** Eine Orgasmus-Anweisung, die mit einer ANDEREN als der geforderten Art beantwortet wurde. */
+export interface OrgasmusFalscheArtRow extends OrgasmusVersaeumtRow {
+  reportedType: string | null;
+}
+
 /** VERSCHLUSS mit einem anderen als dem angeforderten Gerät. */
 export interface FalschesGeraetRow {
   entryId: string;
@@ -275,6 +280,8 @@ interface Labels {
   strafbuchOrgasmusVersaeumt: string;
   strafbuchOrgasmusAbgelaufen: string;
   strafbuchOrgasmusVorgegeben: string;
+  strafbuchOrgasmusFalscheArt: string;
+  strafbuchOrgasmusGemeldet: string;
   strafbuchFalschesGeraet: string;
   strafbuchFalschesGeraetAm: string;
   strafbuchAdminPasswort: string;
@@ -302,6 +309,7 @@ interface Props {
   nichtVerschlossen: NichtVerschlossenRow[];
   verschlussVersaeumt: VerschlussVersaeumtRow[];
   orgasmusVersaeumt: OrgasmusVersaeumtRow[];
+  orgasmusFalscheArt: OrgasmusFalscheArtRow[];
   falschesGeraet: FalschesGeraetRow[];
   adminPasswort: AdminPasswortRow[];
   unerlaubteOrgasmen: UnerlaubterOrgasmusRow[];
@@ -729,7 +737,7 @@ function JudgmentSlot({ ctx, refId, canonical, sectionRefs, anlass }: {
   );
 }
 
-export default function StrafbuchClient({ userId, unerlaubteOeffnungen, zuSpaet, abgelehnt, autoEntfernt, cleaningLimitOffenses, unfulfilledTasks, nichtVerschlossen, verschlussVersaeumt, orgasmusVersaeumt, falschesGeraet, adminPasswort, unerlaubteOrgasmen, missedWeightReports, manuelleVergehen, strafeRecords, statements, labels }: Props) {
+export default function StrafbuchClient({ userId, unerlaubteOeffnungen, zuSpaet, abgelehnt, autoEntfernt, cleaningLimitOffenses, unfulfilledTasks, nichtVerschlossen, verschlussVersaeumt, orgasmusVersaeumt, orgasmusFalscheArt, falschesGeraet, adminPasswort, unerlaubteOrgasmen, missedWeightReports, manuelleVergehen, strafeRecords, statements, labels }: Props) {
   const router = useRouter();
   // Beide Routen dieser Seite (`/api/admin/offense`, `/api/admin/strafe`) liefern stabile
   // Fehler-CODES — übersetzt wird hier.
@@ -939,6 +947,19 @@ export default function StrafbuchClient({ userId, unerlaubteOeffnungen, zuSpaet,
             m.requiredType
               ? <>{labels.strafbuchOrgasmusVorgegeben}: {m.requiredType}</>
               : labels.strafbuchOrgasmusVersaeumt,
+          )}
+          {m.message && <span className={NOTE_CLS}>{labels.instructionLabel}: {m.message}</span>}
+        </>
+      ),
+    }))),
+
+    sec("wrong_orgasm_type", labels.strafbuchOrgasmusFalscheArt, orgasmusFalscheArt.map((m) => ({
+      refId: m.id,
+      anlass: `${m.endsAtStr}`,
+      body: (judged) => (
+        <>
+          {titleLine(judged, <>{labels.strafbuchOrgasmusAbgelaufen} {m.endsAtStr}</>,
+            <>{labels.strafbuchOrgasmusVorgegeben}: {m.requiredType} · {labels.strafbuchOrgasmusGemeldet}: {m.reportedType ?? "–"}</>,
           )}
           {m.message && <span className={NOTE_CLS}>{labels.instructionLabel}: {m.message}</span>}
         </>

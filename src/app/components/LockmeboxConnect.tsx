@@ -31,8 +31,11 @@ const RETRYABLE = new Set<LockmeboxSessionError>(["noDevice", "noReply", "notApp
  * Kann das Gerät kein Bluetooth, zeigt sie nichts (`unsupportedHint` aus) — in der Karte wäre der
  * Satz eine Dauerzeile ohne Handlung. In den Einstellungen sagt sie, warum es nicht geht.
  */
-export default function LockmeboxConnect({ unsupportedHint = false, autoBoxId }: {
+export default function LockmeboxConnect({ unsupportedHint = false, autoBoxId, query = false }: {
   unsupportedHint?: boolean;
+  /** Der Knopf heisst „Box abfragen" statt „Mit Box verbinden": dieselbe Sitzung, aber als bewusste
+   *  Frage nach dem Stand (Riegel, Akku, Firmware) — z.B. in den Einstellungen der gekoppelten Box. */
+  query?: boolean;
   /** Die gekoppelte Box, nach der die App selbst sucht. Ohne sie: nur der Knopf. */
   autoBoxId?: string;
 }) {
@@ -53,7 +56,14 @@ export default function LockmeboxConnect({ unsupportedHint = false, autoBoxId }:
   const report = (outcome: LockmeboxSessionOutcome) => {
     if (outcome.ok) {
       setError(null);
-      setSuccess(outcome.locked === null ? t("done") : outcome.locked ? t("doneLocked") : t("doneOpen"));
+      const { info } = outcome;
+      setSuccess(info && outcome.locked !== null
+        ? t("doneInfo", {
+            state: outcome.locked ? t("stateLocked") : t("stateOpen"),
+            battery: info.battery === null ? t("batteryCharging") : t("batteryPercent", { percent: info.battery }),
+            firmware: info.fwVersion,
+          })
+        : outcome.locked === null ? t("done") : outcome.locked ? t("doneLocked") : t("doneOpen"));
       // Held, Einträge und Karte gleich mit — der Tracker hat eben umgeschaltet.
       router.refresh();
     } else {
@@ -120,7 +130,7 @@ export default function LockmeboxConnect({ unsupportedHint = false, autoBoxId }:
         <>
           <p className="text-sm text-foreground-muted">{t("pressButton")}</p>
           <Button variant="secondary" size="sm" onClick={connect} loading={saving} icon={<Bluetooth size={16} />}>
-            {saving ? t("connecting") : t("connect")}
+            {saving ? t("connecting") : query ? t("query") : t("connect")}
           </Button>
         </>
       )}

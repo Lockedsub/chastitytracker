@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { validateEntryPayload, deviceCategoriesEnabled, clampStartGrace, startGraceFromClock, VALID_TYPES, KG_ENTRY_TYPES, WEAR_ENTRY_TYPES, TASK_DEFAULT_START_GRACE_MIN, TASK_START_GRACE_RANGE, DURATION_UNITS, durationToHours, durationFromHours } from "./constants";
+import { validateEntryPayload, deviceCategoriesEnabled, clampStartGrace, startGraceFromClock, VALID_TYPES, KG_ENTRY_TYPES, WEAR_ENTRY_TYPES, TASK_DEFAULT_START_GRACE_MIN, TASK_START_GRACE_RANGE, DURATION_UNITS, durationToHours, durationFromHours, orgasmTypeSatisfies } from "./constants";
 
 const FUTURE_SAFE_TIME = "2030-01-01T10:00:00Z";
 
@@ -271,5 +271,27 @@ describe("Dauer-Einheiten", () => {
       expect(durationToHours(durationFromHours(hours, "min"), "min")).toBeCloseTo(hours);
       expect(durationToHours(durationFromHours(hours, "h"), "h")).toBeCloseTo(hours);
     }
+  });
+});
+
+describe("orgasmTypeSatisfies — wann ein gemeldeter Orgasmus die geforderte Art erfüllt", () => {
+  it("ohne Vorgabe zählt jede Art", () => {
+    expect(orgasmTypeSatisfies(null, "Orgasmus – durch Technik")).toBe(true);
+    expect(orgasmTypeSatisfies(undefined, null)).toBe(true);
+  });
+
+  it("eine reine Hauptart wird von jeder Unterart erfüllt", () => {
+    expect(orgasmTypeSatisfies("Orgasmus", "Orgasmus – durch Technik")).toBe(true);
+    expect(orgasmTypeSatisfies("Orgasmus", "Orgasmus")).toBe(true);
+  });
+
+  it("ein voller Kombi-Code nur von genau dieser Unterart", () => {
+    expect(orgasmTypeSatisfies("Orgasmus – durch Technik", "Orgasmus – durch Technik")).toBe(true);
+    expect(orgasmTypeSatisfies("Orgasmus – durch Technik", "Orgasmus – durch andere Person")).toBe(false);
+    expect(orgasmTypeSatisfies("Orgasmus – durch Technik", "Orgasmus")).toBe(false);
+  });
+
+  it("eine andere Hauptart erfüllt nie", () => {
+    expect(orgasmTypeSatisfies("Orgasmus", "ruinierter Orgasmus")).toBe(false);
   });
 });

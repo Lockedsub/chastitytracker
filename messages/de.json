@@ -212,6 +212,9 @@
     "DEVICE_INVALID_CODE_REQUIREMENT": "Ungültiger Wert für die Kontroll-Code-Pflicht",
     "BOX_RELOCK_NOT_LOCKED": "Du bist gerade nicht verschlossen — die Box folgt sonst dem Verschluss-Eintrag",
     "BOX_RELOCK_KEY_NOT_IN_BOX": "Laut Deklaration liegt der Schlüssel nicht in der Box",
+    "BOX_REOPEN_NOT_OPEN": "Der Tracker steht nicht auf offen — die Box folgt sonst dem Öffnen-Eintrag",
+    "BOX_REOPEN_NOT_LOCKED": "Die Box meldet den Riegel nicht als zu — es gibt nichts zu öffnen",
+    "BOX_REOPEN_HELD": "Die Box bleibt zu: die Sperrzeit wurde aufgebrochen, und die Box öffnet sich dafür nicht von selbst",
     "BOX_BLE_BAD_STATUS": "Die Box hat eine unlesbare Antwort geschickt — bitte nochmals verbinden",
     "BOX_BLE_OTHER_BOX": "Diese Box ist bereits als andere Box-Art gekoppelt",
     "BOX_ONE_PER_USER": "Du hast bereits eine Schlüsselbox. Entferne sie zuerst in den Einstellungen, dann kannst du eine andere koppeln",
@@ -675,6 +678,9 @@
     "deviceInfo": "Angaben zum Gerät",
     "pendingCloseBle": "Schliessen angefordert — die Box schliesst, sobald sich jemand an ihr per Bluetooth verbindet.",
     "pendingOpenBle": "Öffnung freigegeben — die Box öffnet, sobald sich jemand an ihr per Bluetooth verbindet.",
+    "reopen": "Box nochmals öffnen",
+    "reopenHintSelf": "Der Tracker steht auf offen, die Box ist aber noch zu. Öffne sie neu: die Box öffnet, sobald du dich an ihr verbindest.",
+    "reopenHintKeyholder": "Der Tracker steht auf offen, die Box meldet den Riegel aber zu. Der Öffnen-Befehl hat sie nicht erreicht — der Sub kann sie in seiner App neu öffnen.",
     "neverContacted": "noch nie verbunden",
     "lastContactMinutes": "letzter Kontakt vor {count} Min",
     "lastContactHours": "letzter Kontakt vor {count} Std",
@@ -1185,6 +1191,8 @@
     "strafbuchOrgasmusVersaeumt": "Versäumte Orgasmus-Anweisungen",
     "strafbuchOrgasmusAbgelaufen": "abgelaufen am",
     "strafbuchOrgasmusVorgegeben": "Vorgegeben",
+    "strafbuchOrgasmusFalscheArt": "Falsche Orgasmusart",
+    "strafbuchOrgasmusGemeldet": "Gemeldet",
     "strafbuchFalschesGeraet": "Falsches Gerät getragen",
     "strafbuchFalschesGeraetAm": "Verschlossen am",
     "strafbuchAdminPasswort": "Passwortwechsel während einer Sperrzeit",
@@ -2246,6 +2254,10 @@
       "name": "Orgasmus-Anweisung versäumt",
       "desc": "Ein Pflicht-Fenster lief ab, ohne dass der Orgasmus erfasst wurde."
     },
+    "wrongOrgasmType": {
+      "name": "Falsche Orgasmusart",
+      "desc": "Auf eine Orgasmus-Anweisung mit bestimmter Art wurde ein Orgasmus gemeldet, aber nicht von dieser Art."
+    },
     "lateLock": {
       "name": "Einschliessen versäumt",
       "desc": "Die Frist einer Einschliess-Anforderung verstrich ohne Verschluss."
@@ -2366,6 +2378,12 @@
   "lockmebox": {
     "connect": "Mit Box verbinden",
     "connecting": "Verbinde mit der Box …",
+    "query": "Box abfragen",
+    "stateLocked": "verschlossen",
+    "stateOpen": "offen",
+    "batteryPercent": "Akku {percent} %",
+    "batteryCharging": "Akku lädt",
+    "doneInfo": "Box abgefragt — {state}, {battery}, Firmware {firmware}.",
     "pressButton": "Zuerst den Knopf an der Box drücken — sie schläft sonst und ist nicht zu finden.",
     "done": "Box abgeglichen.",
     "doneLocked": "Box abgeglichen — sie ist verschlossen.",

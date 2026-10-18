@@ -533,6 +533,12 @@ export const FM_CAPABILITIES: FmCapability[] = [
     actors: ["sub"], surfaces: ["sub-ui"], routes: ["/api/box/relock"],
   }),
   c({
+    id: "box-reopen", mechanic: "Box", title: "Box nochmals öffnen",
+    what: "Steht der Tracker auf offen, die Box meldet den Riegel aber zu, setzt der Träger den Öffnen-Befehl neu.",
+    actors: ["sub"], surfaces: ["sub-ui"], routes: ["/api/box/reopen"],
+    note: "Nicht nach einer Sperrbruch-Öffnung: dort bleibt die Box mit Absicht zu. Nur für die LockMeBox: bei Heimdall ist „Tracker offen, Box wartet auf den Knopf\" der Normalfall. Ausgeführt wird der Befehl erst, wenn das Handy des Trägers sich an der Box verbindet.",
+  }),
+  c({
     id: "box-ble", mechanic: "Box", title: "LockMeBox per Bluetooth koppeln und bedienen",
     what: "Das Handy des Trägers verbindet sich mit einer LockMeBox (Werks-Firmware) und reicht Status und Befehle zwischen Box und Tracker durch; der erste Kontakt koppelt sie.",
     actors: ["sub"], surfaces: ["sub-ui"], routes: ["/api/box/ble"],

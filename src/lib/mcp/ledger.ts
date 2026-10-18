@@ -70,6 +70,7 @@ export interface StrafbuchOverview {
   wrongDeviceViolations: ({ time: string | null; note: string | null; deviceName: string | null } & OffenseJudgment)[];
   /** Mandatory orgasm directives (ANWEISUNG) whose window ended without a matching orgasm. */
   missedOrgasmInstructions: ({ windowEndedAt: string; message: string | null; requiredType: string | null } & OffenseJudgment)[];
+  wrongOrgasmTypes: ({ windowEndedAt: string; message: string | null; requiredType: string | null; reportedType: string | null } & OffenseJudgment)[];
   /** Lock requests whose deadline passed without a timely VERSCHLUSS. */
   lateLocks: ({ deadline: string; fulfilledAt: string | null; message: string | null } & OffenseJudgment)[];
   /** REINIGUNG openings not (or too late) followed by a VERSCHLUSS within the re-lock deadline. */
@@ -186,6 +187,13 @@ async function mcpStrafbuch(userId: string, timezone: string, now: Date): Promis
       message: m.message,
       requiredType: m.requiredType,
       ...judge("missed_orgasm", m.id),
+    })),
+    wrongOrgasmTypes: sb.wrongOrgasmTypes.map((m) => ({
+      windowEndedAt: fmt(m.endsAt),
+      message: m.message,
+      requiredType: m.requiredType,
+      reportedType: m.reportedType,
+      ...judge("wrong_orgasm_type", m.id),
     })),
     lateLocks: sb.lateLocks.map((a) => ({
       deadline: fmt(a.endsAt),
@@ -304,8 +312,14 @@ export interface LedgerResult extends Envelope {
    *  unbeurteilt ODER bestraft mit unerledigter Strafe. Bis v3 hiess dasselbe Wort in derselben
    *  Antwort zweierlei: der Zähler war breit, der Filter eng, und ein „1 offenes Vergehen" stand
    *  neben einer leeren Liste (#110). Die Zeilen selbst sind unverändert; wer die alte, enge
-   *  Auswahl braucht, filtert auf `status === "open"`. */
-  schemaVersion: 4;
+   *  Auswahl braucht, filtert auf `status === "open"`.
+   *
+   *  v5: neue Art `wrong_orgasm_type` („Falsche Orgasmusart"). Eine Orgasmus-Anweisung mit Vorgabe,
+   *  die mit einem Orgasmus ANDERER Art beantwortet wurde, zählt nicht mehr als `missed_orgasm`
+   *  (versäumt), sondern als `wrong_orgasm_type` — dieselbe Zeile, dieselbe `ref`, ein bereits
+   *  gefälltes Urteil bleibt an ihr hängen. `missed_orgasm` meint damit nur noch: im Fenster wurde
+   *  gar kein Orgasmus gemeldet. Die Art lässt sich mit `set_offense_rules` abschalten. */
+  schemaVersion: 5;
   user: string;
   detectedOffenseCount: number;
   openOffenseCount: number;
@@ -377,6 +391,7 @@ export function buildOffenseRows(
       });
     }),
     ...sb.missedOrgasmInstructions.map((m) => toRow(m.windowEndedAt, m, { message: m.message, requiredType: m.requiredType })),
+    ...sb.wrongOrgasmTypes.map((m) => toRow(m.windowEndedAt, m, { message: m.message, requiredType: m.requiredType, reportedType: m.reportedType })),
     ...sb.lateLocks.map((a) => toRow(a.fulfilledAt ?? a.deadline, a, { deadline: a.deadline, fulfilledAt: a.fulfilledAt, message: a.message })),
     ...sb.cleaningNotRelocked.map((c) => toRow(c.relockedAt ?? c.deadline, c, { time: c.time, deadline: c.deadline, relockedAt: c.relockedAt, note: c.note })),
     ...sb.unfulfilledTasks.map((t) => toRow(t.failedAt ?? t.holdUntil, t, { title: t.title, holdUntil: t.holdUntil, state: t.state, failedAt: t.failedAt, failureKind: t.failureKind })),
@@ -457,7 +472,7 @@ export async function getOffenses(username: string, opts: GetOffensesOptions = {
   }
 
   return {
-    schemaVersion: 4,
+    schemaVersion: 5,
     user: username,
     ...buildEnvelope(now, iso, timezone),
     detectedOffenseCount: sb.detectedOffenseCount,

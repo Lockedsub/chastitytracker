@@ -224,7 +224,9 @@ export function getLatestKgEntry(
 }
 
 export interface EntryNeighbors {
-  prev: { id: string; type: string; startTime: Date } | null;
+  /** `keyInBox` mit: eine Öffnung fragt am Verschluss davor, ob der Schlüssel überhaupt in der Box liegt
+   *  (Reise → die Box bekommt kein Kommando, `openAwaitsBolt`). */
+  prev: { id: string; type: string; startTime: Date; keyInBox: boolean | null } | null;
   next: { id: string; type: string; startTime: Date } | null;
 }
 
@@ -268,7 +270,7 @@ export async function getEntryNeighbors(
       orderBy: { startTime: "desc" },
       // `id`/`startTime` mit: der Lösch-Pfad braucht den NACHBARN selbst (er ist der Paar-Partner),
       // nicht bloss seine Art — und er soll ihn aus derselben Sicht bekommen wie jeder andere Guard.
-      select: { id: true, type: true, startTime: true },
+      select: { id: true, type: true, startTime: true, keyInBox: true },
     }),
     tx.entry.findFirst({
       where: effectiveEntryWhere({ userId, type: { in: [...pairTypes] }, startTime: { gt: startTime }, ...categoryFilter, ...excludeFilter }),
@@ -1047,6 +1049,25 @@ function isAllowedCleaningOpen(
 ): boolean {
   return oeffnenGrund === "REINIGUNG" && cleaningBlockReason(user, activeLockPeriods, now) === null;
 }
+
+/**
+ * Welche Sperrzeiten eine Freigabe durch die Keyholderin beendet („Sofort aufschliessen", Öffnungs-Eintrag der Keyholderin) — EINE Where-Klausel für Vorschau UND Vollzug.
+ *
+ * Sie stand kurz zweimal da, und die beiden waren schon verschieden: die Vorschau zählte ohne
+ * `endsAt`-Filter also auch längst ABGELAUFENE, nie zurückgezogene Sperrzeiten mit. Die
+ * Trockenübung versprach damit „beendet 3 Sperrzeiten", der Vollzug beendete eine — genau die
+ * Abweichung, gegen die es die Trennung von Vorschau und Vollzug überhaupt gibt.
+ *
+ * Die Auswahl ist DIESELBE wie beim Rückzug von Hand (`withdrawVerschlussAnforderung`): alles, was
+ * noch nicht abgelaufen ist — auch TERMINIERTE, noch nicht ausgelöste. Ohne die wäre eine in fünf
+ * Minuten anspringende Sperre übriggeblieben und hätte gleich wieder verriegelt.
+ */
+export const endableLockPeriods = (userId: string, now: Date) => ({
+  userId,
+  art: "SPERRZEIT",
+  withdrawnAt: null,
+  OR: [{ endsAt: null }, { endsAt: { gt: now } }],
+});
 
 /**
  * Releases active SPERRZEIT periods when a user opens their device.

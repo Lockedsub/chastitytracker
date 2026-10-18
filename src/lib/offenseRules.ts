@@ -34,6 +34,7 @@ export const OFFENSE_RULE_MODES = {
   cleaning_limit: ["off", "on"],
   wrong_device: ["off", "on"],
   missed_orgasm: ["off", "on"],
+  wrong_orgasm_type: ["off", "on"],
   late_lock: ["off", "on"],
   cleaning_not_relocked: ["off", "on"],
   unfulfilled_task: ["off", "on"],
@@ -65,6 +66,9 @@ export const OFFENSE_RULE_DEFAULT: Record<SwitchableOffenseType, OffenseMode> = 
   cleaning_limit: "on",
   wrong_device: "on",
   missed_orgasm: "on",
+  // AN wie bisher: dieselbe Lage zählte vorher als versäumte Anweisung. Wer sie als Absprache
+  // durchgehen lassen will, schaltet sie ab.
+  wrong_orgasm_type: "on",
   late_lock: "on",
   cleaning_not_relocked: "on",
   unfulfilled_task: "on",

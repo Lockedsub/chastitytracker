@@ -212,6 +212,9 @@
     "DEVICE_INVALID_CODE_REQUIREMENT": "Invalid value for the inspection-code requirement",
     "BOX_RELOCK_NOT_LOCKED": "You are not locked right now — otherwise the box follows the lock entry",
     "BOX_RELOCK_KEY_NOT_IN_BOX": "According to your declaration the key is not in the box",
+    "BOX_REOPEN_NOT_OPEN": "The tracker is not set to open — otherwise the box follows the opening entry",
+    "BOX_REOPEN_NOT_LOCKED": "The box does not report its bolt as closed — there is nothing to open",
+    "BOX_REOPEN_HELD": "The box stays shut: the lock period was broken, and the box does not open by itself for that",
     "BOX_BLE_BAD_STATUS": "The box sent an unreadable reply — please connect again",
     "BOX_BLE_OTHER_BOX": "This box is already paired as a different kind of box",
     "BOX_ONE_PER_USER": "You already have a key box. Remove it in the settings first, then you can pair another one",
@@ -675,6 +678,9 @@
     "deviceInfo": "Device details",
     "pendingCloseBle": "Locking requested — the box locks as soon as someone connects to it via Bluetooth.",
     "pendingOpenBle": "Opening released — the box opens as soon as someone connects to it via Bluetooth.",
+    "reopen": "Open box again",
+    "reopenHintSelf": "The tracker is set to open, but the box is still closed. Open it again: the box opens as soon as you connect to it.",
+    "reopenHintKeyholder": "The tracker is set to open, but the box reports its bolt as closed. The open command never reached it — the sub can open it again in their app.",
     "neverContacted": "never connected",
     "lastContactMinutes": "last contact {count} min ago",
     "lastContactHours": "last contact {count} h ago",
@@ -1185,6 +1191,8 @@
     "strafbuchOrgasmusVersaeumt": "Missed orgasm directives",
     "strafbuchOrgasmusAbgelaufen": "expired on",
     "strafbuchOrgasmusVorgegeben": "Required",
+    "strafbuchOrgasmusFalscheArt": "Wrong orgasm type",
+    "strafbuchOrgasmusGemeldet": "Reported",
     "strafbuchFalschesGeraet": "Wrong device worn",
     "strafbuchFalschesGeraetAm": "Locked on",
     "strafbuchAdminPasswort": "Password changed during a lock period",
@@ -2246,6 +2254,10 @@
       "name": "Missed orgasm directive",
       "desc": "A mandatory window expired without the orgasm being logged."
     },
+    "wrongOrgasmType": {
+      "name": "Wrong orgasm type",
+      "desc": "An orgasm directive with a specific type was answered with an orgasm of a different type."
+    },
     "lateLock": {
       "name": "Missed lock-up",
       "desc": "A lock request deadline passed without a lock entry."
@@ -2366,6 +2378,12 @@
   "lockmebox": {
     "connect": "Connect to box",
     "connecting": "Connecting to the box …",
+    "query": "Query box",
+    "stateLocked": "locked",
+    "stateOpen": "open",
+    "batteryPercent": "battery {percent} %",
+    "batteryCharging": "battery charging",
+    "doneInfo": "Box queried — {state}, {battery}, firmware {firmware}.",
     "pressButton": "Press the button on the box first — otherwise it is asleep and cannot be found.",
     "done": "Box synced.",
     "doneLocked": "Box synced — it is locked.",

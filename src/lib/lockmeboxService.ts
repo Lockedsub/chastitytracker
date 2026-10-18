@@ -97,6 +97,7 @@ export async function lockmeboxRelayStep(
       send: next.command ? { command: next.command, frame: encryptLockmeboxCommand(lockmeboxPlaintext(next.command, box.lockPassword)) } : null,
       problem: next.problem,
       locked: status?.locked ?? null,
+      info: status ? { battery: status.battery, charging: status.charging, fwVersion: status.fwVersion } : null,
     },
   };
 }
