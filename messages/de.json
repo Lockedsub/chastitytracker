@@ -1754,6 +1754,7 @@
     "archivedBadge": "Archiviert",
     "restore": "Wiederherstellen",
     "archive": "Archivieren",
+    "deleteDevice": "Gerät löschen",
     "referencesTitle": "Referenzfotos (Erkennung)",
     "referencesHint": "Beispielfotos je Gerät verbessern die automatische Geräte-Erkennung. Lade gute Aufnahmen hoch oder übernimm sie aus deinen Verschluss-Fotos.",
     "referencesAdd": "Foto hinzufügen",

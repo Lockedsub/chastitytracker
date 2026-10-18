@@ -1754,6 +1754,7 @@
     "archivedBadge": "Archived",
     "restore": "Restore",
     "archive": "Archive",
+    "deleteDevice": "Delete device",
     "referencesTitle": "Reference photos (detection)",
     "referencesHint": "Example photos per device improve automatic device detection. Upload good shots or import them from your lock photos.",
     "referencesAdd": "Add photo",

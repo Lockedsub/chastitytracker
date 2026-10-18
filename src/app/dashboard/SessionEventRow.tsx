@@ -96,6 +96,7 @@ const KEY_PROOF_LABEL = {
 
 function CaptureButton({ href }: { href: string }) {
   const t = useTranslations("dashboard");
+  const tc = useTranslations("common");
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState({ top: 0, right: 0 });
   const btnRef = useRef<HTMLButtonElement>(null);
@@ -128,6 +129,7 @@ function CaptureButton({ href }: { href: string }) {
   return (
     <div className="relative flex-shrink-0">
       <button ref={btnRef} type="button" onClick={openMenu}
+        aria-label={tc("actions")} aria-haspopup="menu" aria-expanded={open}
         className="w-6 h-6 flex items-center justify-center rounded-lg text-foreground-faint hover:text-foreground-muted hover:bg-surface-raised active:bg-border-subtle transition">
         <MoreVertical size={16} />
       </button>

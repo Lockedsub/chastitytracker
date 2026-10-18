@@ -375,7 +375,7 @@ function DeviceCard({
                 type="button"
                 onClick={onDelete}
                 className="p-2 rounded-lg text-foreground-muted hover:text-warn transition-colors"
-                aria-label={device.entryCount ? t("archive") : t("deleted")}
+                aria-label={device.entryCount ? t("archive") : t("deleteDevice")}
               >
                 <Trash2 size={16} />
               </button>

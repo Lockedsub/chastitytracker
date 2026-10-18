@@ -5,7 +5,8 @@ import BackLink from "@/app/components/BackLink";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { formatTotalHours } from "@/lib/utils";
-import { Plus, Pencil, Trash2, Tag, ChevronUp, ChevronDown } from "lucide-react";
+import { Plus, Pencil, Trash2, Tag } from "lucide-react";
+import ReorderButtons from "@/app/components/ReorderButtons";
 import Section from "@/app/components/Section";
 import Button from "@/app/components/Button";
 import PageTitle from "@/app/components/PageTitle";
@@ -232,8 +233,7 @@ function CategoryList({
                 category={c}
                 onEdit={onEdit}
                 onDelete={onDelete}
-                onMoveUp={i > 0 ? () => onSwap(c, custom[i - 1]) : undefined}
-                onMoveDown={i < custom.length - 1 ? () => onSwap(c, custom[i + 1]) : undefined}
+                order={{ index: i, count: custom.length, onMove: (dir) => onSwap(c, custom[i + dir]) }}
               />
             ))}
           </ul>
@@ -247,16 +247,13 @@ function CategoryRowItem({
   category: c,
   onEdit,
   onDelete,
-  onMoveUp,
-  onMoveDown,
+  order,
 }: {
   category: CategoryRow;
   onEdit: (c: CategoryRow) => void;
   onDelete: (c: CategoryRow) => void;
-  /** Set when this row can move up — disabled (undefined) for the first custom row. */
-  onMoveUp?: () => void;
-  /** Set when this row can move down — disabled for the last custom row. */
-  onMoveDown?: () => void;
+  /** Nur die eigenen Kategorien lassen sich ordnen; die Ränder sperrt `ReorderButtons` selbst. */
+  order?: { index: number; count: number; onMove: (dir: -1 | 1) => void };
 }) {
   const t = useTranslations("categories");
   const style = categoryStyle(c.color);
@@ -293,27 +290,14 @@ function CategoryRowItem({
             <p className="text-neben text-foreground-faint mt-0.5">{featureLine}</p>
           </div>
           <div className="flex items-center gap-1 shrink-0">
-            {(onMoveUp || onMoveDown) && (
-              <div className="flex flex-col">
-                <button
-                  type="button"
-                  onClick={onMoveUp}
-                  disabled={!onMoveUp}
-                  aria-label={t("moveUp")}
-                  className="size-5 flex items-center justify-center text-foreground-muted hover:bg-background-subtle rounded disabled:opacity-30 disabled:hover:bg-transparent transition"
-                >
-                  <ChevronUp size={14} />
-                </button>
-                <button
-                  type="button"
-                  onClick={onMoveDown}
-                  disabled={!onMoveDown}
-                  aria-label={t("moveDown")}
-                  className="size-5 flex items-center justify-center text-foreground-muted hover:bg-background-subtle rounded disabled:opacity-30 disabled:hover:bg-transparent transition"
-                >
-                  <ChevronDown size={14} />
-                </button>
-              </div>
+            {order && (
+              <ReorderButtons
+                index={order.index}
+                count={order.count}
+                onMove={order.onMove}
+                upLabel={t("moveUp")}
+                downLabel={t("moveDown")}
+              />
             )}
             <button
               type="button"

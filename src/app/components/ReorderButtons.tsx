@@ -9,10 +9,8 @@ import { busyDimCls, iconButtonCls } from "@/app/components/inputStyles";
  * Extrahiert beim zweiten Vorkommen (Öffnungsgründe, Aufgaben-Nachweise): zweimal derselbe
  * gestapelte Knopf-Block mit denselben Klassen, denselben Rand-Sperren und derselben Symbolgrösse.
  *
- * Eine DRITTE Stelle gibt es (`CategoriesClient`), sie ist bewusst nicht migriert: dort steht eine
- * andere Bedienform (die Ränder kommen als fehlende Handler statt aus Index und Anzahl) und eine
- * andere Optik (`size-5`, gerundeter Hover-Grund). Beides anzugleichen ist eine Design-Entscheidung,
- * keine Extraktion. Wer sie trifft, holt die Zeile hierher — dieses Bauteil ist der kanonische Stand.
+ * Die Kategorien-Liste (`CategoriesClient`) nutzt dasselbe Paar; ihre eigene Variante (`size-5`, 20 px)
+ * lag unter dem 24-px-Minimum und ist hier aufgegangen.
  *
  * Die RAND-SPERREN rechnet dieses Bauteil selbst aus `index`/`count` — nicht der Aufrufer. Sie sind
  * keine Geschmacksfrage, sondern folgen aus der Position, und beide Aufrufer hatten sie einzeln

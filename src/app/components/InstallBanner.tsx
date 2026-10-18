@@ -18,6 +18,7 @@ interface BeforeInstallPromptEvent extends Event {
 
 export default function InstallBanner() {
   const t = useTranslations("installBanner");
+  const tc = useTranslations("common");
   const [platform, setPlatform] = useState<Platform>(null);
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [dismissed, setDismissed] = useState(true); // start hidden to avoid flash
@@ -95,7 +96,7 @@ export default function InstallBanner() {
         </button>
       )}
 
-      <button onClick={dismiss} className="text-foreground-invert opacity-50 hover:opacity-100 flex-shrink-0 mt-0.5">
+      <button onClick={dismiss} aria-label={tc("close")} className="text-foreground-invert opacity-50 hover:opacity-100 flex-shrink-0 mt-0.5">
         <X size={16} />
       </button>
     </div>

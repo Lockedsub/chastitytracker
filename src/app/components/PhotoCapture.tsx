@@ -298,7 +298,7 @@ export default function PhotoCapture({ onFile, uploading, variant = "emerald", c
                     {torchOn ? <FlashlightOff size={18} /> : <Flashlight size={18} />}
                   </button>
                 )}
-                <button type="button" onClick={closeModal} className="text-foreground-faint hover:text-foreground-muted transition p-1">
+                <button type="button" onClick={closeModal} aria-label={t("close")} className="text-foreground-faint hover:text-foreground-muted transition p-1">
                   <X size={20} />
                 </button>
               </div>
