@@ -721,7 +721,15 @@ export function cleaningAt(rules: CleaningPauseRules | undefined, at: Date): Cle
  * Einzeiler den gesamten Mail-/Push-Importgraphen des Kontroll-Services herein.
  */
 export function generateKontrollCode(): string {
-  return String(Math.floor(10000 + Math.random() * 90000));
+  // Web Crypto statt `node:crypto`: utils.ts liegt auch im Client-Bundle. Verwerfungsverfahren, damit
+  // die Verteilung gleichmässig bleibt (2^32 ist kein Vielfaches von 90000).
+  const range = 90000;
+  const limit = 0x100000000 - (0x100000000 % range);
+  const buf = new Uint32Array(1);
+  do {
+    globalThis.crypto.getRandomValues(buf);
+  } while (buf[0] >= limit);
+  return String(10000 + (buf[0] % range));
 }
 
 /** Type-pair definition for pair-building. KG_PAIR is the default; WEAR_PAIR is for

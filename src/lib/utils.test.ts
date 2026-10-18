@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  generateKontrollCode,
   buildPairs,
   buildKgWearPairs,
   wearingHoursFromPairs,
@@ -1068,5 +1069,16 @@ describe("moveToEdge", () => {
   it("gibt die Liste unverändert zurück, wenn der Index danebenliegt", () => {
     expect(moveToEdge(list, -1, "start")).toBe(list);
     expect(moveToEdge(list, 4, "end")).toBe(list);
+  });
+});
+
+describe("generateKontrollCode", () => {
+  it("liefert fünf Ziffern ohne führende Null", () => {
+    for (let i = 0; i < 1000; i++) expect(generateKontrollCode()).toMatch(/^[1-9]\d{4}$/);
+  });
+
+  it("würfelt: 1000 Aufrufe sind nicht alle gleich", () => {
+    const codes = new Set(Array.from({ length: 1000 }, () => generateKontrollCode()));
+    expect(codes.size).toBeGreaterThan(900);
   });
 });
