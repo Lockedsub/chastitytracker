@@ -52,6 +52,7 @@ export default function ErrorScreen(props: Props) {
     </div>
   );
 
+  // Die Hülle ist die von `AuthScreen` (Vorgabewelt, Glow, zentriert) — ändert sich dort der Rand der App, hier mit.
   return props.standalone ? (
     <main data-theme={DEFAULT_WORLD} className="world-glow min-h-screen bg-background text-foreground flex items-center justify-center px-4 py-10">
       {body}

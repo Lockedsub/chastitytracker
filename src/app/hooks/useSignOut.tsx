@@ -35,7 +35,8 @@ export function useSignOut(): { requestSignOut: () => void; signOutDialog: React
       onConfirm={() => {
         setLoading(true);
         clearSwUserCache();
-        void signOut({ callbackUrl: "/login" });
+        // Scheitert die Abmeldung (Netz), darf der Dialog nicht im Ladezustand stehen bleiben.
+        signOut({ callbackUrl: "/login" }).catch(() => setLoading(false));
       }}
     />
   );

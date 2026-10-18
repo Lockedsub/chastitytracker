@@ -233,7 +233,7 @@ function CategoryList({
                 category={c}
                 onEdit={onEdit}
                 onDelete={onDelete}
-                order={{ index: i, count: custom.length, onMove: (dir) => onSwap(c, custom[i + dir]) }}
+                order={custom.length < 2 ? undefined : { index: i, count: custom.length, onMove: (dir) => onSwap(c, custom[i + dir]) }}
               />
             ))}
           </ul>

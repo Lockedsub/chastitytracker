@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
   generateKontrollCode,
   buildPairs,
@@ -1075,6 +1075,15 @@ describe("moveToEdge", () => {
 describe("generateKontrollCode", () => {
   it("liefert fünf Ziffern ohne führende Null", () => {
     for (let i = 0; i < 1000; i++) expect(generateKontrollCode()).toMatch(/^[1-9]\d{4}$/);
+  });
+
+  it("greift nie auf Math.random zurück", () => {
+    const spy = vi.spyOn(Math, "random").mockImplementation(() => { throw new Error("Math.random"); });
+    try {
+      for (let i = 0; i < 100; i++) generateKontrollCode();
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it("würfelt: 1000 Aufrufe sind nicht alle gleich", () => {
