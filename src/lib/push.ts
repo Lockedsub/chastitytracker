@@ -6,7 +6,7 @@ import { apnsProviderToken, resetApnsTokenCache } from "@/lib/apnsAuth";
 
 const plog = (label: string, fields: Record<string, unknown>) => structuredLog("push", label, fields);
 
-/** Zeitlimit EINES Push-Aufrufs an einen externen Dienst (APNs, FCM, Web-Push-Endpunkt). Ein
+/** Zeitlimit EINES Push-Aufrufs an einen externen Dienst (APNs, Web-Push-Endpunkt). Ein
  *  hängender Dienst darf den awaitenden Aufrufer nicht festhalten — dieselben 10 s wie bei Telegram. */
 const PUSH_TIMEOUT_MS = 10_000;
 
@@ -24,10 +24,9 @@ if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
 }
 
 // ---------------------------------------------------------------------------
-// Native push (APNs / FCM) — active only when credentials are configured.
+// Native push (APNs) — active only when credentials are configured.
 //
 // APNs (iOS):  APNS_KEY_PATH + APNS_KEY_ID + APNS_TEAM_ID + APNS_BUNDLE_ID
-// FCM (Android): FCM_SERVER_KEY
 // ---------------------------------------------------------------------------
 
 const APNS_KEY_PATH    = process.env.APNS_KEY_PATH;    // path to .p8 file (local dev)
@@ -35,7 +34,6 @@ const APNS_KEY_CONTENT = process.env.APNS_KEY_CONTENT;  // raw .p8 content (serv
 const APNS_KEY_ID      = process.env.APNS_KEY_ID;
 const APNS_TEAM_ID     = process.env.APNS_TEAM_ID;
 const APNS_BUNDLE_ID   = process.env.APNS_BUNDLE_ID;    // e.g. ch.chastitytracker.app
-const FCM_SERVER_KEY   = process.env.FCM_SERVER_KEY;
 
 /** Der APNs-Schlüssel — aus der ENV oder asynchron von der Platte (nie `readFileSync` im Request-Pfad). */
 async function loadApnsKey(): Promise<string> {
@@ -121,43 +119,6 @@ async function sendApns(token: string, title: string, body: string, url?: string
   }
 }
 
-/** Send via FCM legacy API. */
-async function sendFcm(token: string, title: string, body: string, url?: string): Promise<NativeSendResult> {
-  if (!FCM_SERVER_KEY) {
-    plog("fcm:not_configured", {});
-    return { ok: false, invalid: false };
-  }
-  try {
-    const res = await fetch("https://fcm.googleapis.com/fcm/send", {
-      method: "POST",
-      headers: {
-        "Authorization": `key=${FCM_SERVER_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        to: token,
-        notification: { title, body },
-        data: url ? { url } : undefined,
-        priority: "high",
-      }),
-      signal: AbortSignal.timeout(PUSH_TIMEOUT_MS),
-    });
-    if (!res.ok) {
-      plog("fcm:failed", { status: res.status });
-      return { ok: false, invalid: false }; // HTTP-Fehler = transient → Token behalten
-    }
-    // FCM-Legacy liefert 200 auch bei totem Token; der Grund steht im Body.
-    const json = (await res.json().catch(() => null)) as { results?: { error?: string }[] } | null;
-    const err = json?.results?.[0]?.error ?? "";
-    const invalid = err === "NotRegistered" || err === "InvalidRegistration";
-    if (err) plog("fcm:result_error", { error: err, invalid });
-    return { ok: !err, invalid };
-  } catch (err) {
-    plog("fcm:exception", { error: (err as Error).message });
-    return { ok: false, invalid: false };
-  }
-}
-
 /** Send native push to all registered device tokens for a user. Liefert true, wenn der Nutzer native
  *  Tokens hat (= native App vorhanden) — damit der Aufrufer die parallele Web-Push unterdrücken kann. */
 async function sendNativePushToUser(
@@ -167,7 +128,9 @@ async function sendNativePushToUser(
   url?: string,
   badge?: number
 ): Promise<boolean> {
-  const tokens = await prisma.nativePushToken.findMany({ where: { userId } });
+  // Nur iOS: Alt-Zeilen mit platform "android" (Legacy-FCM, abgeschaltet) werden weder bedient noch
+  // unterdrücken sie die Web-Push. Bewusst nicht gelöscht — kein Datenverlust, kein Schema-Eingriff.
+  const tokens = await prisma.nativePushToken.findMany({ where: { userId, platform: "ios" } });
   plog("native:tokens", { userId, count: tokens.length });
   if (tokens.length === 0) return false;
 
@@ -175,9 +138,7 @@ async function sendNativePushToUser(
 
   await Promise.allSettled(
     tokens.map(async (t) => {
-      const r = t.platform === "ios"
-        ? await sendApns(t.token, title, body, url, badge)
-        : await sendFcm(t.token, title, body, url);
+      const r = await sendApns(t.token, title, body, url, badge);
       plog("native:result", { platform: t.platform, ok: r.ok, invalid: r.invalid });
       // NUR definitiv tote Tokens entfernen — transiente Fehler dürfen den Token nicht vernichten.
       if (r.invalid) invalidIds.push(t.id);
@@ -205,7 +166,7 @@ async function sendNativePushToUser(
  * dem Gerät bliebe es still.
  */
 export async function hasPushTarget(userId: string): Promise<boolean> {
-  if (await prisma.nativePushToken.findFirst({ where: { userId }, select: { id: true } })) return true;
+  if (await prisma.nativePushToken.findFirst({ where: { userId, platform: "ios" }, select: { id: true } })) return true;
   return (await prisma.pushSubscription.findFirst({ where: { userId }, select: { id: true } })) !== null;
 }
 

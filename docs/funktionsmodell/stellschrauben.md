@@ -521,7 +521,7 @@ eigentliche Vollständigkeitsbeweis: ein Feld, das weder oben noch hier steht, g
 | `PushSubscription.createdAt` | Datensatz | Anlage-Zeitpunkt. |
 | `NativePushToken.id` | Identität | Primärschlüssel. |
 | `NativePushToken.userId` | Identität | Eigentümer der Zeile. |
-| `NativePushToken.platform` | Datensatz | `ios` oder `android`. |
+| `NativePushToken.platform` | Datensatz | `ios`; Alt-Zeilen mit `android` werden nicht mehr bedient. |
 | `NativePushToken.token` | Identität | Gerätetoken der nativen App. |
 | `NativePushToken.createdAt` | Datensatz | Anlage-Zeitpunkt. |
 | `NativePushToken.updatedAt` | Laufzeitzustand | Letzte Erneuerung des Tokens. |

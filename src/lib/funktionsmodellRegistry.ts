@@ -1297,7 +1297,7 @@ export const FM_REGISTRY: FmEntry[] = [
   stamp("PushSubscription"),
   pk("NativePushToken"),
   owner("NativePushToken"),
-  x("record", "NativePushToken", "platform", "`ios` oder `android`."),
+  x("record", "NativePushToken", "platform", "`ios`; Alt-Zeilen mit `android` werden nicht mehr bedient."),
   x("identity", "NativePushToken", "token", "Gerätetoken der nativen App."),
   stamp("NativePushToken"),
   x("runtime", "NativePushToken", "updatedAt", "Letzte Erneuerung des Tokens."),

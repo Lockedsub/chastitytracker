@@ -79,6 +79,7 @@
     "ENTRY_NOT_CORRECTABLE": "This entry type cannot be corrected this way.",
     "passwordTooShort": "Password too short (min. {min} characters)",
     "passwordTooLong": "Password too long (max. {max} bytes)",
+    "nativePlatformUnsupported": "Native push is not supported on this platform.",
     "missingFields": "Missing fields",
     "tokenInvalid": "Token invalid or expired",
     "usernameRequired": "Username and password required",

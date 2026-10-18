@@ -40,7 +40,7 @@ const UNREGISTERED_KEYS = new Set<string>([
   "usernameRequired", "usernameLength", "emailInvalid", "usernameTaken", "emailTaken",
   "invalidRole", "cannotDeleteSelf", "lastAdmin", "invalidTimezone", "invalidStartPage", "invalidHideOwnTracker",
   "invalidNoticeVersion",
-  "timeRangeInvalid",
+  "timeRangeInvalid", "nativePlatformUnsupported",
   // Die Dashboard-Konfiguration geht denselben Weg wie die übrigen Selbst-Einstellungen
   // (`userSelfFieldRoute` gibt den Code direkt zurück, kein ServiceResult) — deshalb hier und
   // nicht in SERVICE_ERROR_CODES, und deshalb camelCase wie ihre Geschwister.

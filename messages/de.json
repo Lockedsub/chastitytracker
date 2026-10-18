@@ -80,6 +80,7 @@
     "passwordTooShort": "Passwort zu kurz (min. {min} Zeichen)",
     "passwordTooLong": "Passwort zu lang (max. {max} Bytes)",
     "missingFields": "Fehlende Felder",
+    "nativePlatformUnsupported": "Diese Plattform unterstützt keinen nativen Push.",
     "tokenInvalid": "Token ungültig oder abgelaufen",
     "usernameRequired": "Benutzername und Passwort erforderlich",
     "usernameLength": "Benutzername muss 3–50 Zeichen haben",

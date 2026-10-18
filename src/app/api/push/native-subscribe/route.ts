@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireApi } from "@/lib/authGuards";
 import { prisma } from "@/lib/prisma";
 
-const VALID_PLATFORMS = ["ios", "android"] as const;
-
 export async function POST(req: NextRequest) {
   const session = await requireApi();
   if (session instanceof NextResponse) return session;
@@ -11,8 +9,12 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const { token, platform } = body as { token?: string; platform?: string };
 
-  if (!token || !platform || !VALID_PLATFORMS.includes(platform as (typeof VALID_PLATFORMS)[number])) {
-    return NextResponse.json({ error: "token and platform (ios|android) required" }, { status: 400 });
+  if (!token || !platform) {
+    return NextResponse.json({ error: "token and platform (ios) required" }, { status: 400 });
+  }
+  // Android-Push (Legacy-FCM) wird nicht mehr bedient; eine Registrierung liefe ins Leere.
+  if (platform !== "ios") {
+    return NextResponse.json({ error: "nativePlatformUnsupported" }, { status: 400 });
   }
 
   // M17: Hijack verhindern — gehört dieser Token bereits einem ANDEREN Konto, nicht umhängen.
