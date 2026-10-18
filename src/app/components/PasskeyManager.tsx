@@ -4,7 +4,10 @@ import { useState, useEffect, useCallback } from "react";
 import { Fingerprint, Trash2, Plus, Loader2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { startRegistration } from "@simplewebauthn/browser";
+import ActionModal from "@/app/components/ActionModal";
 import Button from "@/app/components/Button";
+import ConfirmDialog from "@/app/components/ConfirmDialog";
+import Input from "@/app/components/Input";
 import useToast from "@/app/hooks/useToast";
 
 interface PasskeyEntry {
@@ -12,6 +15,40 @@ interface PasskeyEntry {
   deviceName: string | null;
   createdAt: string;
   lastUsedAt: string | null;
+}
+
+/**
+ * Name für den eben angelegten Passkey. Der Schlüssel liegt zu diesem Zeitpunkt schon im Gerät —
+ * Schliessen (Escape, X) heisst deshalb „ohne Namen speichern", wie das leere Feld im früheren
+ * `prompt()`; ein verworfener Dialog liesse einen Passkey im Gerät zurück, den der Server nie kennt.
+ */
+function PasskeyNameDialog({ open, saving, onSubmit }: { open: boolean; saving: boolean; onSubmit: (name: string | null) => void }) {
+  const t = useTranslations("passkey");
+  const [name, setName] = useState("");
+  const submit = (n: string) => onSubmit(n.trim() || null);
+  return (
+    <ActionModal
+      open={open}
+      onClose={() => submit("")}
+      busy={saving}
+      title={t("deviceNameTitle")}
+      icon={<Fingerprint size={20} className="text-foreground-muted" />}
+      iconBg="var(--color-surface-raised)"
+    >
+      <form onSubmit={(e) => { e.preventDefault(); submit(name); }} className="flex flex-col gap-3">
+        <Input
+          label={t("deviceNameLabel")}
+          hint={t("deviceNameHint")}
+          value={name}
+          maxLength={60}
+          autoFocus
+          onChange={(e) => setName(e.target.value)}
+        />
+        <Button type="submit" fullWidth loading={saving}>{t("deviceNameSave")}</Button>
+        <Button variant="ghost" fullWidth disabled={saving} onClick={() => submit("")}>{t("deviceNameSkip")}</Button>
+      </form>
+    </ActionModal>
+  );
 }
 
 /**
@@ -26,6 +63,9 @@ export default function PasskeyManager() {
   const [loading, setLoading] = useState(true);
   const [registering, setRegistering] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  /** Die frisch erzeugte Antwort des Geräts, solange der Nutzer den Namen wählt. */
+  const [pendingCredential, setPendingCredential] = useState<Awaited<ReturnType<typeof startRegistration>> | null>(null);
   const toast = useToast();
 
   useEffect(() => {
@@ -60,24 +100,8 @@ export default function PasskeyManager() {
       const options = await optionsRes.json();
 
       // 2. Create credential with browser/authenticator
-      const credential = await startRegistration(options);
-
-      // 3. Prompt for device name
-      const deviceName = prompt(t("deviceNamePrompt")) || null;
-
-      // 4. Verify and store on server
-      const verifyRes = await fetch("/api/auth/passkey/register", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ response: credential, deviceName }),
-      });
-
-      if (verifyRes.ok) {
-        toast.success(t("registered"));
-        loadPasskeys();
-      } else {
-        toast.error(t("registerFailed"));
-      }
+      // 3. Ask for the device name (dialog), then 4. verify and store — see `finishRegistration`
+      setPendingCredential(await startRegistration(options));
     } catch (err) {
       // User cancelled or error
       if ((err as Error)?.name !== "NotAllowedError") {
@@ -88,8 +112,32 @@ export default function PasskeyManager() {
     }
   }
 
+  async function finishRegistration(deviceName: string | null) {
+    if (!pendingCredential) return;
+    setRegistering(true);
+    try {
+      const verifyRes = await fetch("/api/auth/passkey/register", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ response: pendingCredential, deviceName }),
+      });
+
+      if (verifyRes.ok) {
+        toast.success(t("registered"));
+        loadPasskeys();
+      } else {
+        toast.error(t("registerFailed"));
+      }
+    } catch {
+      toast.error(t("registerFailed"));
+    } finally {
+      setPendingCredential(null);
+      setRegistering(false);
+    }
+  }
+
   async function handleDelete(id: string) {
-    if (!confirm(t("deleteConfirm"))) return;
+    setConfirmDeleteId(null);
     setDeletingId(id);
     try {
       const res = await fetch("/api/auth/passkey/list", {
@@ -154,7 +202,7 @@ export default function PasskeyManager() {
               </div>
               <button
                 type="button"
-                onClick={() => handleDelete(pk.id)}
+                onClick={() => setConfirmDeleteId(pk.id)}
                 disabled={deletingId === pk.id}
                 className="text-foreground-faint hover:text-warn transition-colors p-1 flex-shrink-0"
                 aria-label={t("delete")}
@@ -169,6 +217,17 @@ export default function PasskeyManager() {
           ))}
         </div>
       )}
+      {/* Nur gemountet, solange ein Schlüssel wartet: der Name vom letzten Mal soll nicht im Feld stehen. */}
+      {pendingCredential && <PasskeyNameDialog open saving={registering} onSubmit={finishRegistration} />}
+      <ConfirmDialog
+        open={confirmDeleteId !== null}
+        danger
+        title={t("delete")}
+        message={t("deleteConfirm")}
+        confirmLabel={t("delete")}
+        onConfirm={() => confirmDeleteId && handleDelete(confirmDeleteId)}
+        onCancel={() => setConfirmDeleteId(null)}
+      />
     </div>
   );
 }

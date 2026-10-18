@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import Button from "@/app/components/Button";
+import ConfirmDialog from "@/app/components/ConfirmDialog";
 import FormError from "@/app/components/FormError";
 import { useApiError } from "@/app/hooks/useApiError";
 import { parseApiErrorCode } from "@/lib/apiClient";
@@ -15,9 +16,10 @@ export default function DeleteUserButton({ id, username, isSelf }: { id: string;
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   async function handleDelete() {
-    if (!confirm(t("deleteConfirm", { name: username }))) return;
+    setConfirmOpen(false);
     setSaving(true);
     setError("");
     try {
@@ -42,9 +44,19 @@ export default function DeleteUserButton({ id, username, isSelf }: { id: string;
 
   return (
     <>
-      <Button variant="danger" size="sm" loading={saving} onClick={handleDelete}>
+      <Button variant="danger" size="sm" loading={saving} onClick={() => setConfirmOpen(true)}>
         {t("deleteUser")}
       </Button>
+      {/* Vor dem Abruf schliessen, ohne `loading`: die Fehlerzeile steht direkt unter dem Knopf. */}
+      <ConfirmDialog
+        open={confirmOpen}
+        danger
+        title={t("deleteUser")}
+        message={t("deleteConfirm", { name: username })}
+        confirmLabel={t("deleteUser")}
+        onConfirm={handleDelete}
+        onCancel={() => setConfirmOpen(false)}
+      />
       <FormError message={error} />
     </>
   );

@@ -64,6 +64,10 @@ describe("verbotene Muster", () => {
     expect(body).toMatch(/getRandomValues/);
   });
 
+  it("kein natives confirm()/prompt() — die App-Dialoge (ConfirmDialog, ActionModal) tragen die Rückfragen", () => {
+    expect(scan(SRC, /(^|[^.\w])(window\.)?(confirm|prompt)\(/, { "src/app/components/InstallBanner.tsx": "Deklaration von BeforeInstallPromptEvent.prompt()" })).toEqual([]);
+  });
+
   it("signOut() von next-auth wird nur im Hook useSignOut aufgerufen (Rückfrage + Cache-Leerung)", () => {
     expect(scan(SRC, /\bsignOut\(/, { "src/app/hooks/useSignOut.tsx": "der EINE Weg" })).toEqual([]);
   });
