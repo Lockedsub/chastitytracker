@@ -1,5 +1,25 @@
 [
   {
+    "version": "6.5.5",
+    "date": "2026-10-18",
+    "changes": [
+      {
+        "type": "security",
+        "text": {
+          "de": "Der Code für Foto-Kontrollen wird jetzt kryptografisch zufällig erzeugt.",
+          "en": "The code for photo inspections is now generated with cryptographic randomness."
+        }
+      },
+      {
+        "type": "ui",
+        "text": {
+          "de": "Abmelden fragt überall gleich nach, Löschen und der Passkey-Name nutzen die App-Dialoge, Fehler- und 404-Seiten passen zur App, und Symbol-Knöpfe haben Namen für Screenreader.",
+          "en": "Signing out asks the same way everywhere, deleting and naming a passkey use the app's dialogs, error and 404 pages match the app, and icon buttons have names for screen readers."
+        }
+      }
+    ]
+  },
+  {
     "version": "6.5.4",
     "date": "2026-10-17",
     "changes": [
