@@ -2,13 +2,14 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { Fingerprint, Trash2, Plus, Loader2 } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 import { startRegistration } from "@simplewebauthn/browser";
 import ActionModal from "@/app/components/ActionModal";
 import Button from "@/app/components/Button";
 import ConfirmDialog from "@/app/components/ConfirmDialog";
 import Input from "@/app/components/Input";
 import useToast from "@/app/hooks/useToast";
+import { formatDate, toDateLocale } from "@/lib/utils";
 
 interface PasskeyEntry {
   id: string;
@@ -56,8 +57,9 @@ function PasskeyNameDialog({ open, saving, onSubmit }: { open: boolean; saving: 
  * Shown in the user settings page.
  * Only renders on browsers that support WebAuthn.
  */
-export default function PasskeyManager() {
+export default function PasskeyManager({ timezone }: { timezone: string }) {
   const t = useTranslations("passkey");
+  const dateLocale = toDateLocale(useLocale());
   const [supported, setSupported] = useState(false);
   const [passkeys, setPasskeys] = useState<PasskeyEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -196,8 +198,8 @@ export default function PasskeyManager() {
                   {pk.deviceName || t("unnamedDevice")}
                 </span>
                 <span className="text-[10px] text-foreground-faint">
-                  {t("addedOn", { date: new Date(pk.createdAt).toLocaleDateString() })}
-                  {pk.lastUsedAt && ` · ${t("lastUsed", { date: new Date(pk.lastUsedAt).toLocaleDateString() })}`}
+                  {t("addedOn", { date: formatDate(pk.createdAt, dateLocale, timezone) })}
+                  {pk.lastUsedAt && ` · ${t("lastUsed", { date: formatDate(pk.lastUsedAt, dateLocale, timezone) })}`}
                 </span>
               </div>
               <button

@@ -593,7 +593,7 @@ export default function SettingsForm({ username, email, locale, timezone, startP
       {/* App section */}
       <Section title={t("app")}>
         <div className="divide-y divide-border-subtle">
-          <PasskeyManager />
+          <PasskeyManager timezone={timezone} />
           <InfoRow label={t("version")} value={version} mono />
           <InfoRow label={t("buildDate")} value={buildDate ?? t("buildDateLocal")} />
           {census && <InfoRow label={t("imageOrigin")} value={census.image} mono />}
