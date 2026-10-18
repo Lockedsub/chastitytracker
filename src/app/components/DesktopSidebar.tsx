@@ -7,7 +7,7 @@ import {
   Home, ClipboardList, BarChart2, Plus, LogOut,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { signOut } from "next-auth/react";
+import { useSignOut } from "@/app/hooks/useSignOut";
 import NewEntrySheet, { type NewEntryCategoryRow } from "./NewEntrySheet";
 import ViewTransitionLink from "@/app/components/ViewTransitionLink";
 import useViewTransition from "@/app/hooks/useViewTransition";
@@ -31,6 +31,7 @@ interface Props {
 
 export default function DesktopSidebar({ isAdmin, isKeyholder, isLocked, lockCallPending, version, categoryRows, bildersafe, weight, openInspection }: Props) {
   const t = useTranslations("nav");
+  const { requestSignOut, signOutDialog } = useSignOut();
   const pathname = usePathname();
   // EINMAL für die ganze Seitenleiste — Begründung an der `navigate`-Prop von `ViewTransitionLink`.
   const { navigateWithTransition } = useViewTransition();
@@ -90,7 +91,7 @@ export default function DesktopSidebar({ isAdmin, isKeyholder, isLocked, lockCal
 
         <div className="px-3 py-4 border-t border-nav-border flex-shrink-0 flex flex-col gap-3">
           <button
-            onClick={() => { if (window.confirm(t("signOutConfirm"))) signOut({ callbackUrl: "/login" }); }}
+            onClick={requestSignOut}
             className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-nav-inactive-text hover:bg-surface-raised hover:text-nav-inactive-hover transition-colors w-full text-left"
           >
             <LogOut size={18} strokeWidth={1.5} />
@@ -109,6 +110,7 @@ export default function DesktopSidebar({ isAdmin, isKeyholder, isLocked, lockCal
           </div>
         </div>
       </aside>
+      {signOutDialog}
     </>
   );
 }

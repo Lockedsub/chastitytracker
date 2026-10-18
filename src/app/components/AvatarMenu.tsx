@@ -4,9 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import BlockHeading from "@/app/components/BlockHeading";
 import Link from "next/link";
 import { Settings, LogOut, ScrollText } from "lucide-react";
-import { signOut } from "next-auth/react";
 import { useTranslations } from "next-intl";
-import { clearSwUserCache } from "@/lib/swMessages";
+import { useSignOut } from "@/app/hooks/useSignOut";
 import { LockClosedIcon } from "@/app/components/lockIcons";
 
 interface Props {
@@ -25,6 +24,7 @@ export default function AvatarMenu({ username, settingsHref, theme, version }: P
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const t = useTranslations("nav");
+  const { requestSignOut, signOutDialog } = useSignOut();
 
   useEffect(() => {
     function onClickOutside(e: MouseEvent) {
@@ -80,7 +80,7 @@ export default function AvatarMenu({ username, settingsHref, theme, version }: P
             )}
             <div className="border-t border-border-subtle" />
             <button
-              onClick={() => { setOpen(false); if (window.confirm(t("signOutConfirm"))) { clearSwUserCache(); signOut({ callbackUrl: "/login" }); } }}
+              onClick={() => { setOpen(false); requestSignOut(); }}
               className={itemDanger}
             >
               <LogOut size={16} strokeWidth={1.75} />
@@ -89,6 +89,7 @@ export default function AvatarMenu({ username, settingsHref, theme, version }: P
           </div>
         </>
       )}
+      {signOutDialog}
     </div>
   );
 }

@@ -2,7 +2,7 @@
 
 import { useCallback, useId, useState } from "react";
 import { useRouter } from "next/navigation";
-import { signOut } from "next-auth/react";
+import { useSignOut } from "@/app/hooks/useSignOut";
 import { useTranslations } from "next-intl";
 import { User } from "lucide-react";
 import Section from "@/app/components/Section";
@@ -45,6 +45,7 @@ export default function SettingsForm({ username, email, locale, timezone, startP
   const tc = useTranslations("common");
   const ta = useTranslations("admin");
   const tm = useTranslations("messages");
+  const { requestSignOut, signOutDialog } = useSignOut();
   const apiError = useApiError();
   const switchLocale = useLocaleSwitcher();
   const router = useRouter();
@@ -581,7 +582,7 @@ export default function SettingsForm({ username, email, locale, timezone, startP
           {/* Sign out */}
           <button
             className="w-full flex items-center px-5 py-4 hover:bg-surface-raised transition text-left"
-            onClick={() => { if (window.confirm(t("signOutConfirm"))) signOut({ callbackUrl: "/login" }); }}
+            onClick={requestSignOut}
           >
             <span className="text-sm text-warn font-medium">{t("signOut")}</span>
           </button>
@@ -611,6 +612,7 @@ export default function SettingsForm({ username, email, locale, timezone, startP
         onConfirm={() => { setPwConfirm(false); void submitPassword(); }}
         onCancel={() => setPwConfirm(false)}
       />
+      {signOutDialog}
     </main>
   );
 }

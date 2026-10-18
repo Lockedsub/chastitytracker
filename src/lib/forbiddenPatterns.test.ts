@@ -63,4 +63,8 @@ describe("verbotene Muster", () => {
     expect(body).not.toMatch(/Math\.random/);
     expect(body).toMatch(/getRandomValues/);
   });
+
+  it("signOut() von next-auth wird nur im Hook useSignOut aufgerufen (Rückfrage + Cache-Leerung)", () => {
+    expect(scan(SRC, /\bsignOut\(/, { "src/app/hooks/useSignOut.tsx": "der EINE Weg" })).toEqual([]);
+  });
 });

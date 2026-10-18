@@ -4,7 +4,7 @@ import { useState, useCallback } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { LogOut, Plus, ChevronRight } from "lucide-react";
-import { signOut } from "next-auth/react";
+import { useSignOut } from "@/app/hooks/useSignOut";
 import { useTranslations } from "next-intl";
 import { adminNavItems } from "@/lib/adminNavItems";
 import Sheet from "./Sheet";
@@ -25,6 +25,7 @@ interface Props {
 
 export default function AdminDesktopSidebar({ version, isGlobalAdmin, hideOwnTracker }: Props) {
   const t = useTranslations("adminNav");
+  const { requestSignOut, signOutDialog } = useSignOut();
   const tAdmin = useTranslations("admin");
   const pathname = usePathname();
   const router = useRouter();
@@ -117,7 +118,7 @@ export default function AdminDesktopSidebar({ version, isGlobalAdmin, hideOwnTra
 
         <div className="px-3 py-4 border-t border-nav-border flex-shrink-0 flex flex-col gap-3">
           <button
-            onClick={() => { if (window.confirm(t("signOutConfirm"))) signOut({ callbackUrl: "/login" }); }}
+            onClick={requestSignOut}
             className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-nav-inactive-text hover:bg-surface-raised hover:text-nav-inactive-hover transition-colors w-full text-left"
           >
             <LogOut size={18} strokeWidth={1.5} />
@@ -136,6 +137,7 @@ export default function AdminDesktopSidebar({ version, isGlobalAdmin, hideOwnTra
           </div>
         </div>
       </aside>
+      {signOutDialog}
     </>
   );
 }
